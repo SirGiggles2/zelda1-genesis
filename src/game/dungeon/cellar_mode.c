@@ -2,10 +2,11 @@
  * InitMode_EnterRoom; Z_07 EndGameMode/StepOutside.
  * Drained C: src/oracle/room/room_mode_runtime.c, world_runtime.c;
  * active room_dispatch/world_dispatch/enemy_loop room-entry helpers.
- * Coverage: PARTIAL (mode orchestration and host publication absent).
+ * Coverage: FULL native cellar orchestration and Link visibility boundaries.
  * Stance: EXTEND those helpers; no generic scene warp or return latch. */
 #include "cellar_mode.h"
 #include "platform_abi.h"
+#include "../world/level_info_install.h"
 #include "../room/room_dispatch.h"
 #include "../world/world_dispatch.h"
 #include "../combat/collision_dispatch.h"
@@ -22,7 +23,8 @@ static void end_prepare(void)
 
 unsigned char cellar_try_enter(void)
 {
-    unsigned char i, room, tile, saved;
+    unsigned short i;
+    unsigned char room, tile, saved;
     if (R(0x10)==0 || R(0x12)!=5 || R(0x5A)!=0 || R(0x394)!=0 ||
         (R(0x70)&15)!=0 || (R(0x84)&15)!=13 ||
         (R(0xAC)&0xC0)==0x40) return 0;
@@ -30,9 +32,13 @@ unsigned char cellar_try_enter(void)
     tile=collision_get_collidable_tile_still(0);
     R(0x49E)=saved;
     if (tile<0x70 || tile>=0x74) return 0;
-    for (i=0;i<6;++i) {
+    /* Z_05 CheckWarps increments an 8-bit X through installed RAM,
+     * without stopping at the ten declared cellar entries. L3Q1
+     * resolves its raft cellar through a later palette byte ($0F).
+     * Preserve raw A/B indexing, including $FF candidates; one full
+     * index cycle bounds malformed input without hanging the host. */
+    for (i=0;i<256u;++i) {
         room=R(0x6BB2 + i);
-        if (room>=128) continue;
         if (R(0x687E + room)!=R(0xEB) && R(0x68FE + room)!=R(0xEB)) continue;
         room_save_kill_count_uw();
         R(0x527)=R(0xEB);
@@ -61,7 +67,6 @@ static void subroom_start(void)
 {
     R(0xE9)=0; R(0xEE)=0;
     room_inc_submode();
-    cellar_host_draw();
 }
 
 static void fade(void)
@@ -84,7 +89,7 @@ unsigned char cellar_mode_tick(void)
              * EndGameMode, then AnimateAndDrawLinkBehindBackground ->
              * Link_EndMoveAndAnimate (mode 9 now: AnimateLinkBase). */
             R(0x12)=9; (void)room_end_game_mode();
-            roomrom_combat_animate_link_base();
+            cellar_host_draw(2);
         }
         return 1;
     }
@@ -112,11 +117,13 @@ unsigned char cellar_mode_tick(void)
             if (R(0x84)==0x5D) { R(0xAC)=0; R(0x5A)=1; R(0x11)=1; }
             break;
         }
-        cellar_host_draw(); return 1;
+        /* DrawSpritesBetweenRooms does not draw Link in UW. EnterCellar
+         * also keeps him hidden; only WalkCellar calls UpdatePlayer. */
+        cellar_host_draw(sub==9); return 1;
     }
     if (R(0x12)==0xA && returning) {
         /* The layout's NES frames (k_cellar_return_tl) run no submode. */
-        if (cellar_host_clock_busy()) { cellar_host_draw(); return 1; }
+        if (cellar_host_clock_busy()) { cellar_host_draw(0); return 1; }
         switch(sub) {
         case 0: subroom_start(); break;
         case 1: room_init_mode_a_sub1(); break;
@@ -137,7 +144,7 @@ unsigned char cellar_mode_tick(void)
         case 8: room_set_fade_cycle_and_advance_submode(0x80); fade(); break;
         case 10: room_init_mode_a_sub_a_go_to_mode4(); break;
         }
-        cellar_host_draw(); return 1;
+        cellar_host_draw(0); return 1;
     }
     if (returning && R(0x12)==4) {
         if (!R(0x11)) {
@@ -146,11 +153,12 @@ unsigned char cellar_mode_tick(void)
         } else {
             room_go_to_next_mode_play_level_song();
         }
-        cellar_host_draw(); return 1;
+        cellar_host_draw(0); return 1;
     }
     if (returning && R(0x12)==5 && !R(0x11)) {
         room_init_mode5_play_palette_row7(); R(0x11)=1;
-        cellar_host_draw(); returning=0; return 1;
+        /* InitMode5Play explicitly draws Link after its between-room clear. */
+        cellar_host_draw(1); returning=0; return 1;
     }
     if (R(0x12)!=9 && R(0x12)!=0xA && R(0x12)!=4) returning=0;
     return 0;

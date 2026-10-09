@@ -772,6 +772,12 @@ def main() -> int:
 
     print()
     print(f"Debug built: {ROM_OUT}")
+    # User 2026-10-09: keep the latest playable test copy on hand after
+    # every successful build. Debug.md remains the sole build target.
+    latest = ROOT / "builds" / "playtests" / "Debug-Latest.md"
+    latest.parent.mkdir(parents=True, exist_ok=True)
+    latest.write_bytes(ROM_OUT.read_bytes())
+    print(f"Latest test ROM: {latest}")
     return 0
 
 

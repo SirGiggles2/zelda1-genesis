@@ -45,6 +45,12 @@ extern const unsigned char common_chr[];       /* data/chr/common.c (ROM-extract
  *   Tile 0x104        Heart cursor CHR
  */
 static void fs_init(void) {
+    /* T-204: File Select owns a stationary viewport. Title/story callers
+     * may leave either plane scrolled; keep uploads and the initial draw
+     * hidden until this scene is complete. */
+    render_display_enable(0);
+    render_scene_scroll_set(0, 0);
+
     /* Audio handoff: SongRequest=$08 (LA "Get Item") is fired from
      * intro_start_pressed BEFORE the fade. Jingle is single-phrase and
      * self-silences via song_ended -> music_silence after sq1 hits $00,
@@ -133,6 +139,12 @@ static void fs_init(void) {
 
     /* 6. Music: silent on FS per NES original; call site preserved. */
     music_play(SONG_FS_BIT);
+
+    /* Draw FS_LOAD now, while blanked, rather than exposing the previous
+     * title/story nametable with the new CHR for one host frame. Both the
+     * blocking and frame-driven entry paths use this same initialization. */
+    fs_phase_step();
+    render_display_enable(1);
 }
 
 /* Cursor row indices (matches fs_render_cursor table + fs_phase contract). */
@@ -283,7 +295,6 @@ static void fs_input_dispatch(uint8_t edge) {
 
 void fs_main(void) {
     fs_init();
-    render_display_enable(1);
     for (;;) {
         render_wait_vblank();
         fs_phase_step();
@@ -301,7 +312,6 @@ void fs_main(void) {
  * unaffected. */
 void fs_enter(void) {
     fs_init();
-    render_display_enable(1);
 }
 
 void fs_tick(void) {

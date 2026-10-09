@@ -567,9 +567,14 @@ void roomrom_hud_refresh_marker(unsigned char room_id,
         roomrom_sprites_hide_hud_marker(1u);
         return;
     }
-    roomrom_sprites_set_hud_marker(0u,
-        original_marker_x(room_id, is_underworld),
-        original_marker_y(room_id), 0u);
+    /* Z_01 UpdatePlayerPositionMarker returns in mode9. Cellar layout
+     * hides the old marker; its internal room ID is not a dungeon cell. */
+    if (RAM(0x0012u) == 0x09u)
+        roomrom_sprites_hide_hud_marker(0u);
+    else
+        roomrom_sprites_set_hud_marker(0u,
+            original_marker_x(room_id, is_underworld),
+            original_marker_y(room_id), 0u);
 
     if (is_underworld && room_has_compass()) {
         unsigned char level = (unsigned char)RAM(0x0010u);

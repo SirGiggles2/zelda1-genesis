@@ -44,6 +44,10 @@ static void find_and_create_push_block_object(unsigned char room_id)
     OBJ(0x034Fu, 11u) = 0x68u;   /* Block object type */
 }
 
+/* NES source: Z_05.asm:CreateRoomObjects @Deactivate through @StoreLocation.
+ * Drained C: existing boss_framework_room_init (native replacement).
+ * Coverage: FULL collected-item branch, block initialization and item position.
+ * Stance: EXTEND; collected items suppress only the item, not room mechanics. */
 void boss_framework_room_init(unsigned char room_id)
 {
     unsigned char attrs_e;
@@ -79,10 +83,11 @@ void boss_framework_room_init(unsigned char room_id)
         return;
     }
 
-    /* UW path. Z_05.asm:8166 — if room flag says already taken, skip. */
+    /* UW path. Z_05.asm:8166 jumps to @Deactivate, then still creates
+     * the block and installs item coordinates. RoomItemId is retained. */
     if (progress_get_room_flag_uw_item_state() != 0u) {
         BOSS_ROOM_ITEM_STATE = 0xFFu;
-        return;
+        goto create_block;
     }
 
     /* Z_05.asm:8176-8183 — pull room item from LBA_E low 5 bits. */
@@ -107,6 +112,7 @@ void boss_framework_room_init(unsigned char room_id)
         BOSS_ROOM_ITEM_STATE = 0xFFu;
     }
 
+create_block:
     /* Z_05.asm:8200-8203 — a room with a push block (LBA_D bit 6)
      * creates the block object in slot 11: FindAndCreatePushBlockObject
      * (Z_05.asm:5461). T-013: room $42 of L1 has one. */
@@ -121,7 +127,7 @@ void boss_framework_room_init(unsigned char room_id)
     y  = (unsigned char)(xy & 0xFFu);
 
     /* Z_05.asm:8211-8222 — triforce piece shifts left 8 px. */
-    if ((unsigned char)(attrs_e & BOSS_LBA_E_ITEM_MASK) ==
+    if ((unsigned char)(DUNGEON_LBA_E(room_id) & BOSS_LBA_E_ITEM_MASK) ==
         BOSS_ITEM_ID_TRIFORCE_PIECE) {
         x = (unsigned char)(x - BOSS_LBA_E_TRIFORCE_X_OFFSET);
     }

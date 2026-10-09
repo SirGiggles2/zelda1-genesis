@@ -368,9 +368,11 @@ static void blue_wizzrobe_try_shooting(unsigned int slot)
         }
         return;
     }
-    /* Same square column? */
+    /* NES BlueWizzrobe_CheckSquareColumn masks only the monster X.
+     * Link must be exactly on that column boundary; masking Link too
+     * incorrectly permits vertical shots while he is between columns. */
     if (((unsigned char)WIZ_X(slot) & 0xF0u) !=
-        ((unsigned char)WIZ_LINK_X & 0xF0u)) return;
+        (unsigned char)WIZ_LINK_X) return;
     unsigned char a = 0x08u;
     if ((unsigned char)WIZ_Y(slot) < (unsigned char)WIZ_LINK_Y) {
         a >>= 1;

@@ -374,7 +374,8 @@ int debug_main_after_a4(bool hardReset)
                  * hands to gameplay. */
                 render_mode_set_v32();
                 render_window_v_set(0u);
-                render_display_enable(1);
+                render_display_enable(0);
+                audio_music_play(0u);  /* NES menu-to-load silence */
 
                 /* NES QuestNumbers: 0 = first quest, 1 = second. Needed
                  * before entry because level data installs per quest. */
@@ -403,7 +404,14 @@ int debug_main_after_a4(bool hardReset)
                 (void) save_game_load_slot(g_fs_handoff_slot);
                 link_color_after_profile();
 
-                audio_music_play(0x01);  /* SONG_OW — FS exits to overworld */
+                /* T-241: restore the selected profile before the existing
+                 * InitMode3/Unfurl path. NES Z_05 InitMode3_Sub8 loads
+                 * StartRoomId; Z_07 UpdateMode3Unfurl starts the level song
+                 * after the center-out reveal. Mode 3 keeps input locked. */
+                RAM(0x0012u) = 0x03u;
+                RAM(0x0013u) = 0u;
+                RAM(0x0011u) = 0u;
+                RAM(0x0028u) = 0u;
             }
         }
         else

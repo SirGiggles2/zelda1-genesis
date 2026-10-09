@@ -1,4 +1,10 @@
 /* inventory_render.c — see header.
+ * NES: Z_05.asm UpdateMenuCommon1, UpdateMenuScrollDown/Up; live T-242
+ *      captures show one moving menu/HUD/room strip, never two menu images.
+ * Drained: save_menu_runtime.c savert_update_menu_scroll_common; retained
+ *      menu ownership/selection and native adapter's VBlank transfer path.
+ * Coverage: PARTIAL; scroll composition and boundaries, not full menu timing.
+ * Stance: EXTEND the renderer with a frozen strip; no RoomRom edits.
  *
  * V1 layout: simple text + slot grid. Renders entire Plane A as one
  * static frame on subscreen-enter. NES reference is row-by-row scroll
@@ -906,20 +912,17 @@ void inventory_subscreen_enter(void)
      * item sprites that use them appear only once the menu settles. */
     s_icons_pending = 1u;
 
-    /* V2.4k (2026-05-26): NES Z1 inventory subscreen renders HUD strip
-     * at BOTTOM (vs gameplay HUD at top). Swap Window plane position +
-     * shift HUD tile writes to bottom-of-plane. roomrom_hud_set_bottom_mode
-     * handles redraw at new position. */
-    {
-        extern void roomrom_hud_set_bottom_mode(unsigned char bottom);
-        roomrom_hud_set_bottom_mode(1u);
-    }
-
     /* H scroll onto the menu's plane slot (both planes). The old reset
      * wrote control $7C000003 = VRAM $FC00, not the H scroll table $F000,
      * so it never took effect (harmless while the menu used column 0). */
     s_col_base = roomrom_main_menu_col_base();
-    roomrom_main_set_hscroll(s_col_base ? -256 : 0);
+    {
+        unsigned short room_col, room_row;
+        roomrom_main_nt_cell_to_plane(0u, 8u, &room_col, &room_row);
+        render_pause_scene_deferred(s_col_base, room_col, room_row);
+    }
+    /* The adapter publishes scroll/window with the copied strip in VBlank.
+     * Switching now exposes the previous pause's cells for one frame. */
 
     /* Hide all sprites during scroll-in (so frozen gameplay sprites
      * don't render over partially-built subscreen). */
@@ -965,7 +968,7 @@ void inventory_subscreen_enter(void)
         s_menu_rows_pending = MENU_ROWS_FIRST_VISIBLE;
     }
     s_vscroll = (short)SCROLL_VSCROLL_TOP;     /* menu off-screen above */
-    set_subscreen_vscroll(s_vscroll);
+    /* Scroll is published with render_pause_scene_deferred, above. */
 
     /* Start scroll-in: tick ramps VSRAM 174 -> 0 (menu slides down). */
     s_active       = 1u;
@@ -1025,14 +1028,12 @@ void inventory_subscreen_exit(void)
     /* Trigger scroll-out — tick clears rows N..0 over ~28 frames. */
     s_scroll_state = SCROLL_OUT;
     s_scroll_row   = SCROLL_TOTAL_ROWS;  /* clear from bottom up */
+    /* NES hides inventory sprites before scrolling back to the room. */
+    sat_write(0u, 0u, 0u, 0u, 0u, 0u);
     /* s_active stays 1 until scroll completes; tick deactivates + signals
      * main.c to call load_room. */
 
-    /* V2.4k (2026-05-26): restore HUD to TOP for gameplay. */
-    {
-        extern void roomrom_hud_set_bottom_mode(unsigned char bottom);
-        roomrom_hud_set_bottom_mode(0u);
-    }
+    /* The status bar stays in the scrolling strip until the room returns. */
 }
 
 /* NES UpdateMenuActive (MenuState 7 UW / 8 OW): the menu is down and
@@ -1050,6 +1051,7 @@ void inventory_subscreen_abort(void)
     s_active = 0u;
     s_scroll_state = SCROLL_IDLE;
     roomrom_hud_set_bottom_mode(0u);
+    render_set_window_on_top(7u);
 }
 
 /* Query: is scroll-out done (so main.c knows to call load_room)? */
@@ -1088,6 +1090,7 @@ void inventory_subscreen_tick(unsigned char joy_state)
              * The plane is already V64 (gameplay default) — do NOT toggle to
              * V32 here (that left gameplay in the wrong plane mode). */
             set_subscreen_vscroll(0);
+            render_set_window_on_top(7u);
             s_scroll_state = SCROLL_IDLE;
             s_active = 0u;
             /* Clear ALL 80 SAT slots so no stale item/cursor sprite ghosts
@@ -1103,7 +1106,7 @@ void inventory_subscreen_tick(unsigned char joy_state)
                 }
             }
         } else {
-            render_vscroll_set((unsigned short)s_vscroll);
+            set_subscreen_vscroll(s_vscroll);
         }
         return;
     }

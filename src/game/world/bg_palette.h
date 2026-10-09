@@ -70,6 +70,8 @@
 
 unsigned short roomrom_bg_palette_nes_to_cram(unsigned char nes_color);
 void roomrom_bg_palette_load_palram_full(const unsigned char *palram32);
+/* Preserve the scene's BG colors while installing native sprite palettes. */
+void roomrom_bg_palette_load_sprite_only(const unsigned char *palram32);
 void roomrom_bg_palette_load_bg_only(const unsigned char *palram16);
 /* Rewrite PAL1 color 1 (NES $3F11, Link's tunic) from the level palette
  * byte $6B92. For load paths that set the save's ring after the room

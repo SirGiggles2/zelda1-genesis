@@ -12,6 +12,7 @@ void cellar_host_walk(void);
 void cellar_host_prepare(void);
 void cellar_host_return_layout(void);
 unsigned char cellar_host_clock_busy(void);
-void cellar_host_draw(void);
+/* 0: hidden between UW rooms, 1: walking, 2: final stairs update behind BG. */
+void cellar_host_draw(unsigned char link_draw);
 
 #endif

@@ -176,6 +176,10 @@
 /* T-187: common BG ladder $6F and brick $FA, biased to sub-pal2. */
 #define ROOMROM_CELLAR_BG_TILE_BASE 1316u
 #define ROOMROM_CELLAR_BG_TILE_COUNT 2u
+/* T-229: common compass $6A/$6B must survive scene/boss CHR swaps.
+ * The legacy atlas's named compass entry is $2E/$2F, unrelated art. */
+#define ROOMROM_COMPASS_TILE_BASE 1318u
+#define ROOMROM_COMPASS_TILE_COUNT 2u
 /* T-011: Link lifting an item, NES common sprite pair $78/$79 (8x16). Its
  * SPR_TILE_BASE+$78 copy lies inside the SCENE_OBJ overlay (SPR+44) and
  * holds enemy art in play. The 1376..1440 gap was unused in OW / cave /

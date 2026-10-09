@@ -421,10 +421,12 @@ void roomrom_sprites_load_palette(void)
  * pixels lower in the overworld (CurLevel 0, caves included) and in
  * cellars (GameMode 9); normal dungeon rooms use ObjY as is. Lockstep OW
  * captures: NES OAM Y = ObjY + 2 (t050_pond_fairy $AD/$AF, newgame
- * $5D/$5F). Genesis cellars run in mode 5, so ask the cellar table. */
+ * $5D/$5F). Native cellars use mode 9; retain the legacy metadata
+ * fallback for direct scene fixtures, but do not require declared-list
+ * membership for a controller-earned cellar (T-221 L3 raft). */
 static short link_draw_y(short y)
 {
-    if (nes_ram[0x0010u] == 0u ||
+    if (nes_ram[0x0010u] == 0u || nes_ram[0x0012u] == 9u ||
         roomrom_uw_room_is_cellar(roomrom_uw_room_render_get_level(),
                                   roomrom_uw_room_render_get_quest(),
                                   nes_ram[0x00EBu]))
@@ -1186,6 +1188,25 @@ void roomrom_sprites_clear_explosion(void)
                       ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_EXPLOSION));  /* link to slot 7 — keeps slots 7/8 in chain */
 }
 
+
+/* NES source: Z_05 InitMode6/ResetInvObjState; Z_07 DrawSpritesBetweenRooms.
+ * Drained C: ow_scroll_tick and room_dispatch room_hide_all_sprites.
+ * Coverage: PARTIAL (native fixed SAT and weapon-cache publication).
+ * Stance: EXTEND the existing native sprite owner, no gameplay state. */
+void roomrom_sprites_hide_transition_items(void)
+{
+    roomrom_sprites_clear_sword();
+    roomrom_sprites_clear_boomerang();
+    roomrom_sprites_clear_arrow();
+    roomrom_sprites_clear_bomb();
+    roomrom_sprites_clear_explosion();
+    roomrom_sprites_clear_candle_fire();
+    roomrom_sprites_clear_room_item();
+    enemy_render_weapon_reset(0x0Eu);
+    enemy_render_weapon_reset(0x10u);
+    enemy_render_weapon_reset(0x11u);
+    enemy_render_weapon_reset(0x13u);
+}
 
 /* Phase P (2026-05-18) fairy spark renderer.
  * NES Z_04.asm:11508 DrawFairy — 2-frame flicker (F0/F1) every 4

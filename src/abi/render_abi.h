@@ -103,6 +103,9 @@ void render_window_move_deferred(unsigned short src_row, unsigned short dst_row,
                                  unsigned short rows, unsigned char bottom,
                                  unsigned short win_rows);
 void render_set_window_on_bottom(unsigned short rows);
+/* Stage the paused HUD and visible room beneath the menu at next VBlank. */
+void render_pause_scene_deferred(unsigned short menu_col,
+                                 unsigned short room_col, unsigned short room_row);
 
 /* Phase 12.2 SGDK-1 cleanup: VRAM word read. Used by src/game/dungeon/
  * uw_render for plane-readback during scroll diffs. Wraps the
@@ -383,3 +386,6 @@ void render_dma_stats_reset(void);   /* zero peak + total + current */
 void render_dma_stats_frame_end(void); /* roll current into peak, reset current */
 
 #endif /* RENDER_ABI_H */
+
+/* Restore both gameplay planes and the fixed HUD together at VBlank. */
+void render_menu_restore_deferred(short horizontal, short vertical, unsigned short window_rows);

@@ -107,6 +107,9 @@ def main():
     spec = json.loads((ROOT/"tools/lockstep/presets/newgame.json").read_text())
     session.write_save(presets.build(spec)["gen_slot0"])
     session.enter_fs()
+    # File Select now uses mode 3/4 before play. Let InitMode5 and the
+    # first play audio dispatch finish before staging a pickup request.
+    session.press('', 2)
     g = session.g
     baseline = g.save_state()
     timing = json.loads((ROOT/"build/nes_music/capture.json").read_text())["songs"]

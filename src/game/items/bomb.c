@@ -172,9 +172,10 @@ static void bomb_check_wall(unsigned char x)
 {
     signed char y;
     if (nes_ram[NES_CUR_LEVEL] == 0u) return;   /* OW: tile objects own it */
-    /* NES skips cellars by GameMode $09; Genesis cellars run in mode $05,
-     * so ask the cellar table directly. */
-    if (roomrom_uw_room_is_cellar(roomrom_uw_room_render_get_level(),
+    /* NES skips mode $09 cellars. Native controller entry uses that
+     * mode too; metadata alone misses L3Q1's out-of-list raft cellar.
+     * Keep the legacy direct-scene fixture fallback. */
+    if (nes_ram[0x0012u] == 9u || roomrom_uw_room_is_cellar(roomrom_uw_room_render_get_level(),
                                   roomrom_uw_room_render_get_quest(),
                                   nes_ram[NES_CUR_ROOM_ID])) return;
     for (y = 3; y >= 0; --y) {

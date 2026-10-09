@@ -190,6 +190,34 @@ unsigned char level_info_ow_start_room(void)
     return rooms_overworld[BLOB_OW_LEVELINFO_OFF + (0x6BADu - NES_LEVEL_INFO_BASE)];
 }
 
+/* NES source: Z_06 UpdateMode2Load_Full; Z_05 CheckWarps.
+ * Drained C: existing installer below and cellar_mode.c:cellar_try_enter.
+ * Coverage: PARTIAL (read-only metadata consumers previously used L1 tables).
+ * Stance: EXTEND the installed-record owner without a second state copy. */
+const unsigned char *level_info_uw_attributes(unsigned char level,
+                                               unsigned char quest)
+{
+    if (level == 0u || level > 9u || quest == 0u || quest > 2u) return 0;
+    return &rooms_dungeons[(quest == 2u ? 2u * BLOB_UW_BLOCK_BYTES : 0u) +
+                           (level <= 6u ? 0u : BLOB_UW_BLOCK_BYTES)];
+}
+
+const unsigned char *level_info_uw_cellars(unsigned char level,
+                                           unsigned char quest)
+{
+    unsigned int src, k;
+    if (level_info_uw_attributes(level, quest) == 0) return 0;
+    if (quest == 1u)
+        return &rooms_dungeons[BLOB_UW_LEVELINFO_BASE +
+                              (unsigned int)(level - 1u) * BLOB_UW_LEVELINFO_STRIDE +
+                              0x34u];
+    src = ROOMROM_UW_Q2_LI_REPL_BASE_OFF;
+    for (k = 1u; k < level; ++k)
+        src += rooms_dungeons[ROOMROM_UW_Q2_LI_REPL_SIZES_OFF + k - 1u];
+    /* Cellar array $6BB2 lies eleven bytes after Q2 patch destination $6BA7. */
+    return &rooms_dungeons[src + (0x6BB2u - ROOMROM_UW_Q2_LI_PATCH_DEST)];
+}
+
 void level_info_apply_q2_patch(unsigned char level)
 {
     /* NES: LDY Sizes-1,X / @loop LDA ($00),Y / STA $6BA7,Y / DEY / BPL.
@@ -212,18 +240,9 @@ void level_info_install_uw(unsigned char level, unsigned char quest)
      *   L1-L6 Q2 = block 2 (offset 1536)
      *   L7-L9 Q2 = block 3 (offset 2304)
      * level: 1..9, quest: 1 or 2. Clamp out-of-range to L1Q1. */
-    unsigned int block_off;
     if (level == 0u || level > 9u) level = 1u;
     if (quest == 0u || quest > 2u) quest = 1u;
-
-    if (quest == 1u) {
-        block_off = (level <= 6u) ? 0u : BLOB_UW_BLOCK_BYTES;
-    } else {
-        block_off = (level <= 6u) ? (2u * BLOB_UW_BLOCK_BYTES)
-                                  : (3u * BLOB_UW_BLOCK_BYTES);
-    }
-    copy_to_nes_ram(NES_LBA_A_BASE,
-                    &rooms_dungeons[block_off],
+    copy_to_nes_ram(NES_LBA_A_BASE, level_info_uw_attributes(level, quest),
                     NES_LBA_BLOCK_BYTES);
 
     /* LevelInfoUW<level> at base 3072 + (level-1)*256. */
@@ -261,8 +280,7 @@ void level_info_mode2_step(unsigned char step, unsigned char level,
     if (step == 0u) {
         const unsigned char *src = &rooms_overworld[BLOB_OW_LEVELBLOCK_OFF];
         if (level != 0u && level <= 9u)
-            src = &rooms_dungeons[(q2 ? 2u * BLOB_UW_BLOCK_BYTES : 0u) +
-                                  (level <= 6u ? 0u : BLOB_UW_BLOCK_BYTES)];
+            src = level_info_uw_attributes(level, q2 ? 2u : 1u);
         if (lba_differs(src, (unsigned char)(q2 && level == 0u))) lba_changed();
         copy_to_nes_ram(NES_LBA_A_BASE, src, NES_LBA_BLOCK_BYTES);
     } else if (step == 1u) {

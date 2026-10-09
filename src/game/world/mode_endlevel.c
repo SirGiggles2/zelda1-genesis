@@ -105,13 +105,18 @@ static void sub3(void)
 {
     if (M12_OBJ_TIMER_LINK != 0u) return;
     {
-        /* UpdateWorldCurtainEffect copies the (blank) tile-map columns
-         * [ObjX+13] and [ObjX+12] to the screen, then moves them inward. */
+        /* NES source: Z_05 CopyColumnToTileBuf subtracts one from CurColumn.
+         * Drained C: room_transfer_runtime.c / room_copy_column_to_tilebuf.
+         * Coverage: PARTIAL native curtain publication; Stance: EXTEND.
+         * ObjX+13/+12 are 1-based transfer columns; the native hook takes
+         * screen tile columns 0..31. Preserve the original state/timing. */
         unsigned char dec = M12_CURTAIN_DEC_COL, inc = M12_CURTAIN_INC_COL;
         progress_update_world_curtain_effect();
         if (M12_CURTAIN_DEC_COL != dec) {
-            if (inc < 32u) roomrom_mode12_blank_column(inc);
-            if (dec < 32u) roomrom_mode12_blank_column(dec);
+            if (inc != 0u && inc <= 32u)
+                roomrom_mode12_blank_column((unsigned char)(inc - 1u));
+            if (dec != 0u && dec <= 32u)
+                roomrom_mode12_blank_column((unsigned char)(dec - 1u));
         }
     }
     if (M12_CURTAIN_DEC_COL >= 0x11u) return;

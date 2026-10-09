@@ -17,6 +17,13 @@
 #ifndef LEVEL_INFO_INSTALL_H
 #define LEVEL_INFO_INSTALL_H
 
+/* Read-only views of the same ROM records used by the installer. Invalid
+ * level/quest returns NULL; no active-state installation or cache mutation. */
+#define LEVEL_INFO_UW_CELLAR_COUNT 10u
+const unsigned char *level_info_uw_attributes(unsigned char level,
+                                               unsigned char quest);
+const unsigned char *level_info_uw_cellars(unsigned char level,
+                                           unsigned char quest);
 void level_info_install_ow(void);
 unsigned char level_info_ow_start_room(void);
 void level_info_install_uw(unsigned char level, unsigned char quest);

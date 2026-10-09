@@ -38,6 +38,10 @@ void roomrom_sprites_upload_items_chr(void);
 unsigned char roomrom_sprites_item_chr_variant(void);
 void roomrom_sprites_load_palette(void);  /* call after every load_room() */
 void roomrom_sprites_invalidate_cache(void);
+/* InitMode6/DrawSpritesBetweenRooms: retire outgoing weapon and room-item
+ * presentation only. Link/HUD and authoritative object state stay owned
+ * by the scroll state machine; its normal sweep publishes the empty cache. */
+void roomrom_sprites_hide_transition_items(void);
 void roomrom_sprites_spawn_link(short x, short y);
 /* Original gameplay status-map dots; coordinates are Genesis screen pixels.
  * The compass marker's inactive palette uses the biased $3E icon. */

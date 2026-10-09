@@ -27,6 +27,7 @@
 #include "../dungeon/uw_dark.h"          /* uw_dark_is_dark_room */
 #include "../room/room_dispatch.h"       /* room_save_kill_count_uw/_ow */
 #include "render/ow_render.h"             /* roomrom_ow_room_render_prepare_layout */
+#include "render/sprite_render.h"         /* transition item presentation */
 #include "../options/options_consumer.h" /* options_consumer_get_room_scroll */
 #include "../options/options_state.h"    /* OPTIONS_SCROLL_SMOOTH */
 
@@ -190,6 +191,10 @@ unsigned char ow_scroll_tick(short *x, short *y)
             room_reset_player_state();   /* ResetPlayerState: ObjState, InvClock */
             nes_ram[0x64u] = 0u;  /* LadderSlot */
             for (i = 13u; i < 19u; ++i) nes_ram[0xACu + i] = 0u;
+            /* DrawSpritesBetweenRooms hides the outgoing weapons/items.
+             * Their native SAT/cache must retire with ResetInvObjState:
+             * weapon updates do not run again until the new room plays. */
+            roomrom_sprites_hide_transition_items();
             if (uw) {
                 /* InitMode6: hide sprites; a false wall plays the secret
                  * tune; false and bombable walls leave Link $28 px to walk

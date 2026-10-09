@@ -223,19 +223,52 @@ def settle_and_capture(nes, target, wait_for_ganon=False):
     return MAX_SETTLE_FRAMES, None, None, None
 
 
-def required_rooms(level: int, quest: int, manifest: dict) -> list[int]:
+def required_rooms(level: int, quest: int, manifest: dict, rom_id: str = "orig") -> list[int]:
     """Rooms the traversal-derived list omits but the game reaches: the
     boss and Triforce rooms, and in level 9 each Patra room plus every room
     a Patra-room door leads to (formerly tools/builder/inject_boss_rooms.py,
     which synthesized them; here they are captured like any other room)."""
     rooms = {int(manifest[k], 0) for k in ("boss_room_id", "triforce_room_id")
              if manifest.get(k) is not None}
-    if level != 9:
+    if level != 9 and rom_id != "orig":
         return sorted(rooms)
     sys.path.insert(0, str(ROOT / "tools" / "builder"))
     import extract_uw_collision as X  # noqa: PLC0415
     data = X.parse_dungeons_c(ROOT / "data" / "rooms" / "dungeons.c")
     tables, _ = X.load_manifest(ROOT / "data" / "rooms" / "MANIFEST.json")
+    if rom_id == "orig":
+        # T-243: traversal manifests omit reachable rooms (displayed Q2 L5 $01/$02).
+        # NES LevelInfo/AttrsA-D own start, reward, cellar endpoints and doors.
+        from collections import deque
+        li_off, li_size = tables[f"LevelInfoUW{level}"]
+        li = list(data[li_off:li_off + li_size])
+        if quest == 2:
+            patch_off, patch_size = tables[f"LevelInfoUWQ2Replacements{level}"]
+            li[0x29:0x29 + patch_size + 1] = data[patch_off:patch_off + patch_size + 1]
+        off = tables[f"LevelBlock{'UW1' if level <= 6 else 'UW2'}Q{quest}"][0]
+        cellars = {r for r in li[0x34:0x3e] if r < 128}
+        rooms.update(r for r in (li[0x2f], li[0x30], li[0x3e]) if r < 128)
+        for c in cellars:
+            rooms.update((data[off + c], data[off + 128 + c]))
+        if level == 9:
+            rooms.update(r for r in range(128) if
+                ((data[off + 256 + r] & 63) | ((data[off + 384 + r] & 128) >> 1)) in (0x47, 0x48))
+        seen = set()
+        queue = deque(sorted(r for r in rooms if 0 <= r < 128 and r not in cellars))
+        while queue:
+            r = queue.popleft()
+            if r in seen or r in cellars:
+                continue
+            seen.add(r)
+            a, b = data[off + r], data[off + 128 + r]
+            for door, delta in (((a >> 5) & 7, -16), ((a >> 2) & 7, 16),
+                                ((b >> 2) & 7, 1), ((b >> 5) & 7, -1)):
+                dest = r + delta
+                if door == 1 or not 0 <= dest < 128 or (abs(delta) == 1 and r // 16 != dest // 16):
+                    continue
+                if dest not in seen and dest not in cellars:
+                    queue.append(dest)
+        return sorted(seen)
     off = tables[f"LevelBlockUW2Q{quest}"][0]
     for room in range(128):
         enemy = (data[off + 0x100 + room] & 0x3F) | ((data[off + 0x180 + room] & 0x80) >> 1)
@@ -265,7 +298,7 @@ def dump_level(rom: bytes, rom_id: str, level: int, quest: int) -> dict:
     for lv in (range(1, 7) if level <= 6 else range(7, 10)):
         other = ROOT / "RoomRom" / "data" / f"uw_level{lv}_quest{quest}_rooms.json"
         covered.update(int(x, 16) for x in json.loads(other.read_text(encoding="utf-8"))["rooms"])
-    rooms += [r for r in required_rooms(level, quest, manifest) if r not in covered]
+    rooms += [r for r in required_rooms(level, quest, manifest, rom_id) if r not in covered]
     nes = Nes(rom)
     out = {"system_id": "NES", "boot_ok": False, "warp_ok": False, "rom": rom_id,
            "map_name": "nesemu", "level": level, "quest": quest,

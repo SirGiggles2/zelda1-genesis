@@ -36,6 +36,14 @@ static void load_slot16(unsigned char gen_slot, const unsigned char *nes16)
 
 void roomrom_bg_palette_load_palram_full(const unsigned char *palram32)
 {
+    load_slot16(0, palram32);
+    roomrom_bg_palette_load_sprite_only(palram32);
+}
+
+/* T-165: UpdateMenuCommon1 retains the active background palette. Reuse
+ * the established sprite palette/cache owner without touching PAL0. */
+void roomrom_bg_palette_load_sprite_only(const unsigned char *palram32)
+{
     /* CRAM load — Phase B target layout (see src/game/world/bg_palette.h
      * for the full architectural rationale + sword-beam migration).
      *
@@ -66,7 +74,6 @@ void roomrom_bg_palette_load_palram_full(const unsigned char *palram32)
     for (i = 0; i < 16; i++) spr[i] = palram32[16 + i];
     if (nes_ram[LEVEL_PALETTE_LINK_COLOR] != 0u)
         spr[1] = nes_ram[LEVEL_PALETTE_LINK_COLOR];
-    load_slot16(0, palram32 + 0);
     load_slot16(1, spr);
     /* Cache the 16 sprite-palram CRAM words. Retained for the beam
      * pal-cycle path (which reads sub-pal CRAM words to validate PAL2/3

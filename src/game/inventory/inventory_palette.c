@@ -76,5 +76,8 @@ void inventory_palette_load_subscreen(unsigned char uw, unsigned char level,
     if (!uw)                             p = k_inventory_subscreen_palram;
     else if (level >= 1u && level <= 9u) p = k_inventory_uw_palram_lv[level];
     else                                 p = k_inventory_uw_palram;  /* fallback L1 */
-    roomrom_bg_palette_load_palram_full(p);
+    /* Z_05 UpdateMenuCommon1 transfers menu tiles/attributes while NES
+     * PALRAM stays unchanged. The visible scene may be a white cellar,
+     * cave or a room with a different palette than the level default. */
+    roomrom_bg_palette_load_sprite_only(p);
 }

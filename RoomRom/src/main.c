@@ -331,6 +331,7 @@ static u8             s_lvl_timer = 0u;
 static u8             s_lvl_enter_only = 0u;
 static u8             s_lvl_init = 0u;       /* InitMode10 frame pending */
 static u8             s_lvl_load_pending = 0u;  /* T-171: mode 2 entered, load next tick */
+static u8             s_curtain_song_pending = 0u; /* start after final plane transfer */
 static u8             s_lvl_display_pending = 0u; /* T-171: display on at the curtain */
 static u8             s_lvl_exiting = 0u;    /* curtain leads to StepOutside */
 static u8             s_lvl_entrance_tile = 0u; /* UndergroundEntranceTile */
@@ -514,11 +515,11 @@ static void clear_room_scroll_gutters_on_plane(u8 plane)
     render_plane_clear_full_rows(plane ? 1u : 0u, bottom_row, bottom_rows, full_width);
 }
 
-static void clear_hud_underlay_for_row_base(u8 row_base)
+static void clear_hud_underlay_for_slot(u8 row_base, u8 slot_x)
 {
     u16 rows_left = (u16)ROOMROM_HUD_ROWS;
     u16 row = row_base;
-    const u16 col = s_active_slot_x ? ROOMROM_SLOT_TILES : 0u;
+    const u16 col = slot_x ? ROOMROM_SLOT_TILES : 0u;
 
     /* Window tile color 0 is transparent, so the shared scroll surface under
      * the HUD must be black at the active row base. Fixed rows 0..6 are not
@@ -530,6 +531,11 @@ static void clear_hud_underlay_for_row_base(u8 row_base)
         rows_left = (u16)(rows_left - chunk);
         row = 0u;
     }
+}
+
+static void clear_hud_underlay_for_row_base(u8 row_base)
+{
+    clear_hud_underlay_for_slot(row_base, s_active_slot_x);
 }
 
 static void set_bg_scroll(short h_scroll, short v_scroll)
@@ -613,6 +619,9 @@ static void draw_link_pending(void)
 {
     if (!s_link_draw_pending) return;
     s_link_draw_pending = 0u;
+    /* CheckSubroom installs the return coordinates after drawing Link.
+     * Keep that cellar frame; InitModeA hides him on the next tick. */
+    if (nes_ram[0x0012u]==0xAu && !nes_ram[0x0011u] && !nes_ram[0x0013u]) return;
     if (s_cave_load_blank) return;
     if (nes_ram[0x04F0u] != 0u)
         roomrom_sprites_set_link_hurt_pose(players[0].x, players[0].y,
@@ -1418,6 +1427,11 @@ static void init_video(void)
  * Stance: EXTEND. Refresh on both direct load and scrolling entry. */
 static void refresh_room_metadata(u8 room_id)
 {
+    /* NES InitMode_EnterRoom / CreateRoomObjects replaces room-item
+     * ownership at entry. The native slot19 draw cache is separate from
+     * the legacy fixed sprite below; clear both before the new scene's
+     * first sweep (T-210: collected Triforce survived on the overworld). */
+    enemy_render_weapon_reset(0x13u);
     if (s_scene == SCENE_UW) {
         u8 lvl = roomrom_uw_room_render_get_level();
         u8 q = roomrom_uw_room_render_get_quest();
@@ -1715,7 +1729,7 @@ void roomrom_main_apply_warp_outcome(const rr_warp_outcome_t *out)
     s_warp_defer_enter_room = 0u;
     /* Cave exit is still Mode $0A here. NES resumes OW music only when
      * StepOutside finishes; audio_dispatch_tick owns that edge. */
-    if (s_lvl_phase != LVL_CAVE_EXIT)
+    if (s_lvl_phase != LVL_CAVE_EXIT && s_lvl_phase != LVL_MODE3_INIT)
         audio_music_play((s_scene == SCENE_UW) ? 0x40 : 0x01);
 
     /* Phase C (2026-05-24) â€” UET state per NES dispatch (Z_01.asm:2990,
@@ -1754,6 +1768,7 @@ unsigned char roomrom_main_current_scene(void)
  * the menu replaced; nothing is redrawn (load_room drew the overworld
  * room over a cave: s_room_id is the OW room there). */
 static u16 s_pause_cram[64];
+static render_sprite_entry_t s_pause_sat[80];
 
 unsigned char roomrom_main_menu_col_base(void)
 {
@@ -1761,6 +1776,11 @@ unsigned char roomrom_main_menu_col_base(void)
      * the cave fill always uses columns 0-31. */
     const u16 room_col = (u16)((-(s16)s_active_scroll_x) >> 3) & 63u;
     return (unsigned char)((room_col & 32u) ^ 32u);
+}
+
+unsigned char roomrom_main_menu_room_row_base(void)
+{
+    return (unsigned char)(((unsigned short)s_active_scroll_y >> 3) & 63u);
 }
 
 void roomrom_main_set_hscroll(short h)
@@ -1772,13 +1792,18 @@ void roomrom_main_set_hscroll(short h)
 static void pause_cram_save(void)
 {
     s_b_blank_col = 0xFFu;      /* the menu draws in the other slot */
+    /* Menu DMA uses the same native SAT cache. Preserve its gameplay
+     * links as well as the picture, then restore them at the handoff. */
+    memcpy(s_pause_sat, g_render_sat_cache, sizeof(s_pause_sat));
     render_cram_read(s_pause_cram, 64u);        /* intended colors */
 }
 
 static void pause_restore_room(void)
 {
+    memcpy(g_render_sat_cache, s_pause_sat, sizeof(s_pause_sat));
+    VDP_updateSprites(80u, DMA_QUEUE);
     render_cram_subrange_upload(0u, s_pause_cram, 64u);
-    set_bg_scroll(s_active_scroll_x, s_active_scroll_y);
+    render_menu_restore_deferred(s_active_scroll_x, s_active_scroll_y, ROOMROM_HUD_ROWS);
 }
 
 /* Plane cell showing NES name-table cell (col, nt_row) of the current
@@ -2540,6 +2565,11 @@ static void edge_load_or_clamp(void)
         }
         if (want == SCROLL_H_RIGHT || want == SCROLL_H_LEFT) {
             u8 target_slot_x = (u8)(s_active_slot_x ^ 1u);
+            /* NES status-bar black stays fixed through room scrolling.
+             * After pause + vertical scroll this offscreen slot can still
+             * contain saved room rows behind the transparent HUD (T-210).
+             * Clear only its HUD zone before the horizontal camera sees it. */
+            clear_hud_underlay_for_slot(s_active_row_base, target_slot_x);
             s_b_blank_col = 0xFFu;       /* the other slot takes the room */
             /* H scroll within the active plane: render incoming into the
              * OTHER slot (cols 0..31 vs 32..63) and slide that plane. */
@@ -2874,6 +2904,10 @@ static void mode12_draw_lift(void)
     enemy_render_weapon_reset(0x13u);
     draw_animate_item_object(nes_ram[0x0505u], 0x13u);
     nes_ram[0x0340u] = saved_cur;
+    /* T-219: the item writer fills slot19's native draw cache. Publish
+     * it before Link, as normal play does; otherwise the old ground
+     * sprite remains in SAT throughout the end-level fanfare. */
+    enemy_render_native_sweep();
     roomrom_sprites_set_link_lift(players[0].x, players[0].y,
                                   (unsigned char)(nes_ram[0x0052u] != 0u));
 }
@@ -2941,7 +2975,6 @@ static void roomrom_mode11_draw(void)
 void roomrom_mode12_begin(void)
 {
     enemy_render_reset_oam();                  /* HideObjectSprites */
-    enemy_render_native_sweep();
     mode12_draw_lift();
     VDP_updateSprites(80u, DMA_QUEUE);
 }
@@ -3565,15 +3598,36 @@ void cellar_host_walk(void)
     nes_ram[0x0084u]=(u8)players[0].y;
     nes_ram[0x0394u]=(u8)s_link_grid_offset;
     nes_ram[0x03A8u]=s_link_pos_frac;
+    /* Link_EndMoveAndAnimate @TruncGridOffset also runs in mode 9. */
+    if ((nes_ram[0x0394u]&7u)==0u) {
+        nes_ram[0x0394u]=0u; s_link_grid_offset=0;
+    }
     roomrom_combat_end_move_and_animate();
 }
 
-void cellar_host_draw(void)
+/* NES source: Z_05 DrawLinkBetweenRooms/InitMode9; Z_07
+ * DrawSpritesBetweenRooms/Link_EndMoveAndAnimateBetweenRooms.
+ * Drained C: cellar_mode_tick and existing Link renderer.
+ * Coverage: FULL cellar transition visibility; movement remains native.
+ * Stance: EXTEND, publish only Link draws requested by the native mode. */
+void cellar_host_draw(unsigned char link_draw)
 {
     roomrom_main_link_sync_from_nes();
     enemy_render_reset_oam(); enemy_render_native_sweep();
     roomrom_hud_draw(roomrom_uw_room_render_get_map(),s_room_id,1u);
-    level_entry_draw_link();
+    if (link_draw) {
+        if (link_draw==2u) roomrom_combat_end_move_and_animate();
+        level_entry_draw_link();
+        if (link_draw==2u) {
+            g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK].attribut &= 0x7FFFu;
+            g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK_R].attribut &= 0x7FFFu;
+        }
+    } else {
+        VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_LINK,-32,-32,
+            RENDER_SPRITE_SIZE(1,2),0u,ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_LINK));
+        VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_LINK_R,-32,-32,
+            RENDER_SPRITE_SIZE(1,2),0u,ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_LINK_R));
+    }
     VDP_updateSprites(80u,DMA_QUEUE);
 }
 
@@ -3718,6 +3772,7 @@ static void level_entry_tick(void)
             }
             roomrom_hud_b_item_update();          /* DrawSpritesBetweenRooms */
             level_entry_draw_link();
+            nes_ram[0x0011u] = 1u;
             VDP_updateSprites(ROOMROM_SPRITE_SLOT_ENEMY_FIRST, DMA_QUEUE);
             return;                     /* InitMode4 has its own frame */
         }
@@ -3887,6 +3942,14 @@ stepped_out:
     /* GoToNextModePlayLevelSong: mode 4 submode 0, the NES walk-in. */
     s_lvl_phase = LVL_NONE;
     s_lvl_enter_only = 1u;
+    /* T-241: drained roommd_go_to_next_mode_play_level_song, matching
+     * Z_07 UpdateMode3Unfurl. Publish SongRequest on the last column
+     * pair; waiting for play_finish would start it after mode 4. */
+    room_go_to_next_mode_play_level_song();
+    /* XGM_startPlay can span a VBlank. Keep it after the final columns'
+     * transfer rather than letting the audio ISR delay that transfer. */
+    s_curtain_song_pending = nes_ram[0x0600u];
+    nes_ram[0x0600u] = 0u;
     ow_scroll_begin_enter(0x08u);
     s_scroll_start_x = s_active_scroll_x;
     s_scroll_start_y = s_active_scroll_y;
@@ -3898,6 +3961,22 @@ void roomrom_debug_enter(void)
 {
     unsigned char saved_options[OPTIONS_STATE_SIZE];
     unsigned int saved_options_len;
+
+    /* T-226: this entry runs again after Save/ending returns to File Select.
+     * NES Z_02 UpdateMode1Menu_Sub1 selects the OW before loading the chosen
+     * profile; InitMode3 uses its StartRoomId when CaveSourceRoomId is $FF.
+     * C static initializers only handled the first boot, leaving the old
+     * dungeon scene/room (and transition state) alive on the second entry.
+     * Reuse the native scene-switch reset before installing the OW data;
+     * quest and the selected save remain owned by the caller/serializer. */
+    roomrom_state_reset_for_scene_switch();
+    s_scene = SCENE_OW;
+    s_mode = MODE_WALK;
+    s_lvl_phase = LVL_NONE;
+    s_lvl_enter_only = s_lvl_init = s_lvl_exiting = 0u;
+    s_cave_load_blank = 0u;
+    s_b_blank_col = 0xFFu;
+    s_hud_b_key_valid = 0u;
 
     /* Phase 9 Task 9.4 â€” load options from SRAM (or defaults) and apply
      * game-start option-driven seeds (start hearts, bomb cap) BEFORE
@@ -3943,14 +4022,17 @@ void roomrom_debug_enter(void)
      * mode_stub() every frame -> no Mode-5 Play body fired -> Link
      * input + transition logic never ran.
      *
-     * Set GameMode = 5 (Mode 5 Play) per NES Z_07.asm:1613
-     * UpdateMode_JumpTable. GameSubmode = 0 to enter sub-state 0. */
-    nes_ram[0x0012u] = 0x05u;
+     * The debug entry starts Mode 5; the File Select entry below starts
+     * Mode 3 so it can unfurl before play. */
+    /* T-241: publish load mode throughout a real File Select startup;
+     * do not advertise play while its graphics/profile are still loading.
+     * The debug chord retains its direct-play entry. */
+    nes_ram[0x0012u] = g_debug_session ? 0x05u : 0x03u;
     nes_ram[0x0013u] = 0x00u;
     /* Play is running (InitMode5Play done): IsUpdatingMode 1, as on the
      * NES from the first play frame (tick-0 residue $0011 NES 01 GEN 00; a
      * staged save then ran InitModeD, save_roundtrip t130). */
-    nes_ram[0x0011u] = 0x01u;
+    nes_ram[0x0011u] = g_debug_session ? 0x01u : 0u;
     /* CaveSourceRoomId $FF: the NES menu (Z_02.asm:2577) sets it so mode 3
      * puts Link at StartRoomId (tick-0 residue NES FF GEN 00; a Continue
      * then loaded room $00, t013_continue t214). */
@@ -3993,6 +4075,7 @@ void roomrom_debug_enter(void)
     } else {
         nes_ram[0x0010u] = 0u;  /* CurLevel = 0 (OW) */
         level_info_install_ow();
+        s_room_id = nes_ram[0x6BADu];  /* installed OW StartRoomId */
     }
     /* 2026-05-17 â€” level_info_install_* RESTORED. Prior "CRASH FIX"
      * removal was overcautious: A4=$FF8000 is in SGDK heap free-pool
@@ -4261,7 +4344,11 @@ static unsigned char play_update_objects(void)
      * no Link_EndMoveAndAnimate, so no CheckWarps (T-171: the whirlwind
      * carries a halted Link across the screen; t171_flute_whirlwind t290
      * recorded UndergroundEntranceTile on the way). */
+    /* CheckWarps keeps the exit latch until Link completes a tile step.
+     * The native cave shortcut must obey the same gate as dungeon entry;
+     * otherwise an idle Link on the exit pad immediately descends again. */
     if (s_scene == SCENE_OW && gate_pass &&
+        nes_ram[0x005Au] == 0u && s_link_grid_offset == 0 &&
         (nes_ram[0x00ACu] & 0xC0u) != 0x40u) {
         /* @CheckWarps keeps ObjCollidedTile across CheckWarps (PHA/PLA). */
         const u8 coll_saved = nes_ram[0x049Eu];
@@ -4602,6 +4689,11 @@ void roomrom_debug_tick(void)
         while (vtimer == s_tick_vtimer) { /* SGDK volatile V-Int counter. */ }
         SYS_doVBlankProcessEx(ON_VBLANK);
         render_plane_defer_flush();   /* T-172: last tick's transfer cells (NMI) */
+        if (s_curtain_song_pending) {
+            u8 song = s_curtain_song_pending;
+            s_curtain_song_pending = 0u;
+            audio_music_play(song);
+        }
         roomrom_hud_play_flush();     /* T-172: last play tick's status bar */
         state_dump_poll(STATE_DUMP_CTX_GAME);   /* A+B+C+Start: freeze + dump */
         if (s_arch_restore_ticks && --s_arch_restore_ticks == 0u)
@@ -5036,6 +5128,13 @@ void roomrom_debug_tick(void)
         }
         nes_pad2_read();
 
+        /* NES source: Z_07.asm:UpdateMode5Play @CheckMenu.
+         * Drained C: existing inventory_subscreen_tick + pause owner.
+         * Coverage: PARTIAL (T-165 weapons ran before the menu gate).
+         * Stance: EXTEND this required host input handoff. Keep pad polling,
+         * Start and menu navigation; skip gameplay/debug actions while paused. */
+        if (roomrom_pause_is_active()) goto handle_pause_start;
+
         /* SCENE_CAVE harness: tick the native cave gamemode each frame.
          * C+START exit chord hands off to cave_fade sequencer. Other
          * input (D-pad movement, bare-START pause/inventory) falls
@@ -5271,6 +5370,9 @@ void roomrom_debug_tick(void)
          * swing so Link snaps to the swing pose for COMBAT_EXTEND_FRAMES. */
         /* T-131: NES Link_HandleInput filters A/B and the input
          * directions at the room border first (Link_FilterInput). */
+        /* T-225: Z_05 Link_HandleInput samples idle once before A then B.
+         * A can change $AC; that must not cancel B from the same input. */
+        const unsigned char input_was_idle = (nes_ram[0x00ACu] == 0u);
         link_filter_input();
         if ((nes_ram[0x00F8u] & 0x80u) && !roomrom_combat_link_locked()) {
             roomrom_combat_try_swing(players[0].face, players[0].x, players[0].y);
@@ -5286,7 +5388,7 @@ void roomrom_debug_tick(void)
             s_b_item = (b_item_t)nxt;
         }
         /* T-116: Link_HandleInput reads A/B only while Link is idle ($AC 0). */
-        if ((nes_ram[0x00F8u] & 0x40u) && nes_ram[0x00ACu] == 0u) {
+        if ((nes_ram[0x00F8u] & 0x40u) && input_was_idle) {
             /* T-092: NES WieldItem uses SelectedItemSlot ($656), which the
              * pause subscreen sets; the debug Z cycle only overrides it in a
              * debug session. */
@@ -5359,6 +5461,7 @@ void roomrom_debug_tick(void)
             return;
         }
 
+    handle_pause_start:
         /* Task 6.10.1: bare START edge-press = NES Select-equivalent.
          * Toggles voluntary pause when no other button is held. All
          * START-with-modifier handlers already returned above, so a
@@ -5407,7 +5510,14 @@ void roomrom_debug_tick(void)
          * (drives scroll state machine + input). */
         if (roomrom_pause_is_active()) {
             if (inventory_subscreen_scrolled_out()) {
-                /* Should not happen â€” paused but scroll-out done. Defensive. */
+                /* NES source: Z_05.asm:UpdateMenuScrollUp returns after
+                 * clearing MenuState; BeginUpdateWorld runs next tick.
+                 * Drained C: inventory_subscreen_scrolled_out handoff.
+                 * Coverage: PARTIAL (T-165 resumed on the closing tick).
+                 * Stance: EXTEND the existing completion boundary. */
+                roomrom_pause_toggle_voluntary();
+                pause_restore_room();
+                return;
             }
             inventory_subscreen_tick((unsigned char)(joy & 0x00FFu));
             /* UpdateMenuActive (Z_05.asm): after the submenu draw and
@@ -5425,12 +5535,6 @@ void roomrom_debug_tick(void)
                 nes_ram[0x0604u] = 0x80u;              /* SilenceSound */
                 nes_ram[0x0603u] = 0x80u;
                 return;
-            }
-            if (inventory_subscreen_scrolled_out()) {
-                /* Scroll-out animation just finished â€” drop pause flag,
-                 * reload room to restore gameplay BG. */
-                roomrom_pause_toggle_voluntary();
-                pause_restore_room();
             }
             return;
         }

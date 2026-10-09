@@ -342,6 +342,23 @@ static const unsigned char k_cloud_chr_subpal1[6 * 32] = {
 static unsigned char s_cloud_chr_uploaded = 0u;
 static unsigned char s_spark_chr_uploaded = 0u;
 extern const unsigned char common_chr[];
+static unsigned char s_compass_chr_uploaded;
+
+/* NES source: Z_01.asm:Anim_ItemFrameOffsets/Anim_ItemFrameTiles (slot $10).
+ * Drained C: draw_dispatch.c item tables + translate_tile.
+ * Coverage: FULL compass item publication; its common copy was overwritten.
+ * Stance: EXTEND the existing protected common-pattern residency owner.
+ * Live L4/L6 OAM selects $6A/$6B; both pairs match ROM-derived common_chr.
+ * Preserve attrs (including the mirrored right half) and palette routing. */
+static void ensure_compass_chr(void)
+{
+    if (!s_compass_chr_uploaded) {
+        render_chr_upload((unsigned short)(ROOMROM_COMPASS_TILE_BASE * 32u),
+                          common_chr + 0x6Au * 32u,
+                          ROOMROM_COMPASS_TILE_COUNT * 32u);
+        s_compass_chr_uploaded = 1u;
+    }
+}
 
 /* PAL1[13..15] contains NES sprite sub-pal 3. Bias only opaque ROM-derived
  * pixels; tile index zero must stay transparent. */
@@ -1017,6 +1034,10 @@ static inline unsigned short translate_tile(unsigned char nes_tile,
                                 (unsigned short)nes_tile);
     }
     if (nes_attrs & ITEM_ATTR_MARKER) {
+        if (nes_tile == 0x6Au || nes_tile == 0x6Bu) {
+            ensure_compass_chr();
+            return (unsigned short)(ROOMROM_COMPASS_TILE_BASE + nes_tile - 0x6Au);
+        }
         /* T-195: Original Magical Shield is the narrow $56/$57 pair,
          * not atlas sword_diag $48. Falling through to SPR_BASE+$56
          * selects scene-bank enemy art after a room load. */

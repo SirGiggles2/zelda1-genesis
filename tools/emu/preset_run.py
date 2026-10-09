@@ -102,7 +102,9 @@ class Session:
         if not hasattr(self, "_elf"):
             import subprocess
             elf = ROOT / "build" / "debug_project" / "out" / "Debug.out"
-            out = subprocess.run(["m68k-linux-gnu-nm", str(elf)], capture_output=True, text=True).stdout
+            import os
+            nm = ROOT / "sgdk/bin/nm.exe" if os.name == "nt" else "m68k-linux-gnu-nm"
+            out = subprocess.run([str(nm), str(elf)], capture_output=True, text=True, check=True).stdout
             self._elf = {p[2]: int(p[0], 16) for p in (l.split() for l in out.splitlines()) if len(p) == 3}
         return 0xFF0000 | (self._elf[name] & 0xFFFF)
 

@@ -269,6 +269,7 @@ unsigned int room_check_secret_trigger_all_dead(void);
 unsigned int room_check_secret_trigger_last_boss(void);
 unsigned int room_check_secret_trigger_money_or_life(void);
 unsigned int room_check_secret_trigger_block_door(void);
+unsigned int room_check_secret_trigger_block_stairs(void);
 unsigned int room_check_secret_trigger_ringleader(void);
 unsigned int room_check_secret_trigger_block_stairs(void);
 void room_check_underworld_secrets(void);   /* Z_05 CheckUnderworldSecrets */

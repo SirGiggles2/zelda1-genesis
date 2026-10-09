@@ -419,11 +419,21 @@ static void plane_word_now(unsigned short addr, unsigned short word)
 
 static void window_move_flush(void);
 static unsigned char s_wm_pending;
+static void pause_scene_flush(void);
+static unsigned char s_ps_pending;
+static unsigned char s_menu_restore_pending;
+static unsigned short s_menu_restore_rows;
+static unsigned short s_ps_col, s_ps_room_col, s_ps_room_row;
 
 void render_plane_defer_flush(void)
 {
     unsigned char i;
     if (s_wm_pending) window_move_flush();
+    if (s_ps_pending) pause_scene_flush();
+    if (s_menu_restore_pending) {
+        s_menu_restore_pending = 0u;
+        VDP_setWindowOnTop(s_menu_restore_rows);
+    }
     for (i = 0u; i < s_pd_count; ++i) plane_word_now(s_pd_addr[i], s_pd_word[i]);
     s_pd_count = 0u;
 }
@@ -614,6 +624,54 @@ void render_set_window_on_top(unsigned short rows)
 void render_set_window_on_bottom(unsigned short rows)
 {
     VDP_setWindowOnBottom(rows);
+}
+
+/* Keep scroll and fixed-window restoration at the same VBlank boundary. */
+void render_menu_restore_deferred(short horizontal, short vertical, unsigned short window_rows)
+{
+    VDP_setHorizontalScrollVSync(BG_A, horizontal);
+    VDP_setHorizontalScrollVSync(BG_B, horizontal);
+    VDP_setVerticalScrollVSync(BG_A, vertical);
+    VDP_setVerticalScrollVSync(BG_B, vertical);
+    s_menu_restore_rows = window_rows;
+    s_menu_restore_pending = 1u;
+}
+
+void render_pause_scene_deferred(unsigned short menu_col,
+                                 unsigned short room_col, unsigned short room_row)
+{
+    s_ps_col = menu_col;
+    s_ps_room_col = room_col;
+    s_ps_room_row = room_row;
+    s_ps_pending = 1u;
+}
+
+/* NES Z_05 UpdateMenuScrollDown/Up move one continuous nametable strip:
+ * menu, status bar, then the frozen room. Copy the existing rendered cells
+ * rather than reconstructing the room (which would lose cave text/doors).
+ * Both background planes share this strip; Window must not cover it. */
+static void pause_scene_flush(void)
+{
+    unsigned short row;
+    const unsigned short dst = (unsigned short)(PLANE_A_BASE + s_ps_col * 2u);
+    SYS_disableInts();
+    for (row = 0u; row < 28u; ++row) {
+        const unsigned short src = row < 7u
+            ? (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u)
+            : (unsigned short)(PLANE_A_BASE +
+                ((s_ps_room_row + row - 7u) & 63u) * 128u + s_ps_room_col * 2u);
+        DMA_doVRamCopy(src, (unsigned short)(dst + (22u + row) * 128u), 64u, 1);
+        DMA_waitCompletion();
+    }
+    render_set_autoinc_word();
+    VDP_setWindowOnTop(0u);
+    VDP_setHorizontalScroll(BG_A, s_ps_col ? -256 : 0);
+    VDP_setHorizontalScroll(BG_B, s_ps_col ? -256 : 0);
+    VDP_CTRL_LONG = 0x40000010UL;
+    VDP_DATA_WORD = 174u;
+    VDP_DATA_WORD = 174u;
+    s_ps_pending = 0u;
+    SYS_enableInts();
 }
 
 static unsigned char s_wm_pending;
