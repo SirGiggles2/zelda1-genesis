@@ -138,7 +138,7 @@ This port stands on a lot of other people's work. Thank you, all of you.
 
 **This port**
 
-- **SirGiggles2** — maintainer, director and play-tester.
+- **SirGiggles** — Dude who slammed his fists at the keyboard till Claude did what he wanted, and playtested it to DEATH.
 - **Anthropic's Claude** and **OpenAI's Codex** — most of the code (see below).
 
 ## AI disclosure
