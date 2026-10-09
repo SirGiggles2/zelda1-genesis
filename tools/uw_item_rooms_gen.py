@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate RoomRom/data/uw_item_rooms.{c,h} from NES ground truth.
+"""Generate engine/data/uw_item_rooms.{c,h} from NES ground truth.
 
 NES rule (Z_05.asm:8169-8222):
   RoomItemId = LevelBlockAttrsE[room] & $1F
@@ -17,7 +17,7 @@ the trigger so future slices can wire CheckSecretTrigger reveal logic.
 The `active_at_spawn` flag distinguishes immediate-spawn from
 trigger-gated.
 
-Per RoomRom/tools/uw_reachability.py:81 SHORTCUT_REL = 0x05 (offset
+Per engine/tools/uw_reachability.py:81 SHORTCUT_REL = 0x05 (offset
 relative to FoeCounts anchor within LevelInfo block). Per
 data/rooms/dungeons_offsets.h ROOMROM_UW_LEVELINFO_FOE_COUNTS_OFFSET[].
 
@@ -46,8 +46,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DUNGEONS_C = REPO / "data" / "rooms" / "dungeons.c"
-OUT_C = REPO / "RoomRom" / "data" / "uw_item_rooms.c"
-OUT_H = REPO / "RoomRom" / "data" / "uw_item_rooms.h"
+OUT_C = REPO / "engine" / "data" / "uw_item_rooms.c"
+OUT_H = REPO / "engine" / "data" / "uw_item_rooms.h"
 
 LEVELBLOCK_BASES = {
     (1, 1): 0x0000, (2, 1): 0x0300,

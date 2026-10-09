@@ -1,7 +1,7 @@
 #ifndef ROOMROM_COMBAT_H
 #define ROOMROM_COMBAT_H
 
-/* RoomRom S7 v4: sword swing.
+/* engine S7 v4: sword swing.
  *
  * NES Z1 reference (reference/aldonunez/Z_05.asm WieldSword + Z_07.asm
  * UpdateSwordOrRod + PlayerToWeaponOffsetsX/Y at Z_07:4337):

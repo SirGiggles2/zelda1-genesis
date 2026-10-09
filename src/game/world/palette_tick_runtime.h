@@ -1,13 +1,13 @@
 #ifndef ROOMROM_PALETTE_TICK_H
 #define ROOMROM_PALETTE_TICK_H
 
-/* Phase 2.6.5: NES frame-cadence palette toggle framework for RoomRom.
+/* Phase 2.6.5: NES frame-cadence palette toggle framework for engine.
  *
  * Substrate: palette_state.h + palette_tick.c (substrate, compiled into
- * RoomRom per build.bat step 3). Pure C, no SGDK API calls.
+ * engine per build.bat step 3). Pure C, no SGDK API calls.
  *
- * RoomRom Phase 2 toggle inventory (see docs/audit/palette_toggle_inventory.md):
- *   intro_item_flash_8f  — Debug.md scope; not wired here.
+ * engine Phase 2 toggle inventory (see docs/audit/palette_toggle_inventory.md):
+ *   intro_item_flash_8f  — Zelda.md scope; not wired here.
  *   link_hit_invuln      — sprite suppression (roomrom_sprites.c), NOT palette.
  *   low_health_flash     — audio beep only in NES Z_07; no palette toggle.
  *   boss_aquamentus      — (InvTimer & 3) XOR 3 per-sprite attr; Phase 8 scope.

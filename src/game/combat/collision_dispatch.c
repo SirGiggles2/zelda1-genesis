@@ -1,7 +1,7 @@
 /* collision_dispatch.c — native collision subsystem dispatch (Phase 4).
  *
  * Drain MATCH per drain in src/oracle/combat/collision_runtime.c
- * (verified-by-use; in production via Debug.md gameplay).
+ * (verified-by-use; in production via Zelda.md gameplay).
  */
 
 #include "collision_dispatch.h"

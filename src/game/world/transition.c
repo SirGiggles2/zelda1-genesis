@@ -1,4 +1,4 @@
-/* RoomRom warp coordinator implementation (Task 5.4).
+/* engine warp coordinator implementation (Task 5.4).
  *
  * NES source authority:
  *   reference/aldonunez/Z_05.asm:CheckWarps   (line 7213)
@@ -17,14 +17,14 @@
 #include "../combat/collision_dispatch.h"   /* GetCollidableTileStill (T-128) */
 #include "transition.h"
 #include "platform_abi.h"  /* nes_ram for audio cell writes */
-#include "../../../RoomRom/src/roomrom_main_state.h"
+#include "../../../engine/src/engine_state.h"
 #include "ow_meta.h"
 #include "level_info_install.h"
 #include "render/ow_render.h"     /* Phase 12.2 promoted */
 #include "../dungeon/uw_render.h"  /* Phase 12.2 promoted */
 #include "../dungeon/cellar_mode.h"
 #include "../dungeon/cellar_meta.h"  /* Phase 12.2 promoted */
-#include "../../../RoomRom/data/levelinfo_start_rooms.h"
+#include "../../../engine/data/levelinfo_start_rooms.h"
 #include "../world/render/sprite_render.h"  /* LINK_FACE_* enum */
 
 /* Canonical UW Level 1 entrance spawn — matches the debug-entry

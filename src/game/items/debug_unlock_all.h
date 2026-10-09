@@ -1,11 +1,9 @@
-/* debug_unlock_all.h — Debug.md helper to populate g_inventory with every
+/* debug_unlock_all.h — Zelda.md helper to populate g_inventory with every
  * item maxed out. Lets the inventory subscreen render a fully-populated
  * view without playing through Z1 to collect items.
  *
- * Wired into the gameplay-entry path (src/debug/a4_probe_main.c) so it
- * fires once when the user transitions from title to gameplay via the
- * A+B+C (Quest 1) or X+Y+Z (Quest 2) chord. Both run the same current
- * gameplay runtime as File Select, which never calls this debug profile.
+ * Retained for developer tooling. Title input never calls this profile;
+ * File Select starts a normal saved/new-game session.
  */
 #ifndef DEBUG_UNLOCK_ALL_H
 #define DEBUG_UNLOCK_ALL_H

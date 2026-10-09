@@ -21,7 +21,7 @@
  *         column < $11; ObjTimer $80.
  *   Sub4  after ObjTimer, EndGameMode12 -> GameMode 2 (level exit load).
  * The Genesis side (Link lifting the triforce, the blank curtain
- * columns, the exit load) is drawn/run by RoomRom/src/main.c hooks.
+ * columns, the exit load) is drawn/run by engine/src/main.c hooks.
  */
 
 #include "platform_abi.h"
@@ -47,7 +47,7 @@
 #define M12_CUR_PPU_MASK_2001  RAM(0x00FEu)
 
 
-/* Genesis presentation / flow hooks (RoomRom/src/main.c). */
+/* Genesis presentation / flow hooks (engine/src/main.c). */
 extern void roomrom_mode12_begin(void);                 /* InitMode12 visuals */
 extern void roomrom_mode12_draw(void);                  /* DrawLinkLiftingItem */
 extern void roomrom_mode12_blank_column(unsigned char col);

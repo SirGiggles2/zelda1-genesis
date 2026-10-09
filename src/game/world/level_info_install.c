@@ -52,7 +52,7 @@
 #include "level_info_install.h"
 #include "platform_abi.h"
 #include "../../../data/rooms/dungeons_offsets.h"
-#include "../../../RoomRom/src/roomrom_main_state.h"  /* roomrom_main_current_quest */
+#include "../../../engine/src/engine_state.h"  /* roomrom_main_current_quest */
 
 extern const unsigned char rooms_overworld[];
 extern const unsigned char rooms_dungeons[];

@@ -10,11 +10,11 @@
  * at $3F00 (handled by NES PPU; we replicate via PALETTE_UBG_INDEX).
  *
  * Genesis CRAM is 64 word entries (4 PAL banks x 16 colors). The cached
- * Genesis colors are produced by nes_to_cram (RoomRom roomrom_bg_palette
+ * Genesis colors are produced by nes_to_cram (engine roomrom_bg_palette
  * already defines the canonical conversion).
  *
  * NOT yet wired to consumers — this header establishes the typed shape.
- * Wiring lands as RoomRom palette modules promote (Phase 12).
+ * Wiring lands as engine palette modules promote (Phase 12).
  */
 
 #ifndef PALETTE_STATE_H
@@ -44,7 +44,7 @@ typedef struct PaletteState {
     uint8_t  nes_palram[PALETTE_PALRAM_BYTES];
 
     /* Genesis CRAM cache — 64 words from the most recent conversion of
-     * nes_palram. Layout follows the canonical RoomRom mapping
+     * nes_palram. Layout follows the canonical engine mapping
      * (roomrom_bg_palette_load_palram_full). */
     uint16_t cram_cache[PALETTE_CRAM_TOTAL_COLORS];
 
@@ -145,8 +145,8 @@ typedef struct palette_toggle_t {
  *   the existing palette path on next render.
  *
  * Implementation lives in `src/state/palette_tick.c` (substrate, main
- * worktree per Rule WT-1). Both RoomRom (gameplay toggles: low-health,
- * boss flash, hit-invuln) and Debug.md frontend (intro item flash) call
+ * worktree per Rule WT-1). Both engine (gameplay toggles: low-health,
+ * boss flash, hit-invuln) and Zelda.md frontend (intro item flash) call
  * palette_tick from their per-frame update; the runtime is pure C with
  * no SGDK dependencies, so it lands in substrate rather than gameplay-
  * side.

@@ -1,4 +1,4 @@
-/* OW LevelBlock attribute accessor (RoomRom-side).
+/* OW LevelBlock attribute accessor (engine-side).
  *
  * Reads the 6 sub-tables of the overworld LevelBlock from the
  * `rooms_overworld[]` blob (see data/rooms/overworld.c) using the

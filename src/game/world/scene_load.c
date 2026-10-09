@@ -1,10 +1,10 @@
 /* Phase 12.2 SGDK-1 cleanup: dropped unused <genesis.h>. */
 #include "scene_load.h"
 #include "../world/render/sprite_render.h"
-#include "../../../RoomRom/src/atlas/level_chr_swap.h"
+#include "../../../engine/src/atlas/level_chr_swap.h"
 #include "bg_palette.h"  /* Phase 12.2 promoted */
 #include "render_abi.h"                      /* render_chr_upload */
-#include "../../../RoomRom/src/roomrom_vram_map.h"   /* ROOMROM_SPR_TILE_BASE */
+#include "../../../engine/src/vram_layout.h"   /* ROOMROM_SPR_TILE_BASE */
 
 void roomrom_scene_load(roomrom_scene_id_t scene_id, unsigned char variant)
 {
@@ -36,8 +36,8 @@ void roomrom_scene_load(roomrom_scene_id_t scene_id, unsigned char variant)
     case ROOMROM_SCENE_BOOT:
     case ROOMROM_SCENE_TITLE:
     case ROOMROM_SCENE_FILESELECT:
-        /* Aspirational scenes: not yet implemented in RoomRom.
-         * RoomRom boots directly into a UW room without title or FS.
+        /* Aspirational scenes: not yet implemented in engine.
+         * engine boots directly into a UW room without title or FS.
          * No-op until those scenes get hand-written renderers. */
         break;
 

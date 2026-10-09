@@ -25,8 +25,8 @@
 #include "world/render/subpal_routing.h"  /* Phase AA centralized sub-pal -> OAM pal API */
 #include "enemy_loop.h"   /* ENEMY_LOOP_SLOT_FIRST/LAST */
 #include "enemy_state.h"  /* ENEMY_X, ENEMY_Y, ENEMY_ALIVE_FLAG, ENEMY_THROWER_SLOT */
-#include "../../../RoomRom/src/roomrom_vram_map.h"  /* canonical ROOMROM_SPR_TILE_BASE */
-#include "../../../RoomRom/src/atlas/level_chr_swap.h"  /* sub-pal 3 cache flush key */
+#include "../../../engine/src/vram_layout.h"  /* canonical ROOMROM_SPR_TILE_BASE */
+#include "../../../engine/src/atlas/level_chr_swap.h"  /* sub-pal 3 cache flush key */
 
 /* NES RAM cells — see reference/aldonunez/Variables.inc. */
 #define NES_SPRITES_BASE        0x0200u   /* OAM mirror, 64 sprites x 4 bytes */
@@ -301,7 +301,7 @@ void enemy_render_publish_native_pair(unsigned char left_tile,
  * common SPR atlas where their NES tile ID coincides with enemy CHR
  * data → user sees octorok-rock pixels instead of arrow sprite. */
 #define ITEM_ATTR_MARKER            0x08u
-#include "../../../RoomRom/src/atlas/items_chr_x4.h"  /* ROOMROM_ATLAS_ITEMS_X4_* */
+#include "../../../engine/src/atlas/items_chr_x4.h"  /* ROOMROM_ATLAS_ITEMS_X4_* */
 /* NES item tile ID -> items_chr_x4 atlas index ($FF = not in the atlas),
  * generated from the item manifest (tools/atlas/gen_item_tile_atlas_idx.py).
  * T-092: the hand-written table had drifted (42 of 76 entries wrong vs live
@@ -632,12 +632,12 @@ void enemy_render_reset_oam(void)
 #define NES_OAM_SLOT_COUNT      64u
 #define NES_HUD_Y_OFFSET        32u   /* HUD on Window plane covers top 4 rows */
 
-/* SPR_TILE_BASE canonical value comes from roomrom_vram_map.h
+/* SPR_TILE_BASE canonical value comes from vram_layout.h
  * (= 533u post-Phase-J.2 cleanup 2026-05-18). Was 1025u pre-cleanup
  * (1 + 4*256 4x sub-pal stride). Local re-#define removed: was causing
  * enemies (octorok/tektite/moblin/etc) to render INVISIBLE because SAT
  * wrote tile_ids 1025+N into empty VRAM region — VRAM atlas now ends
- * at slot ~1100. Use canonical macro from roomrom_vram_map.h. */
+ * at slot ~1100. Use canonical macro from vram_layout.h. */
 
 /* NES Z1 sprite CHR layout in our Genesis VRAM:
  *
@@ -673,7 +673,7 @@ void enemy_render_reset_oam(void)
  * Genesis the common SPR slot for $5C ($2BD = SPR_BASE+$5C) is CLOBBERED
  * by the OWSP overlay: ROOMROM_SCENE_OBJ_TILE_BASE (SPR_BASE+44) overlaps
  * the common SPR bank, so loading the OW NPC/cave-dweller bank stomps
- * common tiles $2C-$9D (documented VRAM compaction, RoomRom/src/main.c
+ * common tiles $2C-$9D (documented VRAM compaction, engine/src/main.c
  * :1650 "last-writer wins"). VRAM is too tight to relocate SCENE_OBJ
  * (114-tile bank vs 75 free tiles before the table region).
  *

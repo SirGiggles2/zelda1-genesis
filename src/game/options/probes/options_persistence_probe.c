@@ -5,7 +5,7 @@
  * cart SRAM (writes to logical 0x800..0x81F + a sentinel slot
  * outside the locked range to verify boundary preservation).
  *
- * Hard rule WT-5: lives at src/game/options/probes/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/options/probes/, not engine/.
  *
  * Block layout @ OPTIONS_PERSISTENCE_PROBE_BASE = 0xFF7E90
  * (the slot adjacent to the Task 9.1 options_probe at 0xFF7E80;

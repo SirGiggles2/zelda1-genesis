@@ -43,7 +43,7 @@ void mode_dispatch_update(void)
 
     switch (mode) {
     /* Modes 0x00 - 0x02, 0x0D - 0x0F = FRONTEND MODES.
-     * These run before the title->gameplay handoff completes. Debug.md
+     * These run before the title->gameplay handoff completes. Zelda.md
      * boots directly into gameplay via the A+B+C debug-enter chord,
      * which bypasses the entire mode 0/1/2/D/E/F sequence. Wiring them
      * requires the full title-screen->FileSelect->Load handoff path
@@ -51,14 +51,14 @@ void mode_dispatch_update(void)
      * separate multi-session phase; see plan v6 Tier 3 sketch.
      *
      * Until then these stay stubbed — they are unreachable from
-     * Debug.md and wiring drained frontdemo_xxx and frontname_xxx
+     * Zelda.md and wiring drained frontdemo_xxx and frontname_xxx
      * would have no observable effect. */
     case 0x00: mode_stub(); break;  /* Mode 0 Demo — frontend (see comment) */
     case 0x01: mode_stub(); break;  /* Mode 1 Menu (FileSelect) — frontend */
     case 0x02: mode_stub(); break;  /* Mode 2 Load — frontend */
     case 0x03: mode_stub(); break;  /* Mode 3 Unfurl */
     case 0x04: mode_stub(); break;  /* Mode 4 Enter (between rooms) */
-    case 0x05: mode_stub(); break;  /* Mode 5 Play — RoomRom owns gameplay tick */
+    case 0x05: mode_stub(); break;  /* Mode 5 Play — engine owns gameplay tick */
     case 0x06: mode_stub(); break;  /* Mode 6 Leave (between rooms) */
     case 0x07: mode_stub(); break;  /* Mode 7 Scroll */
     case 0x08: mode8_continue_question_update(); break;  /* Phase 9.7 native */

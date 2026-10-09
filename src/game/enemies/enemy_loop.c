@@ -8,15 +8,15 @@
  * Step 3 wires INIT only for ENEMY_TYPE 0x07 (RedSlowOctorock / Ghini).
  * Update-side dispatch is still NULL — enrt_update_rope and friends call
  * c_walker_move / z07_anim_advance_and_fetch / c_check_monster_collisions
- * which are not yet linked into Debug.md. Update wiring lands in Task 7.3
+ * which are not yet linked into Zelda.md. Update wiring lands in Task 7.3
  * paired with native drain or shim plumbing for those primitives. Per
  * Drain Rule D1 we route z07_reset_obj_state to the already-linked
  * core_reset_obj_state body in src/game/core/core_dispatch.c (drain at
  * src/core/core_runtime.c:327). Forwarder is one line, not a stub.
  *
- * Hard rule WT-5 (RoomRom freeze, 2026-05-09): this file lives at
- * src/game/enemies/ instead of RoomRom/src/. ENEMY_* macros are still
- * supplied by RoomRom/src/roomrom_enemy_state.h until Task 7.7 lands a
+ * Hard rule WT-5 (engine freeze, 2026-05-09): this file lives at
+ * src/game/enemies/ instead of engine/src/. ENEMY_* macros are still
+ * supplied by engine/src/enemy_state.h until Task 7.7 lands a
  * promoted version under src/state/.
  */
 
@@ -26,7 +26,7 @@
 #include "../core/core_dispatch.h"          /* ClearRam0300UpTo, SetTypeAndClearObject */
 #include "../combat/collision_dispatch.h"  /* GetCollidableTileStill */
 #include "enemy_dispatch.h"                /* FindEmptyMonsterSlot */
-#include "roomrom_enemy_state.h"          /* still in RoomRom/src/ pre-WT-5 */
+#include "enemy_state.h"          /* still in engine/src/ pre-WT-5 */
 #include "platform_abi.h"
 #include "probes/enemy_loop_probe.h"      /* step 4 live-tick publish */
 #include "obj_lists.h"                    /* 7.7 step 1 room matrix loader */
@@ -112,8 +112,8 @@ static void native_init_obj_attr(unsigned int slot, unsigned char type)
 /* Forward decls — defined in src/oracle/enemies/enemy_walker_runtime.c
  * (init), src/oracle/enemies/enemy_wanderer_runtime.c (goriya update),
  * src/game/enemies/enemy_walker_bridge.c (step-6 native octorock),
- * and src/game/core/core_dispatch.c (reset). All linked into Debug.md
- * per build_debug.py ROOMROM_C_SOURCES + step-6 unblock stubs. */
+ * and src/game/core/core_dispatch.c (reset). All linked into Zelda.md
+ * per build_rom.py ROOMROM_C_SOURCES + step-6 unblock stubs. */
 extern void enrt_init_slow_octorock_or_ghini(unsigned int slot);
 extern void enrt_init_pond_fairy(unsigned int slot);             /* T-050 */
 extern void enrt_update_pond_fairy(unsigned int slot);           /* T-050 */
@@ -197,7 +197,7 @@ extern void enrt_init_tektite(unsigned int slot);                /* 7.4 step 6e 
 extern void enrt_init_bubble(unsigned int slot);                 /* 7.4 step 6e */
 extern void enrt_init_armos_or_flying_ghini(unsigned int slot);  /* 7.4 step 6c */
 /* 7.4 step 7 — whirlwind + trap UPDATE + INIT (trap_dispatch.c).
- * Native drains already linked into Debug.md; just need externs +
+ * Native drains already linked into Zelda.md; just need externs +
  * dispatch rows. NES SwitchBank #$01 collapses to no-op on Genesis. */
 extern void trap_update_whirlwind_full(unsigned int slot);
 extern void trap_update_trap_full(unsigned int slot);
@@ -800,7 +800,7 @@ const enemy_update_fn enemy_update_fns[ENEMY_LOOP_TYPE_MAX] = {
      * shared with $1E armos and reaches into ChangeTileObjTiles +
      * SecretArmosRoomIds + GetRoomFlagUWItemState which require their
      * own native drains (c_change_tile_obj_tiles only resolves via
-     * c_shims.asm bank, not linked into Debug.md). */
+     * c_shims.asm bank, not linked into Zelda.md). */
     [0x22] = enrt_update_flying_ghini,      /* FlyingGhini */
     /* Task 7.4 step 6b — $1E Armos UPDATE (NES Z_04.asm:3302 UpdateArmos).
      * Native drain in enemy_walker_bridge.c — composes enrt_update_goriya
@@ -822,7 +822,7 @@ const enemy_update_fn enemy_update_fns[ENEMY_LOOP_TYPE_MAX] = {
      *
      * Both drained: enemy_walker_runtime.c:14 (bubble) and
      * enemy_common_runtime.c:22 (gibdo). All composed primitives
-     * already linked into Debug.md:
+     * already linked into Zelda.md:
      *   - wanderer_update_common / enrt_update_common_wanderer
      *     (enemy_wanderer_runtime.c — already used by ghini/moblin).
      *   - z01_anim_set_sprite_desc_attrs / enrt_animate_and_draw_common_object
@@ -1554,7 +1554,7 @@ void enemy_loop_force_spawn_typed(unsigned int slot,
 static void enemy_loop_arm_fix_probe(void)
 {
     /* Magic block at ABSOLUTE $FF77D0 (matches the existing
-     * enemy_loop_probe arm at $FF73F8). NOT relative to A4 — Debug.md
+     * enemy_loop_probe arm at $FF73F8). NOT relative to A4 — Zelda.md
      * pins A4 at $FF8000, so RAM(0x77D0) would write $FFFF7D0 which is
      * outside 68K work RAM. Probe Lua writes domain "68K RAM" offset
      * 0x77D0 = physical $FF77D0. */
@@ -1826,7 +1826,7 @@ void enemy_loop_tick(void)
          * each slot. Called from @LoopObject (Z_07.asm:1919) once per slot.
          *
          * ObjTimer ($0028+slot) + ObjStunTimer ($003D+slot) are ALREADY
-         * decremented by main.c NES @UpdateTimers port (RoomRom/src/main.c
+         * decremented by main.c NES @UpdateTimers port (engine/src/main.c
          * line ~1606 loops $27..$3C/$4E). Don't double-dec here. */
         unsigned char dec_inv = ((unsigned char)RAM(0x0015u) & 1u) == 0u;
         if (dec_inv) {
@@ -1926,7 +1926,7 @@ void enemy_loop_force_spawn_slow_octorock(unsigned int slot,
                                           unsigned char dir)
 {
     /* Q4=(c) first probe seed: one slow octorok at known (x,y,dir).
-     * Used by tools/debug/probes/probe_walker_parity.lua to capture a
+     * Used by tools/build/probes/probe_walker_parity.lua to capture a
      * 60-frame X/Y/DIR trace at matched RNG seed for diff vs NES.
      *
      * Step 2 writes state cells only (no enrt_init_ call yet — see

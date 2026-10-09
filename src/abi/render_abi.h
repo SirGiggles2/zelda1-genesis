@@ -23,7 +23,7 @@ void render_set_plane_a_word(unsigned short col, unsigned short row,
 
 /* ---- Plane B tilemap write (PR-2: V scroll staging) ----
  * Same word format as plane A. Plane B occupies VRAM $E000-$EFFF in
- * RoomRom 64x32 layout (post PR-2). Used by V scroll transitions to
+ * engine 64x32 layout (post PR-2). Used by V scroll transitions to
  * stage the incoming room while plane A still shows the old room. */
 /* T-172: queue single-cell plane writes (render_set_plane_a/b_word) while
  * on; render_plane_defer_flush writes them (NES NMI timing). */
@@ -238,7 +238,7 @@ void render_plane_a_write_row(unsigned short row, const unsigned short *cells,
  * render_mode_set_v32      -- set VDP Reg 16 to H32xV32 ($9000).
  * render_mode_set_v64      -- set VDP Reg 16 to H64xV64 ($9011).
  * render_mode_set_h64v32   -- set VDP Reg 16 to H64xV32 ($9001).
- *                             RoomRom PR-2 layout: 64-wide tilemap (128 B
+ *                             engine PR-2 layout: 64-wide tilemap (128 B
  *                             stride) but only 32 rows tall (4 KB plane,
  *                             half of V64). Frees $A800-$BFFF for CHR.
  * render_z80_bus_grab      -- assert Z80 bus request; spin until ACKed.

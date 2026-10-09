@@ -3,26 +3,26 @@
  *
  * Two ABI variants per debate 006 D3 (one header, build-time switch):
  *
- * 1. Debug.md build (default, NO -DROOMROM_BUILD): A4-pinned `nes_ram`.
+ * 1. Zelda.md build (default, NO -DROOMROM_BUILD): A4-pinned `nes_ram`.
  *    - `register volatile unsigned char *nes_ram asm("a4")` reserves A4 globally
  *    - `-ffixed-a4` flag tells gcc to never clobber it
- *    - Boot shell `src/debug/a4_probe_asm.s` (entry point `main:`) loads
+ *    - Boot shell `src/platform/game_startup.s` (entry point `main:`) loads
  *      `lea 0x00FF8000,%a4` before jumping to debug_main_after_a4().
- *      This is the Debug.md NES RAM base — NOT $FF0000. The lower
+ *      This is the Zelda.md NES RAM base — NOT $FF0000. The lower
  *      $FF0000-$FF7FFF region is reserved for SGDK runtime (BSS,
  *      stack guard, system globals). NES work-RAM mirror lives at
- *      $FF8000-$FF87FF. `tools/debug/test_debug_contract.py` enforces
- *      this constant in both the asm and `a4_probe_main.c:10`.
+ *      $FF8000-$FF87FF. `tools/build/test_debug_contract.py` enforces
+ *      this constant in both the asm and `game_main.c:10`.
  *      (The retired pre-Debug title boot used `src/genesis_shell.asm`
- *      with A4 = $FF0000; that boot is NOT linked into Debug.md.)
+ *      with A4 = $FF0000; that boot is NOT linked into Zelda.md.)
  *    - Net effect: `nes_ram[offset]` compiles to `move.b (off,A4)` —
  *      the same addressing mode the transpiled asm uses. Zero perf cost.
  *      Probes that need to read raw absolute RAM cells must use
  *      $FF8000+offset, not $FF0000+offset.
  *
- * 2. RoomRom build (`-DROOMROM_BUILD`): regular global pointer.
+ * 2. engine build (`-DROOMROM_BUILD`): regular global pointer.
  *    - `extern volatile unsigned char *nes_ram` — no register binding
- *    - RoomRom boot init (`RoomRom/src/boot/nes_ram_init.c`) allocates
+ *    - engine boot init (`engine/src/boot/nes_ram_init.c`) allocates
  *      `static unsigned char roomrom_nes_ram[0x800]` and sets pointer
  *      BEFORE any drained code runs
  *    - SGDK-friendly: A4 not reserved, no `-ffixed-a4` collision
@@ -47,11 +47,11 @@ extern "C" {
 #endif
 
 #ifdef ROOMROM_BUILD
-/* RoomRom variant: regular global pointer. Initialized at boot by
- * RoomRom/src/boot/nes_ram_init.c BEFORE any drained code runs. */
+/* engine variant: regular global pointer. Initialized at boot by
+ * engine/src/boot/nes_ram_init.c BEFORE any drained code runs. */
 extern volatile unsigned char *nes_ram;
 #else
-/* Debug.md variant: A4-register pinned. Boot shell loads A4 = $FF0000
+/* Zelda.md variant: A4-register pinned. Boot shell loads A4 = $FF0000
  * before C entry; -ffixed-a4 flag prevents gcc from clobbering. */
 register volatile unsigned char *nes_ram asm("a4");
 #endif
@@ -68,7 +68,7 @@ register volatile unsigned char *nes_ram asm("a4");
  * ($077F..$07FE): every frame they overwrote the room flags (items taken,
  * doors, clears) of L7-9 rooms $61-$7F, and saves carried the damage.
  * Index i = old NES address - $07E0. Probes locate the array with
- * @SYM:g_debug_sentinel@ (tools/debug/run_probe.py). */
+ * @SYM:g_debug_sentinel@ (tools/build/run_probe.py). */
 extern volatile unsigned char g_debug_sentinel[32];
 #define DBG_SENTINEL(i) (g_debug_sentinel[(i)])
 

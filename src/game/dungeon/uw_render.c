@@ -1,13 +1,13 @@
 /* Phase 12.2 SGDK-1 cleanup: dropped <genesis.h>; route VRAM-read
  * via render_vram_read_word adapter. */
 #include "uw_render.h"
-#include "../../../RoomRom/src/uw_room_blob.h"
+#include "../../../engine/src/uw_room_blob.h"
 #include "render_abi.h"
 #include "platform_abi.h"  /* nes_ram, NES_PLAY_AREA_BASE (T-117) */
-#include "../../../RoomRom/src/roomrom_vram_map.h"
+#include "../../../engine/src/vram_layout.h"
 #include "../world/bg_palette.h"  /* Phase 12.2 promoted */
-#include "../../../RoomRom/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
-#include "../../../RoomRom/src/uw_collision_data.h"
+#include "../../../engine/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
+#include "../../../engine/src/uw_collision_data.h"
 
 extern const unsigned char rooms_dungeons[];
 

@@ -8,8 +8,8 @@
  * the target song per docs/audit/audio_routing.md and fires
  * music_play() once.
  *
- * Replaces per-call-site music_play() scattered through RoomRom
- * (scene-toggle re-fire) + src/debug/a4_probe_main.c (boot+enter).
+ * Replaces per-call-site music_play() scattered through engine
+ * (scene-toggle re-fire) + src/platform/game_main.c (boot+enter).
  * Those keep firing for now (dispatcher just re-confirms; one extra
  * music_play() per session is harmless since change_song is idempotent
  * on identical bitmap). Future cleanup removes them once dispatcher
@@ -31,7 +31,7 @@
  *   $07  Dying (cycles palette during 9-frame wipe)
  *   $08  ContinueQuestion
  *
- * Scene constants (must mirror RoomRom/src/main.c scene_t):
+ * Scene constants (must mirror engine/src/main.c scene_t):
  *   0 = SCENE_OW
  *   1 = SCENE_UW
  *   2 = SCENE_CAVE

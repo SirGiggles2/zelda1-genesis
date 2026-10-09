@@ -2,7 +2,7 @@
  *
  * NES source: reference/aldonunez/Z_05.asm InitMode8 +
  * UpdateMode8ContinueQuestion_Full. Reads ButtonsPressed ($F8); the caller
- * (RoomRom/src/main.c roomrom_debug_tick) reads the pads first.
+ * (engine/src/main.c roomrom_debug_tick) reads the pads first.
  */
 
 #ifndef MODE_CONTINUE_QUESTION_H

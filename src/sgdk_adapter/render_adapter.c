@@ -30,11 +30,11 @@
 /* Z80 bus control registers. */
 #define Z80_BUSREQ_WORD (*(volatile unsigned short *)0x00A11100)
 
-/* VDP plane A nametable base for the native title / RoomRom layouts. */
+/* VDP plane A nametable base for the native title / engine layouts. */
 #define PLANE_A_BASE 0xC000u
 
 /* VDP plane B nametable base — used by PR-2 V scroll staging.
- * RoomRom 64x32 layout post PR-2: BGA @ $C000, Window @ $D000,
+ * engine 64x32 layout post PR-2: BGA @ $C000, Window @ $D000,
  * BGB @ $E000. Title H32 layout sets BGB via reg 4 = $07 ($E000) too. */
 #define PLANE_B_BASE 0xE000u
 
@@ -55,7 +55,7 @@ static inline void dma_stats_record(unsigned long bytes)
 #define CRAM_COLORS_PER_PAL 16u
 
 /* Active nametable row stride in bytes. Title runs H32/V32 (32 tiles per
- * row = 64 bytes); RoomRom runs 64x64 (64 tiles per row = 128 bytes).
+ * row = 64 bytes); engine runs 64x64 (64 tiles per row = 128 bytes).
  * CombinedDebug links one render ABI, so the stride has to follow the mode. */
 static unsigned short s_plane_row_stride_bytes = 64u;
 
@@ -127,7 +127,7 @@ void render_mode_set_v64(void)
 
 void render_mode_set_h64v32(void)
 {
-    /* VDP Reg 16 = $9001 (H64 x V32). RoomRom PR-2 64x32 plane mode:
+    /* VDP Reg 16 = $9001 (H64 x V32). engine PR-2 64x32 plane mode:
      * 64-wide stride (128 B/row) but 4 KB plane size, freeing 192 tiles
      * vs V64. */
     s_plane_row_stride_bytes = 128u;
@@ -591,7 +591,7 @@ void render_update_sprites(unsigned short count)
 
 /* Phase 12.2 SGDK-1 cleanup: Window plane HUD wrappers.
  *
- * RoomRom HUD lives on the Window plane (NES status-bar parity at top
+ * engine HUD lives on the Window plane (NES status-bar parity at top
  * of screen). Underlying SGDK call: VDP_setTileMapXY(WINDOW, ...).
  * Adapter routes here so src/game/hud/ can drop <genesis.h>. */
 void render_set_window_word(unsigned short col, unsigned short row,

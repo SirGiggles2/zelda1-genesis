@@ -2,9 +2,9 @@
  *
  * Native rewrite of src/oracle/hud/hud_runtime.c. Both ROMs link.
  *
- * Note: RoomRom has its own roomrom_hud.c for active HUD rendering;
+ * Note: engine has its own roomrom_hud.c for active HUD rendering;
  * this dispatch is the NES gameplay-tier formatter that fills the
- * NES OAM/transfer-buf mirror (used by Debug.md). RoomRom may bind
+ * NES OAM/transfer-buf mirror (used by Zelda.md). engine may bind
  * these natively once UW dialog/HUD-update paths port.
  */
 

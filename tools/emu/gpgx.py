@@ -1,14 +1,14 @@
 """Headless Genesis runner (Genesis Plus GX libretro core) for Linux hosts.
 
 BizHawk (the project's probe emulator, Windows) runs the same core. This
-module runs Debug.md without a display: step frames with held buttons,
+module runs Zelda.md without a display: step frames with held buttons,
 save PNG screenshots, read 68k work RAM, VRAM, CRAM, VSRAM and VDP
 registers, and save/load states.
 
 Build the core once with tools/emu/build_gpgx.sh.
 
     from gpgx import Genesis
-    g = Genesis("builds/Debug.md")
+    g = Genesis("builds/Zelda.md")
     g.run(120)                      # frames, no input
     g.run(10, "START")              # frames holding Start
     g.screenshot("shot.png")

@@ -33,7 +33,7 @@ KEYS = {"U": "UP", "D": "DOWN", "L": "LEFT", "R": "RIGHT", "A": "A", "B": "B",
 
 
 class Session:
-    def __init__(self, rom: Path = ROOT / "builds" / "Debug.md"):
+    def __init__(self, rom: Path = ROOT / "builds" / "Zelda.md"):
         self.g = Genesis(rom)
 
     def nes(self, addr: int, n: int = 1) -> bytes:
@@ -101,7 +101,7 @@ class Session:
     def symbol(self, name: str) -> int:
         if not hasattr(self, "_elf"):
             import subprocess
-            elf = ROOT / "build" / "debug_project" / "out" / "Debug.out"
+            elf = ROOT / "build" / "rom_project" / "out" / "Zelda.out"
             import os
             nm = ROOT / "sgdk/bin/nm.exe" if os.name == "nt" else "m68k-linux-gnu-nm"
             out = subprocess.run([str(nm), str(elf)], capture_output=True, text=True, check=True).stdout
@@ -138,7 +138,7 @@ class Session:
            lambda m: print("stage:", m), "GEN", self.gen_b_item, self.gen_link_pos)
 
 
-def run_preset(name: str, rom: Path = ROOT / "builds" / "Debug.md") -> Session:
+def run_preset(name: str, rom: Path = ROOT / "builds" / "Zelda.md") -> Session:
     import presets
     spec = json.loads((ROOT / "tools" / "lockstep" / "presets" / f"{name}.json").read_text())
     p = presets.build(spec)
@@ -154,7 +154,7 @@ def run_preset(name: str, rom: Path = ROOT / "builds" / "Debug.md") -> Session:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("preset")
-    ap.add_argument("--rom", type=Path, default=ROOT / "builds" / "Debug.md")
+    ap.add_argument("--rom", type=Path, default=ROOT / "builds" / "Zelda.md")
     ap.add_argument("--shot", type=Path)
     ap.add_argument("--state", type=Path, help="save a state after the script")
     a = ap.parse_args()

@@ -10,7 +10,7 @@
  *   c_gel_check_collisions   -> enrt_gel_check_collisions
  *
  * All four drained twins live in src/oracle/enemies/enemy_common_runtime.c
- * (already linked into Debug.md per build_debug.py:164). Stance: ADOPT
+ * (already linked into Zelda.md per build_rom.py:164). Stance: ADOPT
  * (Drain Rule D1) — drained C is PRIMARY evidence, forwarders are
  * one-line trampolines.
  *
@@ -24,11 +24,11 @@
  * read from caller's OBJ(NES_OBJ_TYPE, slot) cell instead of from
  * NES scratch [$00] / arg).
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  */
 
 #include "platform_abi.h"             /* RAM, OBJ, NES_OBJ_TYPE, CARRY_SET */
-#include "roomrom_enemy_state.h"      /* ENEMY_* macros (re-export of state/enemy_state.h) */
+#include "enemy_state.h"      /* ENEMY_* macros (re-export of state/enemy_state.h) */
 
 /* Forward declarations of drained twins. Bodies in
  * src/oracle/enemies/enemy_common_runtime.c. Compiled into
@@ -60,7 +60,7 @@ void c_gel_check_collisions(unsigned int slot)
 
 /* NES Z_04.asm:11369 ShootLimited + :11395 Shoot. Phase 7 Task 7.3
  * step 4. Stance: REPLACE — c_shims.asm forwarder routes to transpiled
- * z_04 bank which is NOT linked into Debug.md.
+ * z_04 bank which is NOT linked into Zelda.md.
  *
  * NES sequence (no ObjWantsToShoot gate, unlike _ShootIfWanted):
  *   1. FindEmptyMonsterSlot — scan Y=$0B downto $01 for ObjType==0.

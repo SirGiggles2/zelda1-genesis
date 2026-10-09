@@ -5,7 +5,7 @@
  * readable pages (summary, objects, NES RAM, VDP) to photograph or
  * screenshot, and lossless image pages carrying all 64 KB of 68k RAM, all
  * 64 KB of VRAM, CRAM, VSRAM and the VDP register shadow for
- * tools/debug/decode_dump.py. Left / Right turn the pages.
+ * tools/build/decode_dump.py. Left / Right turn the pages.
  */
 #ifndef STATE_DUMP_H
 #define STATE_DUMP_H

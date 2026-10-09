@@ -1,7 +1,7 @@
 #ifndef ROOMROM_SPRITES_H
 #define ROOMROM_SPRITES_H
 
-/* RoomRom sprite/OAM scaffold.
+/* engine sprite/OAM scaffold.
  *
  * Owns PAL1 (NES SPR PALRAM) + the sprite-CHR VRAM region. PAL2 is borrowed
  * dynamically by the sword-beam color flash. Renders Link as slot 0 +

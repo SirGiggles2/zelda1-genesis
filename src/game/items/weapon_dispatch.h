@@ -2,7 +2,7 @@
  *
  * Native rewrite of src/oracle/items/weapon_runtime.c. Both ROMs link.
  *
- * RoomRom has its own roomrom_combat / boomerang / arrow / bomb /
+ * engine has its own roomrom_combat / boomerang / arrow / bomb /
  * sword for live B-item handling; this dispatch is the NES gameplay-
  * tier weapon-spawn path.
  */

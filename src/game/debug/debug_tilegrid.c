@@ -20,15 +20,15 @@
  *   Select          toggle 8x16 sprite mode
  *   A button        no-op (Genesis atlas is unified; no bank cycle)
  *
- * Build: linked into Debug.md via TITLE_C_SOURCES in build_debug.py.
+ * Build: linked into Zelda.md via TITLE_C_SOURCES in build_rom.py.
  */
 #include "debug_tilegrid.h"
 #include "state_dump.h"
 #include "../../abi/render_abi.h"
-#include "../../../RoomRom/src/bg_sparse_chr.h"
-#include "../../../RoomRom/src/atlas/items_chr_x4.h"
-#include "../../../RoomRom/src/atlas/enemy_chr.h"
-#include "../../../RoomRom/src/atlas/boss_chr.h"
+#include "../../../engine/src/bg_sparse_chr.h"
+#include "../../../engine/src/atlas/items_chr_x4.h"
+#include "../../../engine/src/atlas/enemy_chr.h"
+#include "../../../engine/src/atlas/boss_chr.h"
 /* T-118: the $E000 fill below overwrites the gameplay HUD window. */
 extern void roomrom_hud_invalidate(void);
 
@@ -45,7 +45,7 @@ extern const unsigned char g_roomrom_ow_palram[2][32];
  * VRAM byte addr = 577 * 32 = 18464 = $4820 (per enemy_chr.h comment). */
 #define SCENE_OBJ_VRAM_OFFSET   (577u * 32u)
 
-/* ----- VDP / hardware addresses (Debug.md PR-2 Option F layout) ----- */
+/* ----- VDP / hardware addresses (Zelda.md PR-2 Option F layout) ----- */
 #define PLANE_A_BASE  0xC000u
 /* SAT relocated to $F400 per init_video; sprite render via render_set_sprite_full
  * (it uses the SGDK SAT cache, not direct VRAM writes). */
@@ -433,7 +433,7 @@ static void redraw_bg(void) {
  * (s_sprite_page * 64 + S) in current sub_pal, at y=$80 + (S>>3)*16,
  * x=(S&7)*16. Slots 64..79 = link=0 terminator. */
 /* SAT VRAM base. Title context sets VDP reg 5 = $7C (debug_enter_title in
- * src/debug/a4_probe_main.c:99) -> SAT at $F800. Gameplay context relocates
+ * src/platform/game_main.c:99) -> SAT at $F800. Gameplay context relocates
  * to $F400. We enter debug from title so use $F800. */
 #define SAT_VRAM_BASE 0xF800u
 

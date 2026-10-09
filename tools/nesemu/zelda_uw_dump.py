@@ -1,14 +1,14 @@
-"""Offline replacement for RoomRom/probe_nes_uw_dump.lua.
+"""Offline replacement for engine/probe_nes_uw_dump.lua.
 
 Same procedure, same RAM pokes, same settle rule, run on tools/nesemu:
 boot to the overworld through file registration (controller only), force
 the quest, warp to the level (SetTargetMode(2) emulation), then for every
-room in RoomRom/data/uw_level{L}_quest{Q}_rooms.json force a mode-3
+room in engine/data/uw_level{L}_quest{Q}_rooms.json force a mode-3
 submode-2 room load and capture CIRAM NT0 + attributes + PALRAM once the
 picture has been stable for STABLE_WINDOW frames.
 
-Writes RoomRom/out/nes_uw_level{L}_quest{Q}_{rom}.json in the probe's
-format, which RoomRom/tools/uw_aggregate.py merges for gen_uw_blob.py.
+Writes engine/out/nes_uw_level{L}_quest{Q}_{rom}.json in the probe's
+format, which engine/tools/uw_aggregate.py merges for gen_uw_blob.py.
 
 Usage:
     python tools/nesemu/zelda_uw_dump.py --rom <rom.nes> [--rom-id orig]
@@ -226,13 +226,13 @@ def settle_and_capture(nes, target, wait_for_ganon=False):
 def required_rooms(level: int, quest: int, manifest: dict, rom_id: str = "orig") -> list[int]:
     """Rooms the traversal-derived list omits but the game reaches: the
     boss and Triforce rooms, and in level 9 each Patra room plus every room
-    a Patra-room door leads to (formerly tools/builder/inject_boss_rooms.py,
+    a Patra-room door leads to (formerly tools/converter/inject_boss_rooms.py,
     which synthesized them; here they are captured like any other room)."""
     rooms = {int(manifest[k], 0) for k in ("boss_room_id", "triforce_room_id")
              if manifest.get(k) is not None}
     if level != 9 and rom_id != "orig":
         return sorted(rooms)
-    sys.path.insert(0, str(ROOT / "tools" / "builder"))
+    sys.path.insert(0, str(ROOT / "tools" / "converter"))
     import extract_uw_collision as X  # noqa: PLC0415
     data = X.parse_dungeons_c(ROOT / "data" / "rooms" / "dungeons.c")
     tables, _ = X.load_manifest(ROOT / "data" / "rooms" / "MANIFEST.json")
@@ -288,7 +288,7 @@ def required_rooms(level: int, quest: int, manifest: dict, rom_id: str = "orig")
 
 
 def dump_level(rom: bytes, rom_id: str, level: int, quest: int) -> dict:
-    rooms_json = ROOT / "RoomRom" / "data" / f"uw_level{level}_quest{quest}_rooms.json"
+    rooms_json = ROOT / "engine" / "data" / f"uw_level{level}_quest{quest}_rooms.json"
     manifest = json.loads(rooms_json.read_text(encoding="utf-8"))
     rooms = [int(x, 16) for x in manifest["rooms"]]
     # Appended after the probe's list so its captures are unaffected. A room
@@ -296,7 +296,7 @@ def dump_level(rom: bytes, rom_id: str, level: int, quest: int) -> dict:
     # same-block lookup reaches that entry (uw_render.c find_blob_entry).
     covered = set()
     for lv in (range(1, 7) if level <= 6 else range(7, 10)):
-        other = ROOT / "RoomRom" / "data" / f"uw_level{lv}_quest{quest}_rooms.json"
+        other = ROOT / "engine" / "data" / f"uw_level{lv}_quest{quest}_rooms.json"
         covered.update(int(x, 16) for x in json.loads(other.read_text(encoding="utf-8"))["rooms"])
     rooms += [r for r in required_rooms(level, quest, manifest, rom_id) if r not in covered]
     nes = Nes(rom)
@@ -353,7 +353,7 @@ def main() -> int:
     ap.add_argument("--rom-id", default="orig", choices=("orig", "redux"))
     ap.add_argument("--levels", default="1-9")
     ap.add_argument("--quests", default="1,2")
-    ap.add_argument("--out-dir", type=Path, default=ROOT / "RoomRom" / "out")
+    ap.add_argument("--out-dir", type=Path, default=ROOT / "engine" / "out")
     ap.add_argument("--jobs", type=int, default=0, help="worker processes (0 = CPU count)")
     args = ap.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate RoomRom/data/uw_l1q1_cellar_pairs.{c,h} from NES ground truth.
+"""Generate engine/data/uw_l1q1_cellar_pairs.{c,h} from NES ground truth.
 
 For each cellar id in LevelInfoUW{N}.CellarRoomIdArray, decodes source
 room via LevelBlockUW{1,2}Q{1,2}.AttrsA[cellar] / AttrsB[cellar] per
 NES Z_05.asm:7264-7278.
 
 Cross-check: at gen time, generator output verified against
-RoomRom/tools/uw_reachability.py cellar_targets path. Mismatch fails
+engine/tools/uw_reachability.py cellar_targets path. Mismatch fails
 build.
 
 Slice-1 emits L1Q1 only. Schema:
@@ -35,8 +35,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DUNGEONS_C = REPO / "data" / "rooms" / "dungeons.c"
-OUT_C = REPO / "RoomRom" / "data" / "uw_l1q1_cellar_pairs.c"
-OUT_H = REPO / "RoomRom" / "data" / "uw_l1q1_cellar_pairs.h"
+OUT_C = REPO / "engine" / "data" / "uw_l1q1_cellar_pairs.c"
+OUT_H = REPO / "engine" / "data" / "uw_l1q1_cellar_pairs.h"
 
 # LevelBlock + LevelInfo offsets (mirror data/rooms/dungeons_offsets.h).
 LEVELBLOCK_BASES = {
@@ -112,7 +112,7 @@ def cross_check_against_reachability(rows: list[dict]) -> None:
     cellar_targets list."""
     import json
     for (level, quest) in SLICE_1_TARGETS:
-        manifest_path = REPO / "RoomRom" / "data" / f"uw_level{level}_quest{quest}_rooms.json"
+        manifest_path = REPO / "engine" / "data" / f"uw_level{level}_quest{quest}_rooms.json"
         if not manifest_path.exists():
             sys.exit(f"missing manifest: {manifest_path}")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -142,7 +142,7 @@ HEADER_TEMPLATE = """\
  *           source = LevelBlockAttrsA[cellar] OR AttrsB[cellar].
  *           Per Z_05.asm:CheckWarps UW branch (line 7264-7282).
  *
- * Cross-checked at gen time vs RoomRom/tools/uw_reachability.py
+ * Cross-checked at gen time vs engine/tools/uw_reachability.py
  * cellar_targets manifest path; mismatch fails build.
  */
 

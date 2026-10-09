@@ -97,12 +97,12 @@
  * reference/aldonunez/Z_05.asm:7795 reads `LevelBlockAttrsE, Y` &
  * `$80` — bit 7 of the AttrsE TABLE (not the cached F-byte).
  *
- * AttrsE base in NES SRAM: `$6A7E` (Variables.inc:328); RoomRom-side
+ * AttrsE base in NES SRAM: `$6A7E` (Variables.inc:328); engine-side
  * SRAM-relative offset is `$0A7E + room_id`. The drained
  * src/game/room/room_dispatch.c:75 `room_is_dark_room()` reads this
- * exact location. NOTE: standalone RoomRom has only 2 KB nes_ram
- * (RoomRom/src/boot/nes_ram_init.c:25), so $0A7E is OUT OF BOUNDS
- * there — RoomRom must use the generated `uw_dark_rooms` master
+ * exact location. NOTE: standalone engine has only 2 KB nes_ram
+ * (engine/src/boot/nes_ram_init.c:25), so $0A7E is OUT OF BOUNDS
+ * there — engine must use the generated `uw_dark_rooms` master
  * table at runtime; the dispatch fn is safe to call only on host
  * environments with full NES SRAM mapped.
  */
@@ -179,15 +179,15 @@
 #define DUNGEON_LBA_E(room)          RAM(0x6A7Eu + (unsigned char)(room))
 #define DUNGEON_LBA_F(room)          RAM(0x6AFEu + (unsigned char)(room))
 
-/* ---- RoomRom bridge state ------------------------------------------------
- * RoomRom (RoomRom/src/main.c) maintains its own scene/room/redux state:
+/* ---- engine bridge state ------------------------------------------------
+ * engine (engine/src/main.c) maintains its own scene/room/redux state:
  *   s_scene    — SCENE_UW / SCENE_OW / SCENE_CAVE
- *   s_room_id  — current room (mirrors NES CUR_ROOM_ID while in RoomRom)
+ *   s_room_id  — current room (mirrors NES CUR_ROOM_ID while in engine)
  *   s_redux    — palette/CHR redux toggle
  *
- * These are RoomRom-private.  Genesis substrate code reads/writes the
+ * These are engine-private.  Genesis substrate code reads/writes the
  * canonical NES RAM cells (CUR_ROOM_ID = RAM(0x00EB), CUR_LEVEL =
- * RAM(0x0010)) and expects RoomRom to sync from those on scene load.
+ * RAM(0x0010)) and expects engine to sync from those on scene load.
  * No additional bridge macros needed here until Phase 12 promotion.
  */
 

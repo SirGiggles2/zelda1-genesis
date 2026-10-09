@@ -4,7 +4,7 @@
  *   NES source:  Z_05.asm:FindDoorAttrByDoorBit, TouchDoor*, LayOutDoors,
  *                UpdateDoors, CheckShutters, SetDoorFlag/ResetDoorFlag
  *   Drained C:   NONE (room_dispatch.c has Z_05 drain stubs, but Phase 5
- *                active scope is RoomRom/src only — no cross-scope import)
+ *                active scope is engine/src only — no cross-scope import)
  *   Coverage:    NONE
  *   Stance:      GREENFIELD (drain_coverage.py reports 0 candidates in scope)
  */

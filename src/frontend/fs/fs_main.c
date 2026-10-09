@@ -93,7 +93,7 @@ static void fs_init(void) {
     /* 1b. T-099: NES CommonMiscPatterns = BG tiles $F2..$FF (full heart $F2,
      *     etc.), which the captured FS block stops short of. common_chr tiles
      *     224..237 are those 14 tiles, extracted from the supplied ROM
-     *     (verified byte-equal to RoomRom/out/prg_blocks CommonMiscPatterns). */
+     *     (verified byte-equal to engine/out/prg_blocks CommonMiscPatterns). */
     render_chr_upload((unsigned short)(0xF2u * 32u), common_chr + 224u * 32u,
                       (unsigned short)(14u * 32u));
 
@@ -305,7 +305,7 @@ void fs_main(void) {
 /* ---- Frame-driven entry, for hosts that own the main loop ----
  *
  * fs_main() blocks forever, which is fine for the proof ROM but useless
- * to Debug.md: its loop in src/debug/a4_probe_main.c has to keep running
+ * to Zelda.md: its loop in src/platform/game_main.c has to keep running
  * so control can come BACK when the player picks a slot. These two split
  * fs_main into "set up once" and "advance one frame", with the caller
  * owning vblank. fs_main() is left untouched so the proof ROM path is

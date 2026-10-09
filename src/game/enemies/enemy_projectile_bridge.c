@@ -2,7 +2,7 @@
  * primitives bridge. Forwarders for c_/z01_/z07_ symbols pulled in by
  * src/oracle/enemies/enemy_projectile_runtime.c. Same model as
  * src/game/enemies/enemy_walker_bridge.c. Drain Rule D1 stance: EXTEND.
- * WT-5: lives at src/game/enemies/, not RoomRom/.
+ * WT-5: lives at src/game/enemies/, not engine/.
  */
 
 #include "core/core_dispatch.h"             /* core_get_opposite_dir, core_destroy_monster */

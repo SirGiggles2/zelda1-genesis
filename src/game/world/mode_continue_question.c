@@ -7,7 +7,7 @@
  * Z_07.asm ResetPlayerState (1447), EndGameMode (1683),
  * PatchAndCueLevelPalettesTransferAndAdvanceSubmode (1423),
  * ClearRoomHistory (1387); Z_01.asm SilenceAllSound (3259).
- * Reached from UpdateMenuActive (pad 2 Up+A, RoomRom/src/main.c) and from
+ * Reached from UpdateMenuActive (pad 2 Up+A, engine/src/main.c) and from
  * mode $11 death.
  * Drained C: room_patch_and_cue_level_palettes_transfer and
  * room_clear_room_history (src/game/room/room_dispatch.c).
@@ -18,7 +18,7 @@
  * t131-t253 (tools/lockstep/presets/t013_save.json).
  *
  * The Genesis screen (blank, text, cursor, flash) is drawn by
- * RoomRom/src/main.c hooks; this file only touches NES RAM and calls them.
+ * engine/src/main.c hooks; this file only touches NES RAM and calls them.
  */
 
 #include "platform_abi.h"
@@ -64,7 +64,7 @@ static const unsigned char k_text_len[3]      = { 8u, 4u, 5u };
 static const unsigned char k_text_row[3]      = { 10u, 13u, 16u };
 #define M8_TEXT_COL 10u
 
-/* Genesis presentation (RoomRom/src/main.c). */
+/* Genesis presentation (engine/src/main.c). */
 extern void roomrom_mode8_blank(void);    /* TurnOffVideoAndClearArtifacts */
 extern void roomrom_mode8_text(unsigned char nes_row, unsigned char nes_col,
                                const unsigned char *tiles, unsigned char n,

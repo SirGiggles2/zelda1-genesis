@@ -60,7 +60,7 @@ extern void c_reset_shove_info(unsigned int slot);
 /* LevelMasks[8] (NES Z_07.asm:747-748). The drained gleeok runtime
  * references this table for the per-neck dead-mask bit; no other TU
  * provides a global definition (only file-static copies in
- * progress_dispatch.c + RoomRom item-room meta). Place it here so the
+ * progress_dispatch.c + engine item-room meta). Place it here so the
  * gleeok drain links cleanly. Marked extern so other consumers
  * (item/trap/progress runtimes) resolve to the same object. */
 const unsigned char LevelMasks[8] = {

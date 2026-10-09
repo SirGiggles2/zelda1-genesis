@@ -34,4 +34,4 @@ void audio_vblank_hook_install(void)
 
 /* Phase 10.3 audio link: SFX stub retired 2026-05-15 — real impl
  * provided by src/sgdk_adapter/audio_adapter.c::audio_sfx_play
- * (now linked into Debug.md alongside data/audio/sfx_pcm.c). */
+ * (now linked into Zelda.md alongside data/audio/sfx_pcm.c). */

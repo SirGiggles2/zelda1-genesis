@@ -2,13 +2,13 @@
 """Verify checked-in generated sources are fresh vs their inputs + gen scripts.
 
 Per Codex parity audit (debate roomrom-default-rule, 2026-05-04 ACTION 3):
-RoomRom standalone build silently accepts stale generated sources for atlas /
+engine standalone build silently accepts stale generated sources for atlas /
 expanded_bg_chr / redux / palette / uw_blob / uw_collision_c. This gate
 closes the staleness window.
 
 Mechanism: each spec lists (script, inputs, outputs). All three are hashed
 into a single sentinel SHA. Sentinels stored in
-RoomRom/data/regen_sentinels.json. On build: re-hash, compare. If inputs or
+engine/data/regen_sentinels.json. On build: re-hash, compare. If inputs or
 script changed without outputs being regenerated (or vice versa), sentinel
 mismatch fires and build fails.
 
@@ -17,7 +17,7 @@ Usage:
     python tools/probes/check_generated_freshness.py --gen      # write sentinels
     python tools/probes/check_generated_freshness.py --gen --only uw_collision
 
-Wired into tools/debug/build_debug.py as part of the Debug build.
+Wired into tools/build/build_rom.py as part of the Debug build.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SENTINELS_PATH = REPO_ROOT / "RoomRom" / "data" / "regen_sentinels.json"
+SENTINELS_PATH = REPO_ROOT / "engine" / "data" / "regen_sentinels.json"
 
 TEXT_HASH_SUFFIXES = frozenset({
     ".asm",
@@ -49,54 +49,54 @@ GEN_SPECS: list[dict] = [
     {
         "name": "item_tile_atlas_idx",
         "script": "tools/atlas/gen_item_tile_atlas_idx.py",
-        "inputs": ["RoomRom/data/item_chr_manifest.json"],
+        "inputs": ["engine/data/item_chr_manifest.json"],
         "outputs": ["src/game/enemies/item_tile_atlas_idx.h"],
     },
     {
         "name": "uw_collision",
-        "script": "tools/builder/gen_uw_collision_c.py",
+        "script": "tools/converter/gen_uw_collision_c.py",
         "inputs": [
             "data/rooms/dungeons.c",
             "data/rooms/MANIFEST.json",
-            "tools/builder/extract_uw_collision.py",  # imported helper
+            "tools/converter/extract_uw_collision.py",  # imported helper
         ],
         "outputs": [
-            "RoomRom/src/uw_collision_data.c",
-            "RoomRom/src/uw_collision_data.h",
+            "engine/src/uw_collision_data.c",
+            "engine/src/uw_collision_data.h",
         ],
     },
     {
         "name": "uw_blob",
-        "script": "RoomRom/tools/gen_uw_blob.py",
+        "script": "engine/tools/gen_uw_blob.py",
         # T-080: rooms are captured from the user's ROM by the offline NES
         # (tools/nesemu), aggregated by uw_aggregate.py. Track those
         # producers and the room lists, not the untracked aggregate.
         "inputs": [
             "tools/nesemu/nes.py",
             "tools/nesemu/zelda_uw_dump.py",
-            "RoomRom/tools/uw_aggregate.py",
-            "RoomRom/data/uw_level*_quest*_rooms.json",
+            "engine/tools/uw_aggregate.py",
+            "engine/data/uw_level*_quest*_rooms.json",
         ],
         "outputs": [
-            "RoomRom/src/uw_room_blob.c",
+            "engine/src/uw_room_blob.c",
         ],
     },
     {
         "name": "atlas",
-        "script": "RoomRom/tools/gen_atlas.py",
+        "script": "engine/tools/gen_atlas.py",
         "inputs": [
-            "RoomRom/data/atlas_master.json",
-            "RoomRom/data/item_chr_manifest.json",
-            "RoomRom/out/prg_blocks/orig/**/*",
+            "engine/data/atlas_master.json",
+            "engine/data/item_chr_manifest.json",
+            "engine/out/prg_blocks/orig/**/*",
         ],
         "outputs": [
-            "RoomRom/src/atlas/*.c",
-            "RoomRom/src/atlas/*.h",
+            "engine/src/atlas/*.c",
+            "engine/src/atlas/*.h",
         ],
     },
     {
         "name": "bg_palette_blob",
-        "script": "RoomRom/tools/gen_bg_palette_blob.py",
+        "script": "engine/tools/gen_bg_palette_blob.py",
         "inputs": [
             "data/misc/palettes.c",
         ],
@@ -108,22 +108,22 @@ GEN_SPECS: list[dict] = [
     },
     {
         "name": "redux_roomrom",
-        "script": "RoomRom/tools/gen_redux_roomrom.py",
+        "script": "engine/tools/gen_redux_assets.py",
         # T-080: Redux sources are located in the user's Redux ROM by
-        # tools/builder/rom_blobs.py from the shipped template.
+        # tools/converter/rom_blobs.py from the shipped template.
         "inputs": [
-            "RoomRom/data/redux_sources.template.json",
-            "tools/builder/rom_blobs.py",
+            "engine/data/redux_sources.template.json",
+            "tools/converter/rom_blobs.py",
             "data/rooms/overworld.c",
         ],
         "outputs": [
-            "RoomRom/src/redux_overworld.c",
-            "RoomRom/src/redux_overworld_bg.c",
+            "engine/src/redux_overworld.c",
+            "engine/src/redux_overworld_bg.c",
         ],
     },
     {
         "name": "redux_uw_bg",
-        "script": "RoomRom/tools/gen_redux_uw_bg.py",
+        "script": "engine/tools/gen_redux_uw_bg.py",
         # T-080: dumped from the user's Redux ROM by the offline NES.
         "inputs": [
             "tools/nesemu/nes.py",
@@ -131,49 +131,49 @@ GEN_SPECS: list[dict] = [
             "tools/nesemu/zelda_uw_dump.py",
         ],
         "outputs": [
-            "RoomRom/src/redux_uw_bg.c",
+            "engine/src/redux_uw_bg.c",
         ],
     },
     # Phase J.2 (2026-05-18): expand_bg_chr.py retired. Legacy
     # expanded_bg_chr.{c,h} deleted; all consumers migrated to sparse
-    # atlas (RoomRom/tools/gen_bg_sparse.py).
+    # atlas (engine/tools/gen_bg_sparse.py).
     {
         "name": "bg_sparse",
-        "script": "RoomRom/tools/gen_bg_sparse.py",
+        "script": "engine/tools/gen_bg_sparse.py",
         "inputs": [
             "data/chr/common.c",
             "data/chr/overworld_bg.c",
             "data/chr/underworld_bg.c",
-            "RoomRom/src/redux_overworld_bg.c",
+            "engine/src/redux_overworld_bg.c",
             "tools/probes/audit_per_tile_subpal.py",
-            "RoomRom/src/uw_room_blob.c",
+            "engine/src/uw_room_blob.c",
             "data/rooms/overworld.c",
         ],
         "outputs": [
-            "RoomRom/src/bg_sparse_chr.c",
-            "RoomRom/src/bg_sparse_chr.h",
+            "engine/src/bg_sparse_chr.c",
+            "engine/src/bg_sparse_chr.h",
         ],
     },
     {
         "name": "sprite_catalog",
         "script": "tools/atlas/gen_sprite_catalog.py",
         "inputs": [
-            "RoomRom/src/roomrom_vram_map.h",
-            "RoomRom/data/chr_atlas_master.json",
-            "RoomRom/data/item_chr_manifest.json",
-            "RoomRom/src/atlas/items_chr_x4.h",
-            "RoomRom/src/atlas/enemy_chr.h",
-            "RoomRom/src/atlas/link_chr.h",
-            "RoomRom/src/atlas/hud_chr.h",
-            "RoomRom/src/atlas/npc_chr.h",
-            "RoomRom/src/atlas/title_chr.h",
-            "RoomRom/src/atlas/fileselect_chr.h",
-            "RoomRom/src/atlas/boss_chr.h",
+            "engine/src/vram_layout.h",
+            "engine/data/chr_atlas_master.json",
+            "engine/data/item_chr_manifest.json",
+            "engine/src/atlas/items_chr_x4.h",
+            "engine/src/atlas/enemy_chr.h",
+            "engine/src/atlas/link_chr.h",
+            "engine/src/atlas/hud_chr.h",
+            "engine/src/atlas/npc_chr.h",
+            "engine/src/atlas/title_chr.h",
+            "engine/src/atlas/fileselect_chr.h",
+            "engine/src/atlas/boss_chr.h",
         ],
         "outputs": [
             "docs/atlas/sprite_catalog.md",
             "docs/atlas/vram_map.md",
-            "RoomRom/data/sprite_catalog.json",
+            "engine/data/sprite_catalog.json",
         ],
     },
 ]

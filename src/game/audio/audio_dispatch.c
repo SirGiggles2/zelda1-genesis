@@ -21,7 +21,7 @@
  * FM path. See src/sgdk_adapter/audio_adapter.c::audio_music_play. */
 extern void audio_music_play(unsigned char song_bitmap);
 
-/* Scene constants — must mirror RoomRom/src/main.c scene_t. */
+/* Scene constants — must mirror engine/src/main.c scene_t. */
 #define SCENE_OW    0u
 #define SCENE_UW    1u
 #define SCENE_CAVE  2u

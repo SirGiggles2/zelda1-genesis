@@ -5,7 +5,7 @@
 **Verifier output (live):** `verify_vram_budget: OK  BG=tiles 1..677  SPR=tiles 678..964  ITEM=tiles 965..1074  BOSS=SCENE_OBJ-shared (NES parity)  BOSS_PAL3=tiles 1075..1138  CLOUD=tiles 1300..1305  FIREBALL=tiles 1306..1307  FIREBALL_PAL3=tiles 1426..1427  SPARK=tiles 1308..1311  SPARK_PAL3=tiles 1428..1431  HUD_MARKER=tiles 1312..1313  SHIELD=tiles 1314..1315  CELLAR_BG=tiles 1316..1317  SUBSCREEN_SPRITE=tiles 1280..1295  LINK_FLASH3=tiles 1378..1409  LINK_ATTACK_FLASH3=tiles 1410..1425  contiguous_tail_headroom=96 tiles before VDP tables  bg_free_zone=14 tiles (sparse atlas leaves BG slots free for direct-tile-id content)
   hscroll_table_unused=1020 bytes (HSCROLL_PLANE mode uses 4 B of 1 KB allocated; available as SAT-extension scratch only)`
 
-Genesis VRAM = 64 KB ($0000-$FFFF). Tile-data ceiling = $C000 (planes A+B shared at $C000 per `RoomRom/src/main.c::init_video`). All tile addresses below are aligned to 32-byte tile boundaries.
+Genesis VRAM = 64 KB ($0000-$FFFF). Tile-data ceiling = $C000 (planes A+B shared at $C000 per `engine/src/main.c::init_video`). All tile addresses below are aligned to 32-byte tile boundaries.
 
 ## Layout (post Phase A-F)
 

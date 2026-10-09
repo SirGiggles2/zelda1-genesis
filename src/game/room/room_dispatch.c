@@ -1,6 +1,6 @@
 /* room_dispatch.c — native room subsystem dispatch (Phase 4).
  *
- * Drain MATCH (verified-by-use; in production via Debug.md gameplay).
+ * Drain MATCH (verified-by-use; in production via Zelda.md gameplay).
  */
 
 #include "room_dispatch.h"

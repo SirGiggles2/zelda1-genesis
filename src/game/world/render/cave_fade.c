@@ -14,7 +14,7 @@
 #include "../../combat/collision_dispatch.h"  /* InitMode10 GetCollidableTileStill (T-171) */
 
 /* Genesis Plane A VRAM base + cell stride. Per src/sgdk_adapter
- * config (RoomRom PR-2 H64xV32 layout): plane A at $C000, 64 cells
+ * config (engine PR-2 H64xV32 layout): plane A at $C000, 64 cells
  * wide, 2 bytes per cell. Plane is 32 rows tall (PR-2 trimmed half
  * of V64 to free CHR space). */
 #define CAVE_FADE_PLANE_A_BASE   0xC000u
@@ -313,7 +313,7 @@ void cave_fade_tick(void)
     case CAVE_FADE_SWAP_ENTRY:
         /* Instant: cave state init + cave plane fill + cave palette
          * stamp. Mirrors the three calls that pre-anim lived inline at
-         * RoomRom/src/main.c. Owner callback then handles Link
+         * engine/src/main.c. Owner callback then handles Link
          * reposition (cave-bottom) + scene flip. */
         (void)cave_init(s_pending_cid);
         roomrom_cave_room_render_fill_plane_a((unsigned char)s_pending_cid);

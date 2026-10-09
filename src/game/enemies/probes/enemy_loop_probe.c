@@ -17,7 +17,7 @@
 
 #include "enemy_loop_probe.h"
 #include "../enemy_loop.h"
-#include "../../../../RoomRom/src/roomrom_enemy_state.h"
+#include "../../../../engine/src/enemy_state.h"
 #include "object_state.h"   /* OBJ_STATE for step-3 forwarder check */
 #include "platform_abi.h"   /* RAM($034C) ActiveMonsterShots — step 14 */
 #include "combat_state.h"   /* MON_HP / MON_HIT_REACTION / MON_SHOVE_*
@@ -418,7 +418,7 @@ void enemy_loop_probe_publish_pre(void)
     volatile unsigned char *block =
         (volatile unsigned char *)ENEMY_LOOP_TICK_PRE_PROBE_BASE;
     /* Raw absolute pointer to the byte ENEMY_TYPE(1) maps to.
-     * Debug.md A4 = $FF8000 (set by src/debug/a4_probe_asm.s entry).
+     * Zelda.md A4 = $FF8000 (set by src/platform/game_startup.s entry).
      * NES OBJ_TYPE+1 offset = $034F + 1 = $0350 → physical $FF8350.
      * Bypasses the A4-pinned `nes_ram` register binding to confirm the
      * macro path and the absolute path agree. */

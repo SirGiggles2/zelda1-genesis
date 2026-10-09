@@ -1,9 +1,9 @@
 #include "ow_render.h"
 #include "render_abi.h"
-#include "../../../../RoomRom/src/roomrom_vram_map.h"
+#include "../../../../engine/src/vram_layout.h"
 #include "../bg_palette.h"  /* Phase 12.2 promoted */
 #include "../ow_palette.h"  /* Phase 12.2 promoted */
-#include "../../../../RoomRom/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
+#include "../../../../engine/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
 #include "platform_abi.h"  /* nes_ram, NES_PLAY_AREA_BASE, NES_TILE_COL_STRIDE */
 #include "../world_dispatch.h"  /* world_get_shortcut_or_item_xy_for_room */
 

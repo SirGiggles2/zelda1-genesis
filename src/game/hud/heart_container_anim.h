@@ -5,7 +5,7 @@
  * container slot.
  *
  * NES Z_01.asm @TakeHeartContainer (line 4538) is instant — Items[$18]
- * gains $11 and the HUD repaints next vblank. RoomRom adds a 3-frame
+ * gains $11 and the HUD repaints next vblank. engine adds a 3-frame
  * fade-in over the new slot so the player can visually parse the
  * increase: EMPTY -> HALF -> FULL across ~30 frames (~500ms @ 60Hz).
  *

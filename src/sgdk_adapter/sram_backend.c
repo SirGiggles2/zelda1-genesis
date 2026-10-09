@@ -1,15 +1,15 @@
-/* sram_backend.c — cart SRAM primitives for Debug.md, on SGDK.
+/* sram_backend.c — cart SRAM primitives for Zelda.md, on SGDK.
  *
  * WHY THIS EXISTS
  * ---------------
  * sram_adapter.c declares four externs — _sram_enable, _sram_read_byte,
  * _sram_write_byte, _sram_load_save_slots, _sram_commit_save_slots — and
  * says they come from src/nes_io.asm. That file is part of the legacy
- * transpiled build and is NOT linked into Debug.md (grep build_debug.py:
+ * transpiled build and is NOT linked into Zelda.md (grep build_rom.py:
  * zero references to nes_io). genesis_shell.asm, which called
  * _sram_load_save_slots at boot, is not linked either.
  *
- * Net effect before this file: Debug.md had no cart SRAM support at all.
+ * Net effect before this file: Zelda.md had no cart SRAM support at all.
  * sram_adapter.c had never been compiled, so nothing noticed. Linking
  * 142 KB of transpiled ASM to get five small routines would be the wrong
  * trade, so they are implemented here on SGDK's SRAM API instead.

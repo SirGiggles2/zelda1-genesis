@@ -27,7 +27,7 @@
  */
 #include <genesis.h>
 #include "state_dump.h"
-#include "roomrom_debug_runtime.h"
+#include "engine_runtime.h"
 
 extern const unsigned char g_state_dump_font[64 * 8];
 

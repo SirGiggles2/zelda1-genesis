@@ -35,7 +35,7 @@
  * SpawnPosListAddrs[ObjDir] but without IsSafeToSpawn rejection; history
  * modify is a no-op (pristine first-entry behavior).
  *
- * Hard rule WT-5: file lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: file lives at src/game/enemies/, not engine/.
  */
 
 #include "obj_lists.h"

@@ -15,7 +15,7 @@
  * Step 2 wires $17 LikeLike. Subsequent steps add $16 PolsVoice +
  * $27 Wallmaster.
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  */
 
 #include <stdint.h>                     /* uint8_t */

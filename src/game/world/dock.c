@@ -3,7 +3,7 @@
 #include "draw_dispatch.h"                  /* draw_static_item_sprites */
 #include "sprite_dispatch.h"                /* sprite_animate_object_walking */
 #include "../room/room_dispatch.h"          /* room_go_to_next_mode_from_play */
-#include "../../../RoomRom/src/roomrom_main_state.h"  /* roomrom_main_link_* */
+#include "../../../engine/src/engine_state.h"  /* roomrom_main_link_* */
 
 /* See dock.h for the NES source map (T-056). */
 #define OBJ_X               0x0070u

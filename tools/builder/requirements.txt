@@ -1,7 +1,0 @@
-# Python modules the ROM converter (tools/builder/build.py) needs beyond the
-# standard library. Pinned: extract_dmc_samples.py resamples with
-# scipy.signal.resample_poly, and these exact versions reproduce the
-# committed sample banks byte-for-byte (tools/builder/regen_audit.py).
-numpy==2.4.6
-scipy==1.17.1
-py65==1.2.0

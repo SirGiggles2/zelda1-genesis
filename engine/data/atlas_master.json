@@ -1,0 +1,4908 @@
+{
+  "schema_version": 1,
+  "generator": "engine/tools/walk_z1_disasm.py",
+  "rom_inputs_lock_sha": "82ac92815b4cc13b74259866b56352a76c58037a1ad43457c8057dceb8a23c73",
+  "categories": {
+    "items": [
+      {
+        "name": "sword",
+        "category": "items",
+        "nes_item_slot": "0x00",
+        "nes_frame_offset": "0x00",
+        "nes_tile_ids": [
+          "0x20",
+          "0x82",
+          "0x3C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 3,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5202,
+          "label": "Anim_ItemFrameTiles+0x00"
+        }
+      },
+      {
+        "name": "bomb",
+        "category": "items",
+        "nes_item_slot": "0x01",
+        "nes_frame_offset": "0x03",
+        "nes_tile_ids": [
+          "0x34",
+          "0x70",
+          "0x72",
+          "0x74"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 4,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5202,
+          "label": "Anim_ItemFrameTiles+0x03"
+        },
+        "sprite_size_override": [
+          1,
+          2
+        ],
+        "sprite_size_override_reason": "NES PPU runs in 8x16 sprite mode (PPUCTRL bit 5 = 1) during gameplay; @Narrow refers to half-WIDTH not 8x8 height. Live BizHawk capture in probe_nes_throw.lua confirmed paired-tile rendering. Renderer uses SPRITE_SIZE(1,2). See feedback_nes_8x16_sprite_mode."
+      },
+      {
+        "name": "arrow",
+        "category": "items",
+        "nes_item_slot": "0x02",
+        "nes_frame_offset": "0x07",
+        "nes_tile_ids": [
+          "0x28",
+          "0x86",
+          "0x3C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 3,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5202,
+          "label": "Anim_ItemFrameTiles+0x07"
+        }
+      },
+      {
+        "name": "bow",
+        "category": "items",
+        "nes_item_slot": "0x03",
+        "nes_frame_offset": "0x0A",
+        "nes_tile_ids": [
+          "0x2A"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5203,
+          "label": "Anim_ItemFrameTiles+0x0A"
+        }
+      },
+      {
+        "name": "candle",
+        "category": "items",
+        "nes_item_slot": "0x04",
+        "nes_frame_offset": "0x0B",
+        "nes_tile_ids": [
+          "0x26"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5203,
+          "label": "Anim_ItemFrameTiles+0x0B"
+        }
+      },
+      {
+        "name": "recorder",
+        "category": "items",
+        "nes_item_slot": "0x05",
+        "nes_frame_offset": "0x0C",
+        "nes_tile_ids": [
+          "0x24"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5203,
+          "label": "Anim_ItemFrameTiles+0x0C"
+        }
+      },
+      {
+        "name": "food",
+        "category": "items",
+        "nes_item_slot": "0x06",
+        "nes_frame_offset": "0x0D",
+        "nes_tile_ids": [
+          "0x22"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5203,
+          "label": "Anim_ItemFrameTiles+0x0D"
+        }
+      },
+      {
+        "name": "letter",
+        "category": "items",
+        "nes_item_slot": "0x07",
+        "nes_frame_offset": "0x0E",
+        "nes_tile_ids": [
+          "0x40"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5203,
+          "label": "Anim_ItemFrameTiles+0x0E"
+        }
+      },
+      {
+        "name": "potion",
+        "category": "items",
+        "nes_item_slot": "0x08",
+        "nes_frame_offset": "0x0F",
+        "nes_tile_ids": [
+          "0x4A",
+          "0x8A"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 2,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5203,
+          "label": "Anim_ItemFrameTiles+0x0F"
+        }
+      },
+      {
+        "name": "wand",
+        "category": "items",
+        "nes_item_slot": "0x09",
+        "nes_frame_offset": "0x11",
+        "nes_tile_ids": [
+          "0x6C"
+        ],
+        "dispatch_class": "Wide_Mirrored",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x11"
+        }
+      },
+      {
+        "name": "raft",
+        "category": "items",
+        "nes_item_slot": "0x0A",
+        "nes_frame_offset": "0x12",
+        "nes_tile_ids": [
+          "0x42"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x12"
+        }
+      },
+      {
+        "name": "book",
+        "category": "items",
+        "nes_item_slot": "0x0B",
+        "nes_frame_offset": "0x13",
+        "nes_tile_ids": [
+          "0x46"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x13"
+        }
+      },
+      {
+        "name": "ring",
+        "category": "items",
+        "nes_item_slot": "0x0C",
+        "nes_frame_offset": "0x14",
+        "nes_tile_ids": [
+          "0x76"
+        ],
+        "dispatch_class": "Wide_Mirrored",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x14"
+        }
+      },
+      {
+        "name": "ladder",
+        "category": "items",
+        "nes_item_slot": "0x0D",
+        "nes_frame_offset": "0x15",
+        "nes_tile_ids": [
+          "0x2C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x15"
+        }
+      },
+      {
+        "name": "magickey",
+        "category": "items",
+        "nes_item_slot": "0x0E",
+        "nes_frame_offset": "0x16",
+        "nes_tile_ids": [
+          "0x4E"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x16"
+        }
+      },
+      {
+        "name": "bracelet",
+        "category": "items",
+        "nes_item_slot": "0x0F",
+        "nes_frame_offset": "0x17",
+        "nes_tile_ids": [
+          "0x4C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x17"
+        }
+      },
+      {
+        "name": "shield",
+        "category": "items",
+        "nes_item_slot": "0x10",
+        "nes_frame_offset": "0x18",
+        "nes_tile_ids": [
+          "0x6A"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x18"
+        }
+      },
+      {
+        "name": "boomerang",
+        "category": "items",
+        "nes_item_slot": "0x11",
+        "nes_frame_offset": "0x17",
+        "nes_tile_ids": [
+          "0x4C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x17"
+        }
+      },
+      {
+        "name": "boomerang2",
+        "category": "items",
+        "nes_item_slot": "0x12",
+        "nes_frame_offset": "0x18",
+        "nes_tile_ids": [
+          "0x6A"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x18"
+        }
+      },
+      {
+        "name": "shield2",
+        "category": "items",
+        "nes_item_slot": "0x13",
+        "nes_frame_offset": "0x17",
+        "nes_tile_ids": [
+          "0x4C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5204,
+          "label": "Anim_ItemFrameTiles+0x17"
+        }
+      },
+      {
+        "name": "heartcontainer",
+        "category": "items",
+        "nes_item_slot": "0x14",
+        "nes_frame_offset": "0x19",
+        "nes_tile_ids": [
+          "0x50",
+          "0x52"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 2,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x19"
+        }
+      },
+      {
+        "name": "triforce",
+        "category": "items",
+        "nes_item_slot": "0x15",
+        "nes_frame_offset": "0x1B",
+        "nes_tile_ids": [
+          "0x66"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x1B"
+        }
+      },
+      {
+        "name": "map",
+        "category": "items",
+        "nes_item_slot": "0x16",
+        "nes_frame_offset": "0x1C",
+        "nes_tile_ids": [
+          "0x32"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x1C"
+        }
+      },
+      {
+        "name": "compass",
+        "category": "items",
+        "nes_item_slot": "0x17",
+        "nes_frame_offset": "0x1D",
+        "nes_tile_ids": [
+          "0x2E"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x1D"
+        }
+      },
+      {
+        "name": "bigkey",
+        "category": "items",
+        "nes_item_slot": "0x18",
+        "nes_frame_offset": "0x1E",
+        "nes_tile_ids": [
+          "0x68"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x1E"
+        }
+      },
+      {
+        "name": "sword2",
+        "category": "items",
+        "nes_item_slot": "0x19",
+        "nes_frame_offset": "0x1F",
+        "nes_tile_ids": [
+          "0xF3"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x1F"
+        }
+      },
+      {
+        "name": "sword3",
+        "category": "items",
+        "nes_item_slot": "0x1A",
+        "nes_frame_offset": "0x20",
+        "nes_tile_ids": [
+          "0x6E"
+        ],
+        "dispatch_class": "Wide_Mirrored",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5206,
+          "label": "Anim_ItemFrameTiles+0x20"
+        }
+      },
+      {
+        "name": "sword4",
+        "category": "items",
+        "nes_item_slot": "0x1B",
+        "nes_frame_offset": "0x21",
+        "nes_tile_ids": [
+          "0xF2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5206,
+          "label": "Anim_ItemFrameTiles+0x21"
+        }
+      },
+      {
+        "name": "map2",
+        "category": "items",
+        "nes_item_slot": "0x1C",
+        "nes_frame_offset": "0x1C",
+        "nes_tile_ids": [
+          "0x32"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5205,
+          "label": "Anim_ItemFrameTiles+0x1C"
+        }
+      },
+      {
+        "name": "boomerang3",
+        "category": "items",
+        "nes_item_slot": "0x1D",
+        "nes_frame_offset": "0x22",
+        "nes_tile_ids": [
+          "0x36",
+          "0x38",
+          "0x3A",
+          "0x3C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 4,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5206,
+          "label": "Anim_ItemFrameTiles+0x22"
+        },
+        "sprite_size_override": [
+          1,
+          2
+        ],
+        "sprite_size_override_reason": "NES PPU runs in 8x16 sprite mode (PPUCTRL bit 5 = 1) during gameplay; @Narrow refers to half-WIDTH not 8x8 height. Live BizHawk capture in probe_nes_throw.lua confirmed paired-tile rendering. Renderer uses SPRITE_SIZE(1,2). See feedback_nes_8x16_sprite_mode."
+      },
+      {
+        "name": "sword_beam",
+        "category": "items",
+        "nes_item_slot": "0x1E",
+        "nes_frame_offset": "0x22",
+        "nes_tile_ids": [
+          "0x36",
+          "0x38",
+          "0x3A",
+          "0x3C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 4,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5206,
+          "label": "Anim_ItemFrameTiles+0x22"
+        }
+      },
+      {
+        "name": "fire",
+        "category": "items",
+        "nes_item_slot": "0x1F",
+        "nes_frame_offset": "0x26",
+        "nes_tile_ids": [
+          "0x56"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5206,
+          "label": "Anim_ItemFrameTiles+0x26"
+        }
+      },
+      {
+        "name": "unknown32",
+        "category": "items",
+        "nes_item_slot": "0x20",
+        "nes_frame_offset": "0x27",
+        "nes_tile_ids": [
+          "0x48"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5206,
+          "label": "Anim_ItemFrameTiles+0x27"
+        }
+      },
+      {
+        "name": "unknown33",
+        "category": "items",
+        "nes_item_slot": "0x21",
+        "nes_frame_offset": "0x28",
+        "nes_tile_ids": [
+          "0x78"
+        ],
+        "dispatch_class": "Wide_Mirrored",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5207,
+          "label": "Anim_ItemFrameTiles+0x28"
+        }
+      },
+      {
+        "name": "boomerang_anim0",
+        "category": "items",
+        "nes_item_slot": "0x22",
+        "nes_frame_offset": "0x29",
+        "nes_tile_ids": [
+          "0x20"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5207,
+          "label": "Anim_ItemFrameTiles+0x29"
+        }
+      },
+      {
+        "name": "boomerang_anim1",
+        "category": "items",
+        "nes_item_slot": "0x23",
+        "nes_frame_offset": "0x2B",
+        "nes_tile_ids": [
+          "0x7A",
+          "0x7C"
+        ],
+        "dispatch_class": "Wide_Mirrored",
+        "frame_count": 2,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5207,
+          "label": "Anim_ItemFrameTiles+0x2B"
+        }
+      },
+      {
+        "name": "boomerang_anim2",
+        "category": "items",
+        "nes_item_slot": "0x24",
+        "nes_frame_offset": "0x2E",
+        "nes_tile_ids": [
+          "0x64",
+          "0x62"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 3,
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 5207,
+          "label": "Anim_ItemFrameTiles+0x2E"
+        }
+      }
+    ],
+    "enemies": [
+      {
+        "name": "lynel_red",
+        "category": "enemies",
+        "obj_type_index": "0x01",
+        "update_routine": "UpdateLynel",
+        "nes_tile_ids": [
+          "0xCE",
+          "0xD0",
+          "0xD2",
+          "0xD4",
+          "0xD6",
+          "0xD8",
+          "0xDA",
+          "0xDC"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5297,
+          "label": "UpdateObject_JumpTable[0x01]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x02",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "lynel_blue",
+        "category": "enemies",
+        "obj_type_index": "0x02",
+        "update_routine": "UpdateLynel",
+        "nes_tile_ids": [
+          "0xCE",
+          "0xD0",
+          "0xD2",
+          "0xD4",
+          "0xD6",
+          "0xD8",
+          "0xDA",
+          "0xDC"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5298,
+          "label": "UpdateObject_JumpTable[0x02]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x03",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "moblin_red",
+        "category": "enemies",
+        "obj_type_index": "0x03",
+        "update_routine": "UpdateMoblin",
+        "nes_tile_ids": [
+          "0xF0",
+          "0xF2",
+          "0xF4",
+          "0xF6",
+          "0xF8",
+          "0xFA",
+          "0xFC",
+          "0xFE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5299,
+          "label": "UpdateObject_JumpTable[0x03]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x04",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "moblin_blue",
+        "category": "enemies",
+        "obj_type_index": "0x04",
+        "update_routine": "UpdateMoblin",
+        "nes_tile_ids": [
+          "0xF0",
+          "0xF2",
+          "0xF4",
+          "0xF6",
+          "0xF8",
+          "0xFA",
+          "0xFC",
+          "0xFE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5300,
+          "label": "UpdateObject_JumpTable[0x04]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x05",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "goriya_red",
+        "category": "enemies",
+        "obj_type_index": "0x05",
+        "update_routine": "UpdateGoriya",
+        "nes_tile_ids": [
+          "0xB8",
+          "0xBA",
+          "0xBC",
+          "0xBE",
+          "0xB0",
+          "0xB2",
+          "0xB4",
+          "0xB6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5301,
+          "label": "UpdateObject_JumpTable[0x05]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x06",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "goriya_blue",
+        "category": "enemies",
+        "obj_type_index": "0x06",
+        "update_routine": "UpdateGoriya",
+        "nes_tile_ids": [
+          "0xB8",
+          "0xBA",
+          "0xBC",
+          "0xBE",
+          "0xB0",
+          "0xB2",
+          "0xB4",
+          "0xB6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5302,
+          "label": "UpdateObject_JumpTable[0x06]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x07",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "octorok_slow_red",
+        "category": "enemies",
+        "obj_type_index": "0x07",
+        "update_routine": "UpdateOctorock",
+        "nes_tile_ids": [
+          "0xB4",
+          "0xB6",
+          "0xB0",
+          "0xB2",
+          "0xB0",
+          "0xB2",
+          "0xB8",
+          "0xBA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5303,
+          "label": "UpdateObject_JumpTable[0x07]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x08",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "octorok_fast_red",
+        "category": "enemies",
+        "obj_type_index": "0x08",
+        "update_routine": "UpdateOctorock",
+        "nes_tile_ids": [
+          "0xB4",
+          "0xB6",
+          "0xB0",
+          "0xB2",
+          "0xB0",
+          "0xB2",
+          "0xB8",
+          "0xBA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5304,
+          "label": "UpdateObject_JumpTable[0x08]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x09",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "octorok_slow_blue",
+        "category": "enemies",
+        "obj_type_index": "0x09",
+        "update_routine": "UpdateOctorock",
+        "nes_tile_ids": [
+          "0xB4",
+          "0xB6",
+          "0xB0",
+          "0xB2",
+          "0xB0",
+          "0xB2",
+          "0xB8",
+          "0xBA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5305,
+          "label": "UpdateObject_JumpTable[0x09]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x0A",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "octorok_fast_blue",
+        "category": "enemies",
+        "obj_type_index": "0x0A",
+        "update_routine": "UpdateOctorock",
+        "nes_tile_ids": [
+          "0xB4",
+          "0xB6",
+          "0xB0",
+          "0xB2",
+          "0xB0",
+          "0xB2",
+          "0xB8",
+          "0xBA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5306,
+          "label": "UpdateObject_JumpTable[0x0A]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x0B",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "darknut_red",
+        "category": "enemies",
+        "obj_type_index": "0x0B",
+        "update_routine": "UpdateDarknut",
+        "nes_tile_ids": [
+          "0xB8",
+          "0xBA",
+          "0xAC",
+          "0xAE",
+          "0xB4",
+          "0xB6",
+          "0xBC",
+          "0xBE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5307,
+          "label": "UpdateObject_JumpTable[0x0B]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x0C",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "darknut_blue",
+        "category": "enemies",
+        "obj_type_index": "0x0C",
+        "update_routine": "UpdateDarknut",
+        "nes_tile_ids": [
+          "0xB8",
+          "0xBA",
+          "0xAC",
+          "0xAE",
+          "0xB4",
+          "0xB6",
+          "0xBC",
+          "0xBE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5308,
+          "label": "UpdateObject_JumpTable[0x0C]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x0D",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "tektite_red",
+        "category": "enemies",
+        "obj_type_index": "0x0D",
+        "update_routine": "UpdateTektiteOrBoulder",
+        "nes_tile_ids": [
+          "0xCA",
+          "0xCC",
+          "0xCC",
+          "0xCE",
+          "0xCA",
+          "0xCC",
+          "0xCC",
+          "0xCE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5309,
+          "label": "UpdateObject_JumpTable[0x0D]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x0E",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "tektite_blue",
+        "category": "enemies",
+        "obj_type_index": "0x0E",
+        "update_routine": "UpdateTektiteOrBoulder",
+        "nes_tile_ids": [
+          "0xCA",
+          "0xCC",
+          "0xCC",
+          "0xCE",
+          "0xBC",
+          "0xBE",
+          "0xBE",
+          "0xC0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5310,
+          "label": "UpdateObject_JumpTable[0x0E]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x0F",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "leever_blue",
+        "category": "enemies",
+        "obj_type_index": "0x0F",
+        "update_routine": "UpdateBlueLeever",
+        "nes_tile_ids": [
+          "0xBC",
+          "0xBE",
+          "0xBE",
+          "0xC0",
+          "0xC0",
+          "0xC2",
+          "0xC0",
+          "0xC2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5311,
+          "label": "UpdateObject_JumpTable[0x0F]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x10",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "leever_red",
+        "category": "enemies",
+        "obj_type_index": "0x10",
+        "update_routine": "UpdateRedLeever",
+        "nes_tile_ids": [
+          "0xBC",
+          "0xBE",
+          "0xBE",
+          "0xC0",
+          "0xC0",
+          "0xC2",
+          "0xC0",
+          "0xC2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5312,
+          "label": "UpdateObject_JumpTable[0x10]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x11",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "zora",
+        "category": "enemies",
+        "obj_type_index": "0x11",
+        "update_routine": "UpdateZora",
+        "nes_tile_ids": [
+          "0xBC",
+          "0xBE",
+          "0xBE",
+          "0xC0",
+          "0xEC",
+          "0xEE",
+          "0xEE",
+          "0xF0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5313,
+          "label": "UpdateObject_JumpTable[0x11]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x12",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "vire",
+        "category": "enemies",
+        "obj_type_index": "0x12",
+        "update_routine": "UpdateVire",
+        "nes_tile_ids": [
+          "0xAC",
+          "0xAE",
+          "0xAE",
+          "0xB0",
+          "0xB0",
+          "0xB2",
+          "0xB2",
+          "0xB4"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5314,
+          "label": "UpdateObject_JumpTable[0x12]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x13",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "zol",
+        "category": "enemies",
+        "obj_type_index": "0x13",
+        "update_routine": "UpdateZol",
+        "nes_tile_ids": [
+          "0xA8",
+          "0xAA",
+          "0xAA",
+          "0xAC",
+          "0x92",
+          "0x94",
+          "0x94",
+          "0x96"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5315,
+          "label": "UpdateObject_JumpTable[0x13]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x14",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gel_0",
+        "category": "enemies",
+        "obj_type_index": "0x14",
+        "update_routine": "UpdateGel",
+        "nes_tile_ids": [
+          "0x92",
+          "0x94",
+          "0x94",
+          "0x96",
+          "0xA0",
+          "0xA2",
+          "0xA2",
+          "0xA4"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5316,
+          "label": "UpdateObject_JumpTable[0x14]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x15",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gel_1",
+        "category": "enemies",
+        "obj_type_index": "0x15",
+        "update_routine": "UpdateGel",
+        "nes_tile_ids": [
+          "0x92",
+          "0x94",
+          "0x94",
+          "0x96",
+          "0xA0",
+          "0xA2",
+          "0xA2",
+          "0xA4"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5317,
+          "label": "UpdateObject_JumpTable[0x15]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x16",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "pols_voice",
+        "category": "enemies",
+        "obj_type_index": "0x16",
+        "update_routine": "UpdatePolsVoice",
+        "nes_tile_ids": [
+          "0xA0",
+          "0xA2",
+          "0xA2",
+          "0xA4",
+          "0xA6",
+          "0xA8",
+          "0xA4",
+          "0xA6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5318,
+          "label": "UpdateObject_JumpTable[0x16]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x17",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "like_like",
+        "category": "enemies",
+        "obj_type_index": "0x17",
+        "update_routine": "UpdateLikeLike",
+        "nes_tile_ids": [
+          "0xA6",
+          "0xA8",
+          "0xA4",
+          "0xA6",
+          "0xA2",
+          "0xA4",
+          "0xA4",
+          "0xA6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5319,
+          "label": "UpdateObject_JumpTable[0x17]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x18",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "peahat",
+        "category": "enemies",
+        "obj_type_index": "0x1A",
+        "update_routine": "UpdatePeahat",
+        "nes_tile_ids": [
+          "0xC6",
+          "0xC8",
+          "0xC8",
+          "0xCA",
+          "0xA0",
+          "0xA2",
+          "0xA8",
+          "0xAA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5322,
+          "label": "UpdateObject_JumpTable[0x1A]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x1B",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "keese_blue",
+        "category": "enemies",
+        "obj_type_index": "0x1B",
+        "update_routine": "UpdateKeese",
+        "nes_tile_ids": [
+          "0x9A",
+          "0x9C",
+          "0x9C",
+          "0x9E",
+          "0x9A",
+          "0x9C",
+          "0x9C",
+          "0x9E"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5323,
+          "label": "UpdateObject_JumpTable[0x1B]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x1C",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "keese_red",
+        "category": "enemies",
+        "obj_type_index": "0x1C",
+        "update_routine": "UpdateKeese",
+        "nes_tile_ids": [
+          "0x9A",
+          "0x9C",
+          "0x9C",
+          "0x9E",
+          "0x9A",
+          "0x9C",
+          "0x9C",
+          "0x9E"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5324,
+          "label": "UpdateObject_JumpTable[0x1C]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x1D",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "keese_black",
+        "category": "enemies",
+        "obj_type_index": "0x1D",
+        "update_routine": "UpdateKeese",
+        "nes_tile_ids": [
+          "0x9A",
+          "0x9C",
+          "0x9C",
+          "0x9E",
+          "0xB4",
+          "0xB6",
+          "0xB8",
+          "0xBA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5325,
+          "label": "UpdateObject_JumpTable[0x1D]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x1E",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "armos",
+        "category": "enemies",
+        "obj_type_index": "0x1E",
+        "update_routine": "UpdateArmos",
+        "nes_tile_ids": [
+          "0xA0",
+          "0xA2",
+          "0xA8",
+          "0xAA",
+          "0xA4",
+          "0xA6",
+          "0xAC",
+          "0xAE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5326,
+          "label": "UpdateObject_JumpTable[0x1E]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x1F",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "boulder_set",
+        "category": "enemies",
+        "obj_type_index": "0x1F",
+        "update_routine": "UpdateBoulderSet",
+        "nes_tile_ids": [
+          "0x90",
+          "0x92",
+          "0xE8",
+          "0xEA",
+          "0xE4",
+          "0xE6",
+          "0xE0",
+          "0xE2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5327,
+          "label": "UpdateObject_JumpTable[0x1F]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x20",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "boulder",
+        "category": "enemies",
+        "obj_type_index": "0x20",
+        "update_routine": "UpdateTektiteOrBoulder",
+        "nes_tile_ids": [
+          "0x90",
+          "0x92",
+          "0xE8",
+          "0xEA",
+          "0xE4",
+          "0xE6",
+          "0xE0",
+          "0xE2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5328,
+          "label": "UpdateObject_JumpTable[0x20]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x21",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "ghini",
+        "category": "enemies",
+        "obj_type_index": "0x21",
+        "update_routine": "UpdateGhini",
+        "nes_tile_ids": [
+          "0xE4",
+          "0xE6",
+          "0xE0",
+          "0xE2",
+          "0x94",
+          "0x96",
+          "0xF3",
+          "0xF5"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5329,
+          "label": "UpdateObject_JumpTable[0x21]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x22",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "flying_ghini",
+        "category": "enemies",
+        "obj_type_index": "0x22",
+        "update_routine": "UpdateFlyingGhini",
+        "nes_tile_ids": [
+          "0xE4",
+          "0xE6",
+          "0xE0",
+          "0xE2",
+          "0x94",
+          "0x96",
+          "0xF3",
+          "0xF5"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5330,
+          "label": "UpdateObject_JumpTable[0x22]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x23",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "wizzrobe_blue",
+        "category": "enemies",
+        "obj_type_index": "0x23",
+        "update_routine": "UpdateBlueWizzrobe",
+        "nes_tile_ids": [
+          "0xB4",
+          "0xB6",
+          "0xB8",
+          "0xBA",
+          "0xBC",
+          "0xBE",
+          "0xBE",
+          "0xC0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5331,
+          "label": "UpdateObject_JumpTable[0x23]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x24",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "wizzrobe_red",
+        "category": "enemies",
+        "obj_type_index": "0x24",
+        "update_routine": "UpdateRedWizzrobe",
+        "nes_tile_ids": [
+          "0xB4",
+          "0xB6",
+          "0xB8",
+          "0xBA",
+          "0xBC",
+          "0xBE",
+          "0xBE",
+          "0xC0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5332,
+          "label": "UpdateObject_JumpTable[0x24]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x25",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "wallmaster",
+        "category": "enemies",
+        "obj_type_index": "0x27",
+        "update_routine": "UpdateWallmaster",
+        "nes_tile_ids": [
+          "0xAC",
+          "0xAE",
+          "0x9C",
+          "0x9E",
+          "0xA0",
+          "0xA2",
+          "0xA4",
+          "0xA6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5335,
+          "label": "UpdateObject_JumpTable[0x27]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x28",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "rope",
+        "category": "enemies",
+        "obj_type_index": "0x28",
+        "update_routine": "UpdateRope",
+        "nes_tile_ids": [
+          "0xA0",
+          "0xA2",
+          "0xA4",
+          "0xA6",
+          "0xA0",
+          "0xA2",
+          "0xA4",
+          "0xA6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5336,
+          "label": "UpdateObject_JumpTable[0x28]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x29",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "stalfos",
+        "category": "enemies",
+        "obj_type_index": "0x2A",
+        "update_routine": "UpdateStalfos",
+        "nes_tile_ids": [
+          "0xA8",
+          "0xAA",
+          "0x8E",
+          "0x90",
+          "0xA4",
+          "0xA6",
+          "0xDC",
+          "0xDE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5338,
+          "label": "UpdateObject_JumpTable[0x2A]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x2B",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "bubble_red",
+        "category": "enemies",
+        "obj_type_index": "0x2B",
+        "update_routine": "UpdateBubble",
+        "nes_tile_ids": [
+          "0x8E",
+          "0x90",
+          "0xA4",
+          "0xA6",
+          "0xDC",
+          "0xDE",
+          "0xE0",
+          "0xE2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5339,
+          "label": "UpdateObject_JumpTable[0x2B]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x2C",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "bubble_blue",
+        "category": "enemies",
+        "obj_type_index": "0x2C",
+        "update_routine": "UpdateBubble",
+        "nes_tile_ids": [
+          "0x8E",
+          "0x90",
+          "0xA4",
+          "0xA6",
+          "0xDC",
+          "0xDE",
+          "0xE0",
+          "0xE2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5340,
+          "label": "UpdateObject_JumpTable[0x2C]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x2D",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "bubble_black",
+        "category": "enemies",
+        "obj_type_index": "0x2D",
+        "update_routine": "UpdateBubble",
+        "nes_tile_ids": [
+          "0x8E",
+          "0x90",
+          "0xA4",
+          "0xA6",
+          "0xDC",
+          "0xDE",
+          "0xE0",
+          "0xE2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5341,
+          "label": "UpdateObject_JumpTable[0x2D]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x2E",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gibdo",
+        "category": "enemies",
+        "obj_type_index": "0x30",
+        "update_routine": "UpdateGibdo",
+        "nes_tile_ids": [
+          "0xA4",
+          "0xA6",
+          "0xDC",
+          "0xDE",
+          "0xE0",
+          "0xE2",
+          "0xE4",
+          "0xE6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5344,
+          "label": "UpdateObject_JumpTable[0x30]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x31",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "trap_0",
+        "category": "enemies",
+        "obj_type_index": "0x49",
+        "update_routine": "UpdateTrap",
+        "nes_tile_ids": [
+          "0x96",
+          "0x98",
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 3,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5369,
+          "label": "UpdateObject_JumpTable[0x49]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x4A",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "trap_1",
+        "category": "enemies",
+        "obj_type_index": "0x4A",
+        "update_routine": "UpdateTrap",
+        "nes_tile_ids": [
+          "0x96",
+          "0x98",
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 3,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5370,
+          "label": "UpdateObject_JumpTable[0x4A]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x4B",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      }
+    ],
+    "bosses": [
+      {
+        "name": "digdogger",
+        "category": "bosses",
+        "obj_type_index": "0x18",
+        "update_routine": "UpdateDigdogger",
+        "nes_tile_ids": [
+          "0xD8",
+          "0xDA",
+          "0xDA",
+          "0xDC",
+          "0x00",
+          "0x02",
+          "0x00",
+          "0x02"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5320,
+          "label": "UpdateObject_JumpTable[0x18]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x19",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "patra_child_0",
+        "category": "bosses",
+        "obj_type_index": "0x25",
+        "update_routine": "UpdatePatraChild",
+        "nes_tile_ids": [
+          "0xFC",
+          "0xFE",
+          "0xFE",
+          "0x00",
+          "0xAC",
+          "0xAE",
+          "0x9C",
+          "0x9E"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5333,
+          "label": "UpdateObject_JumpTable[0x25]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x26",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "patra_child_1",
+        "category": "bosses",
+        "obj_type_index": "0x26",
+        "update_routine": "UpdatePatraChild",
+        "nes_tile_ids": [
+          "0xFC",
+          "0xFE",
+          "0xFE",
+          "0x00",
+          "0xAC",
+          "0xAE",
+          "0x9C",
+          "0x9E"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5334,
+          "label": "UpdateObject_JumpTable[0x26]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x27",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "dodongo_0",
+        "category": "bosses",
+        "obj_type_index": "0x31",
+        "update_routine": "UpdateDodongo",
+        "nes_tile_ids": [
+          "0xDC",
+          "0xDE",
+          "0xE0",
+          "0xE2",
+          "0xE4",
+          "0xE6",
+          "0xE8",
+          "0xEA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5345,
+          "label": "UpdateObject_JumpTable[0x31]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x32",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "dodongo_1",
+        "category": "bosses",
+        "obj_type_index": "0x32",
+        "update_routine": "UpdateDodongo",
+        "nes_tile_ids": [
+          "0xDC",
+          "0xDE",
+          "0xE0",
+          "0xE2",
+          "0xE4",
+          "0xE6",
+          "0xE8",
+          "0xEA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5346,
+          "label": "UpdateObject_JumpTable[0x32]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x33",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gohma_red",
+        "category": "bosses",
+        "obj_type_index": "0x33",
+        "update_routine": "UpdateGohma",
+        "nes_tile_ids": [
+          "0xF4",
+          "0xF6",
+          "0xF6",
+          "0xF8",
+          "0xFE",
+          "0x00",
+          "0xFC",
+          "0xFE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5347,
+          "label": "UpdateObject_JumpTable[0x33]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x34",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gohma_blue",
+        "category": "bosses",
+        "obj_type_index": "0x34",
+        "update_routine": "UpdateGohma",
+        "nes_tile_ids": [
+          "0xF4",
+          "0xF6",
+          "0xF6",
+          "0xF8",
+          "0xFE",
+          "0x00",
+          "0xFC",
+          "0xFE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5348,
+          "label": "UpdateObject_JumpTable[0x34]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x35",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "digdogger_part_0",
+        "category": "bosses",
+        "obj_type_index": "0x38",
+        "update_routine": "UpdateDigdogger",
+        "nes_tile_ids": [
+          "0xD4",
+          "0xD6",
+          "0xFC",
+          "0xFE",
+          "0xFE",
+          "0x00",
+          "0xF8",
+          "0xFA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5352,
+          "label": "UpdateObject_JumpTable[0x38]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x39",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "digdogger_part_1",
+        "category": "bosses",
+        "obj_type_index": "0x39",
+        "update_routine": "UpdateDigdogger",
+        "nes_tile_ids": [
+          "0xD4",
+          "0xD6",
+          "0xFC",
+          "0xFE",
+          "0xFE",
+          "0x00",
+          "0xF8",
+          "0xFA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5353,
+          "label": "UpdateObject_JumpTable[0x39]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x3A",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "lamnola_0",
+        "category": "bosses",
+        "obj_type_index": "0x3A",
+        "update_routine": "UpdateLamnola",
+        "nes_tile_ids": [
+          "0xFC",
+          "0xFE",
+          "0xFE",
+          "0x00",
+          "0xF8",
+          "0xFA",
+          "0xE8",
+          "0xEA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5354,
+          "label": "UpdateObject_JumpTable[0x3A]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x3B",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "lamnola_1",
+        "category": "bosses",
+        "obj_type_index": "0x3B",
+        "update_routine": "UpdateLamnola",
+        "nes_tile_ids": [
+          "0xFC",
+          "0xFE",
+          "0xFE",
+          "0x00",
+          "0xF8",
+          "0xFA",
+          "0xE8",
+          "0xEA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5355,
+          "label": "UpdateObject_JumpTable[0x3B]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x3C",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "manhandla",
+        "category": "bosses",
+        "obj_type_index": "0x3C",
+        "update_routine": "UpdateManhandla",
+        "nes_tile_ids": [
+          "0xE8",
+          "0xEA",
+          "0xEA",
+          "0xEC",
+          "0xE0",
+          "0xE2",
+          "0xE4",
+          "0xE6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5356,
+          "label": "UpdateObject_JumpTable[0x3C]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x3D",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "aquamentus",
+        "category": "bosses",
+        "obj_type_index": "0x3D",
+        "update_routine": "UpdateAquamentus",
+        "nes_tile_ids": [
+          "0xD0",
+          "0xD2",
+          "0xD4",
+          "0xD6",
+          "0xD8",
+          "0xDA",
+          "0xDC",
+          "0xDE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5357,
+          "label": "UpdateObject_JumpTable[0x3D]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x3E",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "ganon",
+        "category": "bosses",
+        "obj_type_index": "0x3E",
+        "update_routine": "UpdateGanon",
+        "nes_tile_ids": [
+          "0xD0",
+          "0xD2",
+          "0xD4",
+          "0xD6",
+          "0xD8",
+          "0xDA",
+          "0xDC",
+          "0xDE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5358,
+          "label": "UpdateObject_JumpTable[0x3E]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x3F",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "moldorm",
+        "category": "bosses",
+        "obj_type_index": "0x41",
+        "update_routine": "UpdateMoldorm",
+        "nes_tile_ids": [
+          "0xDE",
+          "0xE0",
+          "0xEE",
+          "0xF0",
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5361,
+          "label": "UpdateObject_JumpTable[0x41]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x42",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gleeok_1head",
+        "category": "bosses",
+        "obj_type_index": "0x42",
+        "update_routine": "UpdateGleeok",
+        "nes_tile_ids": [
+          "0xDE",
+          "0xE0",
+          "0xEE",
+          "0xF0",
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5362,
+          "label": "UpdateObject_JumpTable[0x42]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x43",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gleeok_2head",
+        "category": "bosses",
+        "obj_type_index": "0x43",
+        "update_routine": "UpdateGleeok",
+        "nes_tile_ids": [
+          "0xDE",
+          "0xE0",
+          "0xEE",
+          "0xF0",
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5363,
+          "label": "UpdateObject_JumpTable[0x43]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x44",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gleeok_3head",
+        "category": "bosses",
+        "obj_type_index": "0x44",
+        "update_routine": "UpdateGleeok",
+        "nes_tile_ids": [
+          "0xDE",
+          "0xE0",
+          "0xEE",
+          "0xF0",
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5364,
+          "label": "UpdateObject_JumpTable[0x44]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x45",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gleeok_4head",
+        "category": "bosses",
+        "obj_type_index": "0x45",
+        "update_routine": "UpdateGleeok",
+        "nes_tile_ids": [
+          "0xDE",
+          "0xE0",
+          "0xEE",
+          "0xF0",
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5365,
+          "label": "UpdateObject_JumpTable[0x45]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x46",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "gleeok_head",
+        "category": "bosses",
+        "obj_type_index": "0x46",
+        "update_routine": "UpdateGleeokHead",
+        "nes_tile_ids": [
+          "0xDE",
+          "0xE0",
+          "0xEE",
+          "0xF0",
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5366,
+          "label": "UpdateObject_JumpTable[0x46]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x47",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "patra_0",
+        "category": "bosses",
+        "obj_type_index": "0x47",
+        "update_routine": "UpdatePatra",
+        "nes_tile_ids": [
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98",
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5367,
+          "label": "UpdateObject_JumpTable[0x47]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x48",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      },
+      {
+        "name": "patra_1",
+        "category": "bosses",
+        "obj_type_index": "0x48",
+        "update_routine": "UpdatePatra",
+        "nes_tile_ids": [
+          "0xF8",
+          "0xFA",
+          "0x96",
+          "0x98",
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "level_conditional",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5368,
+          "label": "UpdateObject_JumpTable[0x48]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x49",
+            "heap_label": "ObjAnimFrameHeap",
+            "heap_line": 4902
+          }
+        }
+      }
+    ],
+    "hud": [
+      {
+        "name": "hud_heart_full",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0xF2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_target": "bg_table_1",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 3161,
+          "label": "FormatHeartsInTextBuf",
+          "note": "full heart \u2014 FormatHeartsInTextBuf:@EmitFullHeart LDA #$F2"
+        }
+      },
+      {
+        "name": "hud_heart_half",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x65"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "chr_target": "bg_table_1",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 3161,
+          "label": "FormatHeartsInTextBuf",
+          "note": "half heart \u2014 FormatHeartsInTextBuf:@EmitHalfHeart LDA #$65"
+        }
+      },
+      {
+        "name": "hud_heart_empty",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x66"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "chr_target": "bg_table_1",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 3161,
+          "label": "FormatHeartsInTextBuf",
+          "note": "empty heart \u2014 FormatHeartsInTextBuf:@EmitEmptyHeart LDA #$66"
+        }
+      },
+      {
+        "name": "hud_digit_0",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x00"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 0 -> tile 0x00 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_1",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x01"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 1 -> tile 0x01 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_2",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x02"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 2 -> tile 0x02 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_3",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x03"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 3 -> tile 0x03 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_4",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x04"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 4 -> tile 0x04 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_5",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x05"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 5 -> tile 0x05 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_6",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x06"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 6 -> tile 0x06 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_7",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x07"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 7 -> tile 0x07 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_8",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x08"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 8 -> tile 0x08 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_digit_9",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x09"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1351,
+          "label": "ModeE_CharMap",
+          "note": "digit 9 -> tile 0x09 (FormatDecimalCountByte output)"
+        }
+      },
+      {
+        "name": "hud_blank",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x24"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 2850,
+          "label": "StatusBarTransferBufTemplate",
+          "note": "blank tile 0x24 used as placeholder in status bar template (Z_01.asm:2805)"
+        }
+      },
+      {
+        "name": "hud_rupee_count",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x00",
+          "0x01",
+          "0x02"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 2850,
+          "label": "FormatStatusBarText",
+          "note": "FormatDecimalCountByteInTextBuf for InvRupees -> 3 BG digit tiles at DynTileBuf+0x1B"
+        }
+      },
+      {
+        "name": "hud_key_count",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x00",
+          "0x01",
+          "0x02"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 2850,
+          "label": "FormatStatusBarText",
+          "note": "FormatDecimalCountByteInTextBuf for InvKeys -> 3 BG digit tiles at DynTileBuf+0x08"
+        }
+      },
+      {
+        "name": "hud_bomb_count",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x00",
+          "0x01",
+          "0x02"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 2850,
+          "label": "FormatStatusBarText",
+          "note": "FormatDecimalCountByteInTextBuf for InvBombs -> 3 BG digit tiles at DynTileBuf+0x27"
+        }
+      },
+      {
+        "name": "hud_level_text",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0x15",
+          "0x0E",
+          "0x1F",
+          "0x0E",
+          "0x15"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 454,
+          "label": "LevelNumberTransferBuf",
+          "note": "LEVEL text + digit; BG tiles 0x15=L 0x0E=E 0x1F=V"
+        }
+      },
+      {
+        "name": "hud_map_dot",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0xED"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 464,
+          "label": "TriforceRow0TransferBuf",
+          "note": "map room visited dot"
+        }
+      },
+      {
+        "name": "hud_map_current",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0xE9"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 464,
+          "label": "TriforceRow0TransferBuf",
+          "note": "triforce/current room indicator"
+        }
+      },
+      {
+        "name": "hud_map_border",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0xEA"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 464,
+          "label": "TriforceRow0TransferBuf",
+          "note": "map border tile"
+        }
+      },
+      {
+        "name": "hud_map_blank",
+        "category": "hud",
+        "nes_tile_ids": [
+          "0xEE"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 464,
+          "label": "TriforceRow0TransferBuf",
+          "note": "map empty tile"
+        }
+      }
+    ],
+    "title": [
+      {
+        "name": "title_sprite_00_tileCA",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xCA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x77",
+        "oam_x": "0xD0",
+        "oam_attr": "0xC2",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[0]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_01_tileCC",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xCC"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x77",
+        "oam_x": "0xC8",
+        "oam_attr": "0xC2",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[1]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_08_tileCE",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xCE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x57",
+        "oam_x": "0x74",
+        "oam_attr": "0x02",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[8]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_09_tileD0",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xD0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x57",
+        "oam_x": "0x7C",
+        "oam_attr": "0x02",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[9]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_10_tileD2",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xD2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x31",
+        "oam_x": "0x57",
+        "oam_attr": "0x02",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[10]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_14_tileD4",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xD4"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x31",
+        "oam_x": "0x5F",
+        "oam_attr": "0x02",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[14]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_18_tileD6",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xD6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x27",
+        "oam_x": "0x50",
+        "oam_attr": "0x02",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[18]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_sprite_22_tileA0",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xA0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "oam_y": "0x67",
+        "oam_x": "0x60",
+        "oam_attr": "0x03",
+        "chr_bank": "CommonSpritePatterns + DemoSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 343,
+          "label": "InitialTitleSprites[22]",
+          "note": "NES OAM record: [Y, tile, attr, X]"
+        }
+      },
+      {
+        "name": "title_story_final_00_tileE0",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xE0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[0]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_01_tileE2",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xE2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[1]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_02_tileEC",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xEC"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[2]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_03_tileEE",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xEE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[3]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_04_tileF8",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xF8"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[4]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_05_tileFA",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xFA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[5]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_06_tileE4",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xE4"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[6]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_07_tileE6",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xE6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[7]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_08_tileF0",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xF0"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[8]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_09_tileF2",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xF2"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[9]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_10_tileFC",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xFC"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[10]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_11_tileFE",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xFE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[11]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_12_tileE8",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xE8"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[12]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_13_tileEA",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xEA"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[13]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_14_tileF4",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xF4"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[14]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_15_tileF6",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xF6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[15]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_16_tileDC",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xDC"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[16]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      },
+      {
+        "name": "title_story_final_17_tileDE",
+        "category": "title",
+        "nes_tile_ids": [
+          "0xDE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 408,
+          "label": "DemoStoryFinalSpriteTiles[17]",
+          "note": "Final story frame sprites (Link + Zelda + Triforce)"
+        }
+      }
+    ],
+    "fileselect": [
+      {
+        "name": "fs_char_a",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x0A"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[0]",
+          "note": "character board tile for 'A'"
+        }
+      },
+      {
+        "name": "fs_char_b",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x0B"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[1]",
+          "note": "character board tile for 'B'"
+        }
+      },
+      {
+        "name": "fs_char_c",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x0C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[2]",
+          "note": "character board tile for 'C'"
+        }
+      },
+      {
+        "name": "fs_char_d",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x0D"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[3]",
+          "note": "character board tile for 'D'"
+        }
+      },
+      {
+        "name": "fs_char_e",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x0E"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[4]",
+          "note": "character board tile for 'E'"
+        }
+      },
+      {
+        "name": "fs_char_f",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x0F"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[5]",
+          "note": "character board tile for 'F'"
+        }
+      },
+      {
+        "name": "fs_char_g",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x10"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[6]",
+          "note": "character board tile for 'G'"
+        }
+      },
+      {
+        "name": "fs_char_h",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x11"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[7]",
+          "note": "character board tile for 'H'"
+        }
+      },
+      {
+        "name": "fs_char_i",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x12"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[8]",
+          "note": "character board tile for 'I'"
+        }
+      },
+      {
+        "name": "fs_char_j",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x13"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[9]",
+          "note": "character board tile for 'J'"
+        }
+      },
+      {
+        "name": "fs_char_k",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x14"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[10]",
+          "note": "character board tile for 'K'"
+        }
+      },
+      {
+        "name": "fs_char_l",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x15"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[11]",
+          "note": "character board tile for 'L'"
+        }
+      },
+      {
+        "name": "fs_char_m",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x16"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[12]",
+          "note": "character board tile for 'M'"
+        }
+      },
+      {
+        "name": "fs_char_n",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x17"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[13]",
+          "note": "character board tile for 'N'"
+        }
+      },
+      {
+        "name": "fs_char_o",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x18"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[14]",
+          "note": "character board tile for 'O'"
+        }
+      },
+      {
+        "name": "fs_char_p",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x19"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[15]",
+          "note": "character board tile for 'P'"
+        }
+      },
+      {
+        "name": "fs_char_q",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x1A"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[16]",
+          "note": "character board tile for 'Q'"
+        }
+      },
+      {
+        "name": "fs_char_r",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x1B"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[17]",
+          "note": "character board tile for 'R'"
+        }
+      },
+      {
+        "name": "fs_char_s",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x1C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[18]",
+          "note": "character board tile for 'S'"
+        }
+      },
+      {
+        "name": "fs_char_t",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x1D"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[19]",
+          "note": "character board tile for 'T'"
+        }
+      },
+      {
+        "name": "fs_char_u",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x1E"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[20]",
+          "note": "character board tile for 'U'"
+        }
+      },
+      {
+        "name": "fs_char_v",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x1F"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[21]",
+          "note": "character board tile for 'V'"
+        }
+      },
+      {
+        "name": "fs_char_w",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x20"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[22]",
+          "note": "character board tile for 'W'"
+        }
+      },
+      {
+        "name": "fs_char_x",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x21"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[23]",
+          "note": "character board tile for 'X'"
+        }
+      },
+      {
+        "name": "fs_char_y",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x22"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[24]",
+          "note": "character board tile for 'Y'"
+        }
+      },
+      {
+        "name": "fs_char_z",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x23"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[25]",
+          "note": "character board tile for 'Z'"
+        }
+      },
+      {
+        "name": "fs_char_dash",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x62"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[26]",
+          "note": "character board tile for '-'"
+        }
+      },
+      {
+        "name": "fs_char_dot",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x63"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[27]",
+          "note": "character board tile for '.'"
+        }
+      },
+      {
+        "name": "fs_char_space",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x28"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[28]",
+          "note": "character board tile for ' '"
+        }
+      },
+      {
+        "name": "fs_digit_0",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x29"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[29]",
+          "note": "character board tile for '0'"
+        }
+      },
+      {
+        "name": "fs_digit_1",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x2A"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[30]",
+          "note": "character board tile for '1'"
+        }
+      },
+      {
+        "name": "fs_digit_2",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x2B"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[31]",
+          "note": "character board tile for '2'"
+        }
+      },
+      {
+        "name": "fs_digit_3",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x2C"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[32]",
+          "note": "character board tile for '3'"
+        }
+      },
+      {
+        "name": "fs_digit_4",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x00"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[33]",
+          "note": "character board tile for '4'"
+        }
+      },
+      {
+        "name": "fs_digit_5",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x01"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[34]",
+          "note": "character board tile for '5'"
+        }
+      },
+      {
+        "name": "fs_digit_6",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x02"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[35]",
+          "note": "character board tile for '6'"
+        }
+      },
+      {
+        "name": "fs_digit_7",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x03"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[36]",
+          "note": "character board tile for '7'"
+        }
+      },
+      {
+        "name": "fs_digit_8",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x04"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[37]",
+          "note": "character board tile for '8'"
+        }
+      },
+      {
+        "name": "fs_digit_9",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x05"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[38]",
+          "note": "character board tile for '9'"
+        }
+      },
+      {
+        "name": "fs_char_e",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x06"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[39]",
+          "note": "character board tile for 'E'"
+        }
+      },
+      {
+        "name": "fs_char_n",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x07"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[40]",
+          "note": "character board tile for 'N'"
+        }
+      },
+      {
+        "name": "fs_char_d",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x08"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[41]",
+          "note": "character board tile for 'D'"
+        }
+      },
+      {
+        "name": "fs_char_42",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x09"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[42]",
+          "note": "character board tile for 'char_42'"
+        }
+      },
+      {
+        "name": "fs_char_43",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x24"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 1,
+        "chr_target": "bg_table_0",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1352,
+          "label": "ModeE_CharMap[43]",
+          "note": "character board tile for 'char_43'"
+        }
+      },
+      {
+        "name": "fs_cursor_hand",
+        "category": "fileselect",
+        "nes_tile_ids": [
+          "0x03"
+        ],
+        "dispatch_class": "Wide_Slim",
+        "frame_count": 1,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 1368,
+          "label": "ModeEandFCursorSprites",
+          "note": "hand cursor sprite tile[1]; Y=$F3 marks hidden sprite"
+        }
+      }
+    ],
+    "npc": [
+      {
+        "name": "pond_fairy",
+        "category": "npc",
+        "obj_type_index": "0x2F",
+        "update_routine": "UpdatePondFairy",
+        "nes_tile_ids": [
+          "0xF3",
+          "0xF5",
+          "0xC9",
+          "0xCB",
+          "0xBD",
+          "0xBF",
+          "0xC1",
+          "0xC3"
+        ],
+        "dispatch_class": "Narrow",
+        "frame_count": 4,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5343,
+          "label": "UpdateObject_JumpTable[0x2F]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x30"
+          }
+        }
+      },
+      {
+        "name": "grumble",
+        "category": "npc",
+        "obj_type_index": "0x36",
+        "update_routine": "UpdateGrumble",
+        "nes_tile_ids": [
+          "0xB0",
+          "0xB2",
+          "0xF6",
+          "0xF8",
+          "0xF0",
+          "0xF2",
+          "0xD4",
+          "0xD6"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5350,
+          "label": "UpdateObject_JumpTable[0x36]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x37"
+          }
+        }
+      },
+      {
+        "name": "zelda",
+        "category": "npc",
+        "obj_type_index": "0x37",
+        "update_routine": "UpdateZelda",
+        "nes_tile_ids": [
+          "0xF6",
+          "0xF8",
+          "0xF0",
+          "0xF2",
+          "0xD4",
+          "0xD6",
+          "0xFC",
+          "0xFE"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 4,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5351,
+          "label": "UpdateObject_JumpTable[0x37]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x38"
+          }
+        }
+      },
+      {
+        "name": "uw_person_0",
+        "category": "npc",
+        "obj_type_index": "0x4B",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5371,
+          "label": "UpdateObject_JumpTable[0x4B]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x4C"
+          }
+        }
+      },
+      {
+        "name": "uw_person_1",
+        "category": "npc",
+        "obj_type_index": "0x4C",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5372,
+          "label": "UpdateObject_JumpTable[0x4C]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x4D"
+          }
+        }
+      },
+      {
+        "name": "uw_person_2",
+        "category": "npc",
+        "obj_type_index": "0x4D",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5373,
+          "label": "UpdateObject_JumpTable[0x4D]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x4E"
+          }
+        }
+      },
+      {
+        "name": "uw_person_3",
+        "category": "npc",
+        "obj_type_index": "0x4E",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5374,
+          "label": "UpdateObject_JumpTable[0x4E]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x4F"
+          }
+        }
+      },
+      {
+        "name": "uw_person_4",
+        "category": "npc",
+        "obj_type_index": "0x4F",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5375,
+          "label": "UpdateObject_JumpTable[0x4F]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x50"
+          }
+        }
+      },
+      {
+        "name": "uw_person_5",
+        "category": "npc",
+        "obj_type_index": "0x50",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5376,
+          "label": "UpdateObject_JumpTable[0x50]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x51"
+          }
+        }
+      },
+      {
+        "name": "uw_person_money",
+        "category": "npc",
+        "obj_type_index": "0x51",
+        "update_routine": "UpdateUnderworldPersonLifeOrMoney",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5377,
+          "label": "UpdateObject_JumpTable[0x51]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x52"
+          }
+        }
+      },
+      {
+        "name": "uw_person_6",
+        "category": "npc",
+        "obj_type_index": "0x52",
+        "update_routine": "UpdateUnderworldPerson",
+        "nes_tile_ids": [
+          "0x98",
+          "0x9A",
+          "0xB1",
+          "0xB3"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_07.asm",
+          "line": 5378,
+          "label": "UpdateObject_JumpTable[0x52]",
+          "anim_source": {
+            "file": "Z_01.asm",
+            "label": "ObjAnimations",
+            "line": 4884,
+            "anim_index": "0x53"
+          }
+        }
+      },
+      {
+        "name": "fairy_stationary",
+        "category": "npc",
+        "obj_type_index": "0x2F",
+        "update_routine": "AnimateStationaryFairy",
+        "nes_tile_ids": [
+          "0xC6",
+          "0xC8"
+        ],
+        "dispatch_class": "Wide_Flippable",
+        "frame_count": 2,
+        "chr_bank": "CommonSpritePatterns",
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 858,
+          "label": "AnimateStationaryFairy",
+          "note": "title/demo screen stationary fairy animation"
+        }
+      }
+    ],
+    "bg": [
+      {
+        "name": "bg_commonspritepatterns",
+        "category": "bg",
+        "label": "CommonSpritePatterns",
+        "dat_file": "dat/CommonSpritePatterns.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": 1792,
+        "scene": "all",
+        "referenced_by": [
+          "TransferCommonPatterns (Z_02.asm:69)"
+        ],
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 147,
+          "label": "CommonSpritePatterns",
+          "note": "Common sprite patterns: Link walk, all items, enemy walk frames. Always loaded at boot."
+        }
+      },
+      {
+        "name": "bg_commonbackgroundpatterns",
+        "category": "bg",
+        "label": "CommonBackgroundPatterns",
+        "dat_file": "dat/CommonBackgroundPatterns.dat",
+        "block_type": "bg",
+        "chr_target_vram": "0x1000",
+        "byte_count": 1792,
+        "scene": "all",
+        "referenced_by": [
+          "TransferCommonPatterns (Z_02.asm:69)"
+        ],
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 150,
+          "label": "CommonBackgroundPatterns",
+          "note": "Common BG patterns: HUD font, status bar tiles, common map tiles. Always loaded."
+        }
+      },
+      {
+        "name": "bg_commonmiscpatterns",
+        "category": "bg",
+        "label": "CommonMiscPatterns",
+        "dat_file": "dat/CommonMiscPatterns.dat",
+        "block_type": "misc",
+        "chr_target_vram": "0x1F20",
+        "byte_count": 224,
+        "scene": "all",
+        "referenced_by": [
+          "TransferCommonPatterns (Z_02.asm:69)"
+        ],
+        "disasm_citation": {
+          "file": "Z_02.asm",
+          "line": 153,
+          "label": "CommonMiscPatterns",
+          "note": "Miscellaneous common patterns appended at end of BG table. Always loaded."
+        }
+      },
+      {
+        "name": "bg_demospritepatterns",
+        "category": "bg",
+        "label": "DemoSpritePatterns",
+        "dat_file": "dat/DemoSpritePatterns.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "title_demo",
+        "referenced_by": [
+          "InitDemo_Phase1 (Z_01.asm:189)",
+          "title/demo mode load"
+        ],
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 1696,
+          "label": "DemoSpritePatterns",
+          "note": "Demo/title mode sprite patterns loaded over CommonSpritePatterns during title."
+        }
+      },
+      {
+        "name": "bg_demobackgroundpatterns",
+        "category": "bg",
+        "label": "DemoBackgroundPatterns",
+        "dat_file": "dat/DemoBackgroundPatterns.dat",
+        "block_type": "bg",
+        "chr_target_vram": "0x1000",
+        "byte_count": null,
+        "scene": "title_demo",
+        "referenced_by": [
+          "InitDemo_Phase1 (Z_01.asm:189)",
+          "title/demo mode load"
+        ],
+        "disasm_citation": {
+          "file": "Z_01.asm",
+          "line": 1699,
+          "label": "DemoBackgroundPatterns",
+          "note": "Demo/title mode BG patterns loaded over CommonBackgroundPatterns during title."
+        }
+      },
+      {
+        "name": "bg_patternblockuwbg",
+        "category": "bg",
+        "label": "PatternBlockUWBG",
+        "dat_file": "dat/PatternBlockUWBG.dat",
+        "block_type": "bg",
+        "chr_target_vram": "0x1000",
+        "byte_count": null,
+        "scene": "underworld",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 203,
+          "label": "PatternBlockUWBG",
+          "note": "Underworld background patterns. Loaded for all dungeon levels."
+        }
+      },
+      {
+        "name": "bg_patternblockowbg",
+        "category": "bg",
+        "label": "PatternBlockOWBG",
+        "dat_file": "dat/PatternBlockOWBG.dat",
+        "block_type": "bg",
+        "chr_target_vram": "0x1000",
+        "byte_count": null,
+        "scene": "overworld",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 206,
+          "label": "PatternBlockOWBG",
+          "note": "Overworld background patterns. Loaded for overworld map scenes."
+        }
+      },
+      {
+        "name": "bg_patternblockowsp",
+        "category": "bg",
+        "label": "PatternBlockOWSP",
+        "dat_file": "dat/PatternBlockOWSP.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "overworld",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 209,
+          "label": "PatternBlockOWSP",
+          "note": "Overworld sprite patterns (enemy frames for OW enemies). Loaded for overworld."
+        }
+      },
+      {
+        "name": "bg_patternblockuwsp358",
+        "category": "bg",
+        "label": "PatternBlockUWSP358",
+        "dat_file": "dat/PatternBlockUWSP358.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "underworld_levels_3_5_8",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 212,
+          "label": "PatternBlockUWSP358",
+          "note": "UW sprite patterns for dungeons 3, 5, 8 (non-boss enemies)."
+        }
+      },
+      {
+        "name": "bg_patternblockuwsp469",
+        "category": "bg",
+        "label": "PatternBlockUWSP469",
+        "dat_file": "dat/PatternBlockUWSP469.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "underworld_levels_4_6_9",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 215,
+          "label": "PatternBlockUWSP469",
+          "note": "UW sprite patterns for dungeons 4, 6, 9 (non-boss enemies)."
+        }
+      },
+      {
+        "name": "bg_patternblockuwsp",
+        "category": "bg",
+        "label": "PatternBlockUWSP",
+        "dat_file": "dat/PatternBlockUWSP.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "underworld_default",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 218,
+          "label": "PatternBlockUWSP",
+          "note": "Default UW sprite patterns (dungeons without a specific set)."
+        }
+      },
+      {
+        "name": "bg_patternblockuwsp127",
+        "category": "bg",
+        "label": "PatternBlockUWSP127",
+        "dat_file": "dat/PatternBlockUWSP127.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "underworld_levels_1_2_7",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "InitMode2 scene load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 221,
+          "label": "PatternBlockUWSP127",
+          "note": "UW sprite patterns for dungeons 1, 2, 7 (non-boss enemies)."
+        }
+      },
+      {
+        "name": "bg_patternblockuwspboss1257",
+        "category": "bg",
+        "label": "PatternBlockUWSPBoss1257",
+        "dat_file": "dat/PatternBlockUWSPBoss1257.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "boss_levels_1_2_5_7",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "boss room load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 224,
+          "label": "PatternBlockUWSPBoss1257",
+          "note": "Boss sprite patterns for dungeons 1 (Aquamentus), 2 (Dodongo), 5 (Digdogger), 7 (Aquamentus)."
+        }
+      },
+      {
+        "name": "bg_patternblockuwspboss3468",
+        "category": "bg",
+        "label": "PatternBlockUWSPBoss3468",
+        "dat_file": "dat/PatternBlockUWSPBoss3468.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "boss_levels_3_4_6_8",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "boss room load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 227,
+          "label": "PatternBlockUWSPBoss3468",
+          "note": "Boss sprite patterns for dungeons 3 (Manhandla), 4 (Gleeok), 6 (Gohma), 8 (Moldorm)."
+        }
+      },
+      {
+        "name": "bg_patternblockuwspboss9",
+        "category": "bg",
+        "label": "PatternBlockUWSPBoss9",
+        "dat_file": "dat/PatternBlockUWSPBoss9.dat",
+        "block_type": "sprite",
+        "chr_target_vram": "0x0000",
+        "byte_count": null,
+        "scene": "boss_level_9",
+        "referenced_by": [
+          "CopyBlock (Z_06.asm:171)",
+          "boss room load"
+        ],
+        "disasm_citation": {
+          "file": "Z_03.asm",
+          "line": 230,
+          "label": "PatternBlockUWSPBoss9",
+          "note": "Boss sprite patterns for dungeon 9 (Ganon, Patra)."
+        }
+      },
+      {
+        "name": "bg_storytileattrtransferbuf",
+        "category": "bg",
+        "label": "StoryTileAttrTransferBuf",
+        "dat_file": "dat/StoryTileAttrTransferBuf.dat",
+        "block_type": "bg_attr",
+        "chr_target_vram": null,
+        "byte_count": null,
+        "scene": "title_story",
+        "referenced_by": [
+          "TransferBufAddrs[1] (Z_06.asm:490)",
+          "TransferCurTileBuf"
+        ],
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 832,
+          "label": "StoryTileAttrTransferBuf",
+          "note": "Story screen BG attribute (palette) transfer buffer (nametable attributes, not CHR)."
+        }
+      },
+      {
+        "name": "bg_gametitletransferbuf",
+        "category": "bg",
+        "label": "GameTitleTransferBuf",
+        "dat_file": "dat/GameTitleTransferBuf.dat",
+        "block_type": "bg_nametable",
+        "chr_target_vram": null,
+        "byte_count": null,
+        "scene": "title",
+        "referenced_by": [
+          "TransferBufAddrs[8] (Z_06.asm:498)",
+          "TransferCurTileBuf"
+        ],
+        "disasm_citation": {
+          "file": "Z_06.asm",
+          "line": 835,
+          "label": "GameTitleTransferBuf",
+          "note": "ZELDA title logo BG nametable transfer buffer (tile indices, not CHR bytes)."
+        }
+      }
+    ]
+  },
+  "stats": {
+    "total_entries": 224,
+    "total_unique_sprite_tiles": 147,
+    "per_category": {
+      "items": 37,
+      "enemies": 43,
+      "bosses": 22,
+      "hud": 22,
+      "title": 26,
+      "fileselect": 45,
+      "npc": 12,
+      "bg": 17
+    }
+  }
+}

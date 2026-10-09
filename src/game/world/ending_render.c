@@ -10,8 +10,8 @@
  */
 #include "ending_render.h"
 #include "render_abi.h"
-#include "../../../RoomRom/src/roomrom_main_state.h"
-#include "../../../RoomRom/src/roomrom_vram_map.h"
+#include "../../../engine/src/engine_state.h"
+#include "../../../engine/src/vram_layout.h"
 
 extern const unsigned short bg_sparse_tile_lut[256][4];
 extern const unsigned char common_chr[7616];

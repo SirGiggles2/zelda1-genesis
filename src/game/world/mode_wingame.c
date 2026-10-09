@@ -44,7 +44,7 @@
 #include "core/core_dispatch.h"
 #include "inventory.h"
 #include "../enemies/enemy_render.h"
-#include "../../../RoomRom/src/roomrom_main_state.h"  /* quest selector */
+#include "../../../engine/src/engine_state.h"  /* quest selector */
 
 /* NES RAM aliases. */
 #define M13_GAME_SUBMODE          RAM(0x0013u)

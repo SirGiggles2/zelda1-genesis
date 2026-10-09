@@ -1,7 +1,7 @@
 /* enemy_dispatch.h — native enemy subsystem dispatch (Phase 4).
  *
  * Native rewrite of src/oracle/enemies/enemy_runtime.c +
- * enemy_common_runtime.c. Both ROMs link. RoomRom needs this most
+ * enemy_common_runtime.c. Both ROMs link. engine needs this most
  * directly — current enemy gap (no monsters in OW per user feedback)
  * traces to oracle-only enemy update/draw. Native ports start with
  * leaf helpers, build up to full per-monster updaters.

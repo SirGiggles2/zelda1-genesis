@@ -26,7 +26,7 @@
  * Tile-ID translation (initial pass):
  *   NES tile id -> SCENE_OBJ tile_base + nes_tile_id. NES Z1 sprite
  *   tiles live at $00..$BF in 8x16 mode. Our SCENE_OBJ slot at
- *   roomrom_vram_map.h::ROOMROM_SPR_TILE_BASE+44 holds enemy CHR.
+ *   vram_layout.h::ROOMROM_SPR_TILE_BASE+44 holds enemy CHR.
  *   Per-enemy refined mapping lands in follow-up commits.
  */
 

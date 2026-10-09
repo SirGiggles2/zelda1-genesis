@@ -25,7 +25,7 @@
  * Stance: EXTEND. All callees are drained C (PRIMARY evidence per
  * Drain Rule D1). No NES asm linkage. No transpiled-bank fallback.
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  *
  * NOTE — ENEMY_THROWER_SLOT ($0340) is read by enrt_shoot but not
  * written by any current call-site in the vire chain. NES Shoot uses
@@ -36,7 +36,7 @@
  */
 
 #include "platform_abi.h"             /* RAM, OBJ, NES_OBJ_TYPE, CARRY_SET */
-#include "roomrom_enemy_state.h"      /* ENEMY_SHOT_TYPE_SCRATCH macros */
+#include "enemy_state.h"      /* ENEMY_SHOT_TYPE_SCRATCH macros */
 #include "enemy_state.h"              /* ENEMY_X/Y/DIR/RNG_B/INVINCIBILITY/MOVE_TIMER/BOUNCE_FLAGS */
 #include "progress_state.h"           /* FRAME_COUNTER */
 #include "world/sprite_dispatch.h"    /* sprite_anim_advance_and_fetch */
@@ -76,7 +76,7 @@ void c_anim_advance_and_fetch(unsigned int val, unsigned int slot)
 }
 
 /* c_find_empty_monster_slot — native body. enemy_runtime.c (which
- * carries enrt_find_empty_monster_slot) is NOT linked into Debug.md
+ * carries enrt_find_empty_monster_slot) is NOT linked into Zelda.md
  * (would pull enrt_animate_and_draw_common_object + its full chain).
  * Body verbatim from enemy_runtime.c:12 — scan slots 11..1 for
  * ObjType==0, stash into ENEMY_NEXT_SHOT_SLOT, return slot index. */
@@ -117,7 +117,7 @@ unsigned int c_shoot(unsigned int type)
 /*   enrt_init_aquamentus  @ enemy_boss_runtime.c:102                     */
 /*   enrt_update_aquamentus @ enemy_boss_runtime.c:108                    */
 /* which calls c_aquamentus_{move,shoot,draw} as primitives. NES bodies   */
-/* live in legacy bank Z_04 (NOT linked into Debug.md via c_shims.asm),   */
+/* live in legacy bank Z_04 (NOT linked into Zelda.md via c_shims.asm),   */
 /* so native bodies must be carried here. Every primitive is a direct    */
 /* per-line translation of the NES asm — no logic divergence. Verified   */
 /* per-line vs reference/aldonunez/Z_04.asm.                             */

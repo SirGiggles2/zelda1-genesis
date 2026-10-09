@@ -4,7 +4,7 @@
  * Drained: save_menu_runtime.c savert_update_menu_scroll_common; retained
  *      menu ownership/selection and native adapter's VBlank transfer path.
  * Coverage: PARTIAL; scroll composition and boundaries, not full menu timing.
- * Stance: EXTEND the renderer with a frozen strip; no RoomRom edits.
+ * Stance: EXTEND the renderer with a frozen strip; no engine edits.
  *
  * V1 layout: simple text + slot grid. Renders entire Plane A as one
  * static frame on subscreen-enter. NES reference is row-by-row scroll
@@ -25,7 +25,7 @@
 #include "inventory_tilemap.h"
 #include "inventory_uw_tilemap.h"
 #include "inventory_sprite_chr.h"
-#include "../../../RoomRom/src/roomrom_main_state.h"  /* roomrom_main_current_scene */
+#include "../../../engine/src/engine_state.h"  /* roomrom_main_current_scene */
 #include "../world/draw_dispatch.h"
 #include "../world/render/subpal_routing.h"
 #include "../room/room_dispatch.h" /* native per-level map/compass ownership */
@@ -39,9 +39,9 @@ static unsigned char s_dungeon_map[8][16];
 static unsigned char s_subscreen_uw = 0u;
 #include "../../abi/platform_abi.h"
 #include "../../abi/render_abi.h"
-#include "../../../RoomRom/src/bg_sparse_chr.h"
-#include "../../../RoomRom/src/roomrom_vram_map.h"
-#include "../../../RoomRom/src/atlas/items_chr_x4.h"
+#include "../../../engine/src/bg_sparse_chr.h"
+#include "../../../engine/src/vram_layout.h"
+#include "../../../engine/src/atlas/items_chr_x4.h"
 #include "../../state/inventory.h"
 
 /* Genesis VRAM tile for item N: ITEM_VRAM_TILE_BASE + ROOMROM_ITEM_TILE_<X>.
@@ -49,7 +49,7 @@ static unsigned char s_subscreen_uw = 0u;
  * hardcoded 819 (= old SPR_TILE_BASE 533 + LINK 238 + walk 32 + attack 16).
  * Bumping SPR_TILE_BASE for inventory atlas force-includes silently broke
  * hardcoded version (Gemini H2 review finding). Source from
- * roomrom_vram_map.h for auto-update on any SPR/ITEM_BASE shift. */
+ * vram_layout.h for auto-update on any SPR/ITEM_BASE shift. */
 #define ITEM_VRAM_TILE_BASE (unsigned short)(ROOMROM_ITEM_TILE_BASE - 1u)
 /* SAT VRAM base, gameplay context per PR-2 Option F. */
 #define SAT_VRAM_BASE_GAMEPLAY 0xF400u
@@ -74,7 +74,7 @@ static void sat_write(unsigned char slot, unsigned short y,
  * Cross-search NES CHR vs Genesis VRAM revealed Common SPR atlas only
  * contains NES tiles $20-$2A at SPR_BASE+nes_tile direct mapping. Other
  * inventory tile_ids ($34/$36/$42/$46/etc) extracted to items_chr_x4
- * atlas at non-linear offsets per `RoomRom/src/atlas/items_chr_x4.h`.
+ * atlas at non-linear offsets per `engine/src/atlas/items_chr_x4.h`.
  *
  * Hardcoded LUT per NES inventory slot -> Genesis VRAM tile, derived
  * from /c/tmp/{nes,gen}_subscreen captures + cross-search.

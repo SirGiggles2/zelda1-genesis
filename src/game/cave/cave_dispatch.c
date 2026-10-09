@@ -90,7 +90,7 @@ static cave_id_t g_active_cave = 0;
  * derives CAVE_FLAGS top-bits from text-selector + ware bytes.
  *
  * Inlined to keep cave_init self-contained — cavert_init_cave in
- * src/oracle/cave/cave_runtime.c is not in Debug.md link set, and its
+ * src/oracle/cave/cave_runtime.c is not in Zelda.md link set, and its
  * z01_set_up_common_cave_objects dependency cascades into the
  * unlinked src/gen/z_01.c TU.
  *
@@ -598,7 +598,7 @@ void cave_copy_price_list_template(void)
      * 30-byte-ROM-blob copy referenced in finding 3_4n_i (last deferred
      * shim in the price-formatter chain). Replaces the
      * z01_copy_price_list_template transpile shim that did not link
-     * into Debug.md. */
+     * into Zelda.md. */
     for (unsigned char i = 0u; i < sizeof(k_cave_price_list_template); ++i) {
         RAM(CAVE_TRANSFER_BUF_CHAR_BASE + i) = k_cave_price_list_template[i];
     }
@@ -841,7 +841,7 @@ static void cave_link_end_move_and_draw_stub(void)
     /* Freeze Link's anim timer (NES Link_EndMoveAndDraw freezes it during
      * the textbox). Link's SPRITE is drawn every frame by the main-loop
      * sprite_render path (fixed SAT slot, Link CHR tile $357) — see
-     * RoomRom/src/main.c gameplay tick. The NES-ported static draw below
+     * engine/src/main.c gameplay tick. The NES-ported static draw below
      * was REDUNDANT and BUGGY on Genesis: this stub fetched Link's
      * position but never set his animation tile (the full
      * Link_EndMoveAndAnimate chain is unported), so draw_object_mirrored
@@ -910,7 +910,7 @@ void cave_update_person_state_textbox(void)
     CAVE_TEXT_TICK_SFX = 16u;
 
     /* Phase J2 (2026-05-28): publish the 5-byte char transfer record so
-     * the central transfer_buf_drain (RoomRom/src/main.c:2199) flushes it
+     * the central transfer_buf_drain (engine/src/main.c:2199) flushes it
      * to Plane A this frame. TRANSFER_BUF_POS = RAM(0x0301) is the buffer
      * length; the record lives at $0302-$0306 (TRANSFER_BUF_BYTE base
      * $0302). Without this the streamer wrote the record but never set the

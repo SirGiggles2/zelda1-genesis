@@ -104,7 +104,7 @@ void mode13_save_update(void)
     s_after_init = 0u;
     /* UpdateModeDSave_Sub2: GameMode 0 submode 1 (the title's save
      * validation, then the menu); the Genesis front end takes over there
-     * (a4_probe_main.c). */
+     * (game_main.c). */
     MODE_SAVE_GAME_MODE = 0u;
     MODE_SAVE_GAME_SUBMODE = 1u;
 }

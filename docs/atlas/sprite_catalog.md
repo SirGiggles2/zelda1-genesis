@@ -25,7 +25,7 @@ Genesis has 4 CRAM palettes × 16 colors = 64 slots. Layout post-Phase-B/F:
 - **tile_range**: `[1, 677]`
 - **subpal_count**: `1`
 - **bytes_resident**: `21664`
-- **source**: `data/chr/overworld_bg.c + data/chr/underworld_bg.c (via RoomRom/tools/expand_bg_chr.py)`
+- **source**: `data/chr/overworld_bg.c + data/chr/underworld_bg.c (via engine/tools/expand_bg_chr.py)`
 - **replication**: `4x pixel-bias (Phase J selective dedup planned)`
 
 ### SPR
@@ -44,7 +44,7 @@ Genesis has 4 CRAM palettes × 16 colors = 64 slots. Layout post-Phase-B/F:
 - **tile_range**: `[965, 1074]`
 - **subpal_count**: `1`
 - **bytes_resident**: `1173`
-- **source**: `RoomRom/data/item_chr_manifest.json + RoomRom/tools/gen_atlas.py`
+- **source**: `engine/data/item_chr_manifest.json + engine/tools/gen_atlas.py`
 - **replication**: `1x (Phase B collapsed from 3x on 2026-05-18)`
 
 ### BOSS
@@ -96,45 +96,45 @@ Each named item tile has a stable Genesis VRAM tile offset (relative to `ROOMROM
 
 | Genesis tile offset | NES tile ID | Renderer entry | NES asm reference |
 |---:|---|---|---|
-| 0 | 0x20 | `roomrom_sprites_set_sword` | see RoomRom/data/item_chr_manifest.json |
-| 2 | 0x20 | `roomrom_sprites_set_sword` | see RoomRom/data/item_chr_manifest.json |
-| 6 | 0x36 | `roomrom_sprites_set_boomerang` | see RoomRom/data/item_chr_manifest.json |
-| 14 | 0x28 | `roomrom_sprites_set_arrow` | see RoomRom/data/item_chr_manifest.json |
-| 16 | 0x28 | `roomrom_sprites_set_arrow` | see RoomRom/data/item_chr_manifest.json |
-| 20 | 0x34 | `roomrom_sprites_set_bomb` | see RoomRom/data/item_chr_manifest.json |
-| 22 | 0x70 | `roomrom_sprites_set_explosion` | see RoomRom/data/item_chr_manifest.json |
-| 34 | 0x20 | `roomrom_sprites_set_sword` | see RoomRom/data/item_chr_manifest.json |
-| 38 | 0x5C | `roomrom_sprites_set_candle` | see RoomRom/data/item_chr_manifest.json |
-| 42 | 0x5C | `roomrom_sprites_set_candle` | see RoomRom/data/item_chr_manifest.json |
-| 46 | 0x5C | `roomrom_sprites_set_candle` | see RoomRom/data/item_chr_manifest.json |
-| 50 | 0x5C | `roomrom_sprites_set_candle` | see RoomRom/data/item_chr_manifest.json |
-| 54 | 0x2E | `roomrom_sprites_set_compass` | see RoomRom/data/item_chr_manifest.json |
-| 56 | 0x32 | `roomrom_sprites_set_map` | see RoomRom/data/item_chr_manifest.json |
-| 58 | 0x68 | `roomrom_sprites_set_heart` | see RoomRom/data/item_chr_manifest.json |
-| 62 | 0x68 | `roomrom_sprites_set_big` | see RoomRom/data/item_chr_manifest.json |
-| 64 | 0x46 | `roomrom_sprites_set_book` | see RoomRom/data/item_chr_manifest.json |
-| 66 | 0x42 | `roomrom_sprites_set_raft` | see RoomRom/data/item_chr_manifest.json |
-| 68 | 0x2C | `roomrom_sprites_set_ladder` | see RoomRom/data/item_chr_manifest.json |
-| 70 | 0x76 | `roomrom_sprites_set_ring` | see RoomRom/data/item_chr_manifest.json |
-| 72 | 0x4E | `roomrom_sprites_set_magic` | see RoomRom/data/item_chr_manifest.json |
-| 74 | 0x4C | `roomrom_sprites_set_bracelet` | see RoomRom/data/item_chr_manifest.json |
-| 76 | 0x2A | `roomrom_sprites_set_bow` | see RoomRom/data/item_chr_manifest.json |
-| 78 | 0x22 | `roomrom_sprites_set_recorder` | see RoomRom/data/item_chr_manifest.json |
-| 80 | 0x40 | `roomrom_sprites_set_food` | see RoomRom/data/item_chr_manifest.json |
-| 82 | 0x4A | `roomrom_sprites_set_potion` | see RoomRom/data/item_chr_manifest.json |
-| 84 | 0x6E | `roomrom_sprites_set_triforce` | see RoomRom/data/item_chr_manifest.json |
-| 88 | 0x4E | `roomrom_sprites_set_magic` | see RoomRom/data/item_chr_manifest.json |
-| 92 | 0x4E | `roomrom_sprites_set_magic` | see RoomRom/data/item_chr_manifest.json |
-| 96 | 0x50 | `roomrom_sprites_set_fairy` | see RoomRom/data/item_chr_manifest.json |
-| 98 | 0x50 | `roomrom_sprites_set_fairy` | see RoomRom/data/item_chr_manifest.json |
-| 100 | 0xF3 | `roomrom_sprites_set_drop` | see RoomRom/data/item_chr_manifest.json |
-| 102 | 0xF3 | `roomrom_sprites_set_drop` | see RoomRom/data/item_chr_manifest.json |
-| 104 | 0x8A | `roomrom_sprites_set_rod` | see RoomRom/data/item_chr_manifest.json |
-| 108 | 0x20 | `roomrom_sprites_set_sword` | see RoomRom/data/item_chr_manifest.json |
+| 0 | 0x20 | `roomrom_sprites_set_sword` | see engine/data/item_chr_manifest.json |
+| 2 | 0x20 | `roomrom_sprites_set_sword` | see engine/data/item_chr_manifest.json |
+| 6 | 0x36 | `roomrom_sprites_set_boomerang` | see engine/data/item_chr_manifest.json |
+| 14 | 0x28 | `roomrom_sprites_set_arrow` | see engine/data/item_chr_manifest.json |
+| 16 | 0x28 | `roomrom_sprites_set_arrow` | see engine/data/item_chr_manifest.json |
+| 20 | 0x34 | `roomrom_sprites_set_bomb` | see engine/data/item_chr_manifest.json |
+| 22 | 0x70 | `roomrom_sprites_set_explosion` | see engine/data/item_chr_manifest.json |
+| 34 | 0x20 | `roomrom_sprites_set_sword` | see engine/data/item_chr_manifest.json |
+| 38 | 0x5C | `roomrom_sprites_set_candle` | see engine/data/item_chr_manifest.json |
+| 42 | 0x5C | `roomrom_sprites_set_candle` | see engine/data/item_chr_manifest.json |
+| 46 | 0x5C | `roomrom_sprites_set_candle` | see engine/data/item_chr_manifest.json |
+| 50 | 0x5C | `roomrom_sprites_set_candle` | see engine/data/item_chr_manifest.json |
+| 54 | 0x2E | `roomrom_sprites_set_compass` | see engine/data/item_chr_manifest.json |
+| 56 | 0x32 | `roomrom_sprites_set_map` | see engine/data/item_chr_manifest.json |
+| 58 | 0x68 | `roomrom_sprites_set_heart` | see engine/data/item_chr_manifest.json |
+| 62 | 0x68 | `roomrom_sprites_set_big` | see engine/data/item_chr_manifest.json |
+| 64 | 0x46 | `roomrom_sprites_set_book` | see engine/data/item_chr_manifest.json |
+| 66 | 0x42 | `roomrom_sprites_set_raft` | see engine/data/item_chr_manifest.json |
+| 68 | 0x2C | `roomrom_sprites_set_ladder` | see engine/data/item_chr_manifest.json |
+| 70 | 0x76 | `roomrom_sprites_set_ring` | see engine/data/item_chr_manifest.json |
+| 72 | 0x4E | `roomrom_sprites_set_magic` | see engine/data/item_chr_manifest.json |
+| 74 | 0x4C | `roomrom_sprites_set_bracelet` | see engine/data/item_chr_manifest.json |
+| 76 | 0x2A | `roomrom_sprites_set_bow` | see engine/data/item_chr_manifest.json |
+| 78 | 0x22 | `roomrom_sprites_set_recorder` | see engine/data/item_chr_manifest.json |
+| 80 | 0x40 | `roomrom_sprites_set_food` | see engine/data/item_chr_manifest.json |
+| 82 | 0x4A | `roomrom_sprites_set_potion` | see engine/data/item_chr_manifest.json |
+| 84 | 0x6E | `roomrom_sprites_set_triforce` | see engine/data/item_chr_manifest.json |
+| 88 | 0x4E | `roomrom_sprites_set_magic` | see engine/data/item_chr_manifest.json |
+| 92 | 0x4E | `roomrom_sprites_set_magic` | see engine/data/item_chr_manifest.json |
+| 96 | 0x50 | `roomrom_sprites_set_fairy` | see engine/data/item_chr_manifest.json |
+| 98 | 0x50 | `roomrom_sprites_set_fairy` | see engine/data/item_chr_manifest.json |
+| 100 | 0xF3 | `roomrom_sprites_set_drop` | see engine/data/item_chr_manifest.json |
+| 102 | 0xF3 | `roomrom_sprites_set_drop` | see engine/data/item_chr_manifest.json |
+| 104 | 0x8A | `roomrom_sprites_set_rod` | see engine/data/item_chr_manifest.json |
+| 108 | 0x20 | `roomrom_sprites_set_sword` | see engine/data/item_chr_manifest.json |
 
 ## ITEM bank inventory
 
-Atlas defined by `RoomRom/data/item_chr_manifest.json`; emitted via `RoomRom/tools/gen_atlas.py`. Tile indices are 0-based offsets within the ITEM bank (add `ROOMROM_ITEM_TILE_BASE` for absolute VRAM tile).
+Atlas defined by `engine/data/item_chr_manifest.json`; emitted via `engine/tools/gen_atlas.py`. Tile indices are 0-based offsets within the ITEM bank (add `ROOMROM_ITEM_TILE_BASE` for absolute VRAM tile).
 
 | Name | Item | Direction | NES Tile | Genesis Tile IDs | Dispatch (W×H) | Draw Rule |
 |---|---|---|---|---|---|---|

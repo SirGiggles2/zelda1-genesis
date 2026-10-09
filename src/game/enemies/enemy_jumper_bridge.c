@@ -30,7 +30,7 @@
  * NES data tables transcribed verbatim. No NES asm linkage. No
  * transpiled-bank fallback.
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  */
 
 #include "platform_abi.h"             /* RAM, OBJ, NES_OBJ_TYPE */
@@ -68,7 +68,7 @@ void c_bound_flyer(unsigned int slot)
 }
 
 /* z07_find_empty_monster_slot — NATIVE body (gen/z_07.c is not linked
- * into Debug.md). Body matches enemy_runtime.c:12 enrt_find_empty_monster_slot
+ * into Zelda.md). Body matches enemy_runtime.c:12 enrt_find_empty_monster_slot
  * + the inline c_find_empty_monster_slot (enemy_boss_bridge.c:79):
  *
  *   for slot in 11..1:

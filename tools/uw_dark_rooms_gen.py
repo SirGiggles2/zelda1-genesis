@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate RoomRom/data/uw_dark_rooms.{c,h} from NES ground truth.
+"""Generate engine/data/uw_dark_rooms.{c,h} from NES ground truth.
 
 NES rule (Z_05.asm:IsDarkRoom_Bank5 lines 7795-7801):
     A = LevelBlockAttrsE[room_id] & $80
     return A != 0 (dark) else 0 (lit)
 
-Per RoomRom/tools/uw_reachability.py + dungeons_offsets.h:
+Per engine/tools/uw_reachability.py + dungeons_offsets.h:
 - LevelBlockUW1Q1 base = $0000, AttrsE rel = $0200
 - LevelBlockUW2Q1 base = $0300, AttrsE rel = $0200
 - LevelBlockUW1Q2 base = $0600, AttrsE rel = $0200
@@ -41,8 +41,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DUNGEONS_C = REPO / "data" / "rooms" / "dungeons.c"
-OUT_C = REPO / "RoomRom" / "data" / "uw_dark_rooms.c"
-OUT_H = REPO / "RoomRom" / "data" / "uw_dark_rooms.h"
+OUT_C = REPO / "engine" / "data" / "uw_dark_rooms.c"
+OUT_H = REPO / "engine" / "data" / "uw_dark_rooms.h"
 
 LEVELBLOCK_BASES = {
     (1, 1): 0x0000,
@@ -92,9 +92,9 @@ HEADER = """\
  * Master table: every (level, quest, room_id) row whose AttrsE
  * byte has bit 7 set.
  *
- * RoomRom 5.8 runtime calls this manifest directly (NOT the
+ * engine 5.8 runtime calls this manifest directly (NOT the
  * drained `room_is_dark_room()` dispatch — that reads $0A7E which
- * is OOB on RoomRom's 2 KB nes_ram, per Task 5.8 G1 fix). The
+ * is OOB on engine's 2 KB nes_ram, per Task 5.8 G1 fix). The
  * dispatch fn is invoked only at generator time on the host for
  * cross-check provenance.
  */

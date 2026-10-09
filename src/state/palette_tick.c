@@ -1,8 +1,8 @@
 /* palette_tick.c — frame-cadence palette toggle runtime.
  *
  * Substrate per debate 004 Rule WT-1 (main worktree single-writer).
- * Pure C; no SGDK API calls. Both RoomRom gameplay (low-health,
- * boss-flash, hit-invuln) and Debug.md frontend (intro item flash)
+ * Pure C; no SGDK API calls. Both engine gameplay (low-health,
+ * boss-flash, hit-invuln) and Zelda.md frontend (intro item flash)
  * register toggles and call palette_tick() from their per-frame
  * update.
  *

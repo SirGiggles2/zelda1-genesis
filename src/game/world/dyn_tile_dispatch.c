@@ -10,8 +10,8 @@
  * SecondarySquaresOW / PlayAreaColumnAddrs data tables ADOPTed verbatim.
  *
  * c_shims.asm:4669 carries `c_change_tile_obj_tiles` for the legacy
- * bank build but tools/debug/build_debug.py does not link c_shims.asm,
- * so this native body is the only resolved primitive in Debug.md.
+ * bank build but tools/build/build_rom.py does not link c_shims.asm,
+ * so this native body is the only resolved primitive in Zelda.md.
  */
 
 #include "dyn_tile_dispatch.h"

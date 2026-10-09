@@ -17,7 +17,7 @@
  *   64+    — never used in H32
  *
  * The opaque black HUD underlay now comes from BG_A tile 0 (PAL0 color 0),
- * produced by clear_hud_underlay_for_row_base() in RoomRom/src/main.c.
+ * produced by clear_hud_underlay_for_row_base() in engine/src/main.c.
  *
  * SAT chain: each slot's link field points to the next slot in render
  * order (ROOMROM_SPRITE_NEXT: 0->1->...->18->19 enemy bridge entry). Per

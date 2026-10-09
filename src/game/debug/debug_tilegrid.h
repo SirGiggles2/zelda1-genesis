@@ -18,7 +18,7 @@
  *   A button     no-op (Genesis has one atlas; A=bank cycle on NES side has
  *                no Genesis analog since all banks coexist in VRAM)
  *
- * Build: linked into Debug.md via tools/debug/build_debug.py TITLE_C_SOURCES.
+ * Build: linked into Zelda.md via tools/build/build_rom.py TITLE_C_SOURCES.
  */
 #ifndef GAME_DEBUG_TILEGRID_H
 #define GAME_DEBUG_TILEGRID_H

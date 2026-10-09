@@ -190,7 +190,7 @@ void inventory_rupee_debit(unsigned char count)
  *   ADC #$11            ; else add 1-max + 1-current (carry was clear from CMP).
  *   JMP SetItemValue    ; store back to Items[Y].
  *
- * RoomRom equivalent: heart_values packs max in hi nibble, cur in lo
+ * engine equivalent: heart_values packs max in hi nibble, cur in lo
  * nibble; cap max at $0F (HEART_CONTAINERS_MAX). The CMP-with-$F0
  * gate means once max == $0F no further heart containers are added. */
 unsigned char inventory_add_heart_container(void)

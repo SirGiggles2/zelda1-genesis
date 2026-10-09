@@ -1,8 +1,8 @@
 /* cave_dispatch.h — native cave gamemode entry (debate 006 D2).
  *
- * Both ROMs link this. Debug.md (post-cutover) replaces
+ * Both ROMs link this. Zelda.md (post-cutover) replaces
  * src/gen/z_01.c cavert_init_cave / cavert_update_cave_person /
- * cavert_draw_cave_person callsites with these. RoomRom calls
+ * cavert_draw_cave_person callsites with these. engine calls
  * directly from main.c SCENE_CAVE dispatch.
  *
  * Native impl mirrors src/oracle/cave/cave_runtime.c reference
@@ -16,7 +16,7 @@
  *   (cave person: cave_update_cave_person from the enemy object loop)
  *   cave_exit   — restore overworld state
  *
- * Phase 12 promotion target: this file becomes Debug.md's primary
+ * Phase 12 promotion target: this file becomes Zelda.md's primary
  * cave gameplay path; src/oracle/cave/ retires.
  */
 
@@ -26,7 +26,7 @@
 /* Avoid stdint.h here: under SGDK_GCC the toolchain's types.h defines
  * uint8_t / uint32_t as macros aliasing SGDK's u8 / u32, which collides
  * with the project's src/stdint.h shim (typedef-based). cave_dispatch.h
- * is a public header included by both Debug.md (no SGDK_GCC) and RoomRom
+ * is a public header included by both Zelda.md (no SGDK_GCC) and engine
  * (with SGDK_GCC), so use plain C types in the API. cave_state.h needs
  * stdint.h types internally — gate by SGDK_GCC there too if/when needed. */
 
@@ -53,8 +53,8 @@ void cave_init_person(unsigned int slot);
  * per-function from oracle reference in subsequent commits. */
 
 /* Cave exit handler. Saves any persistent state to the typed CaveState
- * + signals scene transition back to overworld. Caller (RoomRom main
- * or Debug.md gamemode dispatch) handles the actual scene swap. */
+ * + signals scene transition back to overworld. Caller (engine main
+ * or Zelda.md gamemode dispatch) handles the actual scene swap. */
 void cave_exit(void);
 
 /* Read accessor: which cave is currently active. Returns 0 if no
@@ -76,8 +76,8 @@ cave_id_t cave_current_id(void);
  * Stage 1 (this commit): port branch shape only. The actual sprite
  * descriptor fetch + SAT writes are stubs — Phase 4 cross-subsystem
  * native object_draw port replaces them with render_sat_write-based
- * impl. Debug.md gates this via NATIVE_CAVE_DRAW (default OFF), so
- * stage-1 stub never runs in shipping path. RoomRom links it but
+ * impl. Zelda.md gates this via NATIVE_CAVE_DRAW (default OFF), so
+ * stage-1 stub never runs in shipping path. engine links it but
  * doesn't call it yet (cave_tick is also stub). */
 void cave_draw_person(unsigned int slot);
 

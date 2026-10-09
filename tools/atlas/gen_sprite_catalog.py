@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate docs/atlas/sprite_catalog.md + docs/atlas/vram_map.md from
-RoomRom atlas headers + manifests + roomrom_vram_map.h.
+engine atlas headers + manifests + vram_layout.h.
 
 Phase X (2026-05-18 VRAM cleanup): single source of truth for every
 graphic / sprite / atlas in the game. Reads existing artifacts (no
@@ -18,17 +18,17 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-VRAM_MAP_H = REPO / "RoomRom" / "src" / "roomrom_vram_map.h"
-CHR_ATLAS_MASTER = REPO / "RoomRom" / "data" / "chr_atlas_master.json"
-ITEM_MANIFEST = REPO / "RoomRom" / "data" / "item_chr_manifest.json"
-ATLAS_DIR = REPO / "RoomRom" / "src" / "atlas"
-VERIFY_SCRIPT = REPO / "RoomRom" / "tools" / "verify_vram_budget.py"
+VRAM_MAP_H = REPO / "engine" / "src" / "vram_layout.h"
+CHR_ATLAS_MASTER = REPO / "engine" / "data" / "chr_atlas_master.json"
+ITEM_MANIFEST = REPO / "engine" / "data" / "item_chr_manifest.json"
+ATLAS_DIR = REPO / "engine" / "src" / "atlas"
+VERIFY_SCRIPT = REPO / "engine" / "tools" / "verify_vram_budget.py"
 SPRITE_SLOTS_H = REPO / "src" / "game" / "world" / "render" / "sprite_slots.h"
 SPRITE_RENDER_C = REPO / "src" / "game" / "world" / "render" / "sprite_render.c"
 
 OUT_CATALOG_MD = REPO / "docs" / "atlas" / "sprite_catalog.md"
 OUT_VRAM_MAP_MD = REPO / "docs" / "atlas" / "vram_map.md"
-OUT_CATALOG_JSON = REPO / "RoomRom" / "data" / "sprite_catalog.json"
+OUT_CATALOG_JSON = REPO / "engine" / "data" / "sprite_catalog.json"
 
 
 def grep_define(text: str, name: str) -> int | None:
@@ -138,7 +138,7 @@ def build_catalog(vram, atlases, items, master) -> dict:
                 "tile_range": [vram["BG_TILE_BASE"], bg_end],
                 "subpal_count": vram["BG_SUBPAL_COUNT"],
                 "bytes_resident": vram["BG_TILE_COUNT_PER_PAL"] * vram["BG_SUBPAL_COUNT"] * 32,
-                "source": "data/chr/overworld_bg.c + data/chr/underworld_bg.c (via RoomRom/tools/expand_bg_chr.py)",
+                "source": "data/chr/overworld_bg.c + data/chr/underworld_bg.c (via engine/tools/expand_bg_chr.py)",
                 "replication": "4x pixel-bias (Phase J selective dedup planned)",
             },
             "SPR": {
@@ -161,7 +161,7 @@ def build_catalog(vram, atlases, items, master) -> dict:
                 "tile_range": [item_base, item_end],
                 "subpal_count": vram["ITEM_SUBPAL_COUNT"],
                 "bytes_resident": item_bytes // 3 if vram["ITEM_SUBPAL_COUNT"] == 1 else item_bytes,
-                "source": "RoomRom/data/item_chr_manifest.json + RoomRom/tools/gen_atlas.py",
+                "source": "engine/data/item_chr_manifest.json + engine/tools/gen_atlas.py",
                 "replication": "1x (Phase B collapsed from 3x on 2026-05-18)",
             },
             "BOSS": {
@@ -277,14 +277,14 @@ def emit_catalog_md(catalog: dict) -> str:
         manifest_entry = next((d for d in catalog["items"] if d["name"].lower().startswith(short.split("_")[0])), None)
         nes_tile = manifest_entry["nes_frame_tile"] if manifest_entry else "—"
         renderer = "roomrom_sprites_set_" + ("sword" if "sword" in short else short.split("_")[0])
-        nes_ref = "see RoomRom/data/item_chr_manifest.json"
+        nes_ref = "see engine/data/item_chr_manifest.json"
         lines.append(f"| {offset} | {nes_tile} | `{renderer}` | {nes_ref} |")
     lines.append("")
 
     # Items
     lines.append("## ITEM bank inventory")
     lines.append("")
-    lines.append("Atlas defined by `RoomRom/data/item_chr_manifest.json`; emitted via `RoomRom/tools/gen_atlas.py`. Tile indices are 0-based offsets within the ITEM bank (add `ROOMROM_ITEM_TILE_BASE` for absolute VRAM tile).")
+    lines.append("Atlas defined by `engine/data/item_chr_manifest.json`; emitted via `engine/tools/gen_atlas.py`. Tile indices are 0-based offsets within the ITEM bank (add `ROOMROM_ITEM_TILE_BASE` for absolute VRAM tile).")
     lines.append("")
     lines.append("| Name | Item | Direction | NES Tile | Genesis Tile IDs | Dispatch (W×H) | Draw Rule |")
     lines.append("|---|---|---|---|---|---|---|")
@@ -322,7 +322,7 @@ def emit_vram_map_md(catalog: dict) -> str:
     lines.append("")
     lines.append(f"**Verifier output (live):** `{catalog['verifier_output']}`")
     lines.append("")
-    lines.append("Genesis VRAM = 64 KB ($0000-$FFFF). Tile-data ceiling = $C000 (planes A+B shared at $C000 per `RoomRom/src/main.c::init_video`). All tile addresses below are aligned to 32-byte tile boundaries.")
+    lines.append("Genesis VRAM = 64 KB ($0000-$FFFF). Tile-data ceiling = $C000 (planes A+B shared at $C000 per `engine/src/main.c::init_video`). All tile addresses below are aligned to 32-byte tile boundaries.")
     lines.append("")
     lines.append("## Layout (post Phase A-F)")
     lines.append("")

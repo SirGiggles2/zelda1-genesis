@@ -51,8 +51,8 @@ read, never changed.
 **From the command line instead**, inside the `zelda1-genesis` folder:
 
 ```powershell
-python -m pip install -r tools\builder\requirements.txt
-python tools\builder\build.py "C:\path\to\zelda.nes" --redux-patch "C:\path\to\Zelda1_Redux.ips" --output "C:\path\to\Zelda.md"
+python -m pip install -r tools\converter\requirements.txt
+python tools\converter\build.py "C:\path\to\zelda.nes" --redux-patch "C:\path\to\Zelda1_Redux.ips" --output "C:\path\to\Zelda.md"
 ```
 
 ## If something goes wrong
@@ -74,7 +74,7 @@ runs under Wine; install Wine and make sure `wine` is on your PATH.
 
 ## How it works
 
-The converter (`tools/builder/build.py`) checks both inputs, applies the Redux
+The converter (`tools/converter/build.py`) checks both inputs, applies the Redux
 patch to a copy of your ROM, and pulls everything the port needs out of the two
 ROMs: graphics, rooms, music, text and the game's own tables. The title, item,
 level 9, Ganon, Triforce, Zelda rescue and ending songs are converted from your
@@ -84,9 +84,20 @@ exactly the same ROM, byte for byte, so you can compare your build with
 anyone else's.
 
 More detail is in [docs/CONVERTER.md](docs/CONVERTER.md). The release checks
-(`tools/builder/from_scratch_gate.py`, `package_closure.py`, `make_package.py`,
+(`tools/converter/from_scratch_gate.py`, `package_closure.py`, `make_package.py`,
 `rom_bytes_scan.py`) confirm that conversion works from a clean copy, gives the
 same ROM every time, and that no game data is in this repository.
+
+## Source layout
+
+- `engine/`: game runtime, generated asset inputs and asset generators.
+- `src/platform/`: Genesis startup and the game entry point.
+- `tools/converter/`: ROM validation, extraction, converter window and release checks.
+- `tools/build/build_rom.py`: SGDK compilation, also launched by `Build.bat`.
+- `builds/Zelda.md`: locally built game; converter saves your chosen output separately.
+
+At the title, press Start for File Select. The old quest and tile-grid shortcuts
+are removed. ABC+Start still freezes the game and captures a diagnostic dump.
 
 ## Credits
 

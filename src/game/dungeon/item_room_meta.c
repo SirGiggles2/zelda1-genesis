@@ -9,7 +9,7 @@
 #include "../../state/inventory.h"
 #include "../items/item_dispatch.h"
 #include "../cave/cave_dispatch.h"
-#include "../../../RoomRom/data/uw_item_rooms.h"
+#include "../../../engine/data/uw_item_rooms.h"
 
 /* Canonical inventory storage in the NES RAM mirror. */
 #include "../../state/item_state.h"

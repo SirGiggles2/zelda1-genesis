@@ -41,7 +41,7 @@ typedef struct {
     void (*on_descend_step)(unsigned char step_idx);
     /* Called at SWAP_ENTRY. Owner sets scene = SCENE_CAVE +
      * Link reposition (NES $70,$DD = 112,221 face up; Z_01.asm:2965) +
-     * any other RoomRom-local state bookkeeping. */
+     * any other engine-local state bookkeeping. */
     void (*on_swap_entry)(cave_id_t cid);
     /* Called once per LINK_ASCEND tick (cave exit). Owner adjusts
      * players[0].y -= 1 + ticks walk-anim. 16 steps total. */

@@ -2,12 +2,12 @@
 #define ROOMROM_INVENTORY_H
 
 /* ---------------------------------------------------------------------------
- * Phase 6 Task 6.10.4 — RoomRom inventory_t struct.
+ * Phase 6 Task 6.10.4 — engine inventory_t struct.
  *
  * Shape mirrors NES Z1 Variables.inc cells one-for-one. Field names follow
  * the NES "Inv*" prefix to keep cross-references between drained C, NES
  * disasm, and parity oracle traces obvious. Storage is byte-wide except
- * for `rupees`, which the NES treats as a single byte but RoomRom widens
+ * for `rupees`, which the NES treats as a single byte but engine widens
  * to 16-bit so the `rupees_to_add` / `rupees_to_sub` tick animation can
  * run without per-frame wrap.
  *
@@ -45,7 +45,7 @@
  *   RupeesToSubtract $67E  pending -1 rupee tick countdown
  *   WorldFlags       $67F  per-room secret-revealed bitfield (Q1/Q2)
  *
- * The `selected_b_item` field aliases NES $656 (SelectedItemSlot). RoomRom
+ * The `selected_b_item` field aliases NES $656 (SelectedItemSlot). engine
  * already owns this in its `b_item_t s_b_item` token; the inventory_t copy
  * is the canonical save-side cell.
  *
@@ -151,10 +151,10 @@ typedef struct inventory_t {
     unsigned char rupees_to_sub;     /* $67E RupeesToSubtract */
 
     /* Per-room scripted-secret revealed bitfield (Q1/Q2 select via WorldFlags hi/lo).
-     * NES is a 16-bit cell; RoomRom keeps it 16-bit too. */
+     * NES is a 16-bit cell; engine keeps it 16-bit too. */
     unsigned short world_flags;      /* $67F */
 
-    /* B-item selection (NES $656 SelectedItemSlot). RoomRom mirrors here so
+    /* B-item selection (NES $656 SelectedItemSlot). engine mirrors here so
      * pause-screen UI and per-frame dispatch share one source of truth. */
     unsigned char selected_b_item;
 } inventory_t;
@@ -171,7 +171,7 @@ static inline unsigned char heart_values_pack(unsigned char max_h, unsigned char
 }
 
 /* Single global inventory instance — Phase 13 will fold this into
- * PlayerState. Until then, RoomRom keeps a singleton for the 1-player
+ * PlayerState. Until then, engine keeps a singleton for the 1-player
  * boot path. */
 extern inventory_t g_inventory;
 void inventory_hud_mark_dirty(void);

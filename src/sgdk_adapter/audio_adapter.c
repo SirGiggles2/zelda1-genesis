@@ -28,7 +28,7 @@ extern void music_tick(void);
 extern void music_silence(void);
 
 /* Driver storage is linker-owned; fixed low-RAM addresses collide with C BSS.
- * Native RAM base follows platform_abi (A4 Debug or pointer RoomRom). */
+ * Native RAM base follows platform_abi (A4 Debug or pointer engine). */
 /* aligned(4): audio_driver.asm clears these with clr.w/clr.l and keeps a
  * 32-bit script pointer at m_script_ptr (+$08); 68000 word/long access to
  * an odd address is an address-error exception. */
@@ -66,7 +66,7 @@ static volatile u8 * const music_song_req_ptr = &audio_music_state[0x01];
 #define SONG_UW_BITMAP  0x40u
 
 #ifdef ZELDA_LOCAL_MUSIC
-/* Your own VGMs (tools/builder/local_music.py, build.py --music): a song
+/* Your own VGMs (tools/converter/local_music.py, build.py --music): a song
  * request with a file here plays it on the XGM driver. Local builds only. */
 #include "local_music.h"
 static const u8 *local_blob(unsigned char song)

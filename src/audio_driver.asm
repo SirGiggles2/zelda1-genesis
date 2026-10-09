@@ -511,7 +511,7 @@ PATCH_VOICE07:
 ; ============================================================================
 ; MUSIC_BASE / DMC_BASE are linker-owned C arrays in audio_adapter.c.
 ; The old fixed $FFE000/$FFE100 assumed an A4 base of $FF0000; under the
-; Debug.md base of $FF8000 they are nes_ram[$6000]/[$6100] = NES SaveRAM,
+; Zelda.md base of $FF8000 they are nes_ram[$6000]/[$6100] = NES SaveRAM,
 ; and a Mode $0D save overwrote m_song/m_song_req (T-094).
 ; ============================================================================
     xref audio_music_state

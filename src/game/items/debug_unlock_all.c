@@ -45,7 +45,7 @@
 
 /* T-090: 1 only for a gameplay session entered by the title debug chord
  * (A+B+C / X+Y+Z); 0 on the File Select path. Gates every gameplay debug
- * input and debug seed (RoomRom/src/main.c). */
+ * input and debug seed (engine/src/main.c). */
 unsigned char g_debug_session = 0u;
 
 void debug_unlock_all_items(void)

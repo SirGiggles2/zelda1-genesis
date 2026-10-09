@@ -1,0 +1,2050 @@
+{
+  "schema_version": 1,
+  "source_policy": "live_nes_chr_only",
+  "notes": [
+    "Do not source weapon/item tiles from guessed common_chr offsets.",
+    "NES tile IDs >= 0x70 are valid only when backed by live CHR bytes."
+  ],
+  "item_defs": [
+    {
+      "name": "sword_vert",
+      "item": "sword",
+      "direction_class": "vertical",
+      "nes_frame_tile": "0x20",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x20",
+        "0x21"
+      ],
+      "draw_rule": "narrow_8x16",
+      "sprite_size_override_reason": "NES uses 8x16 hardware sprites (PPU OAM obj size bit): tile $20 is the top 8x8, tile $21 is the bottom 8x8 of the same 8x16 sprite. Anim_WriteSpecificItemSprites @Narrow (Z_01.asm:5288) emits a single OAM entry whose hardware height is 16px. Genesis SPRITE_SIZE(1,2) matches NES visual output exactly. The dispatch table [1,1] reflects the NES tile-count per OAM entry, not the rendered pixel height."
+    },
+    {
+      "name": "sword_horz",
+      "item": "sword",
+      "direction_class": "horizontal",
+      "nes_frame_tile": "0x82",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x82",
+        "0x83",
+        "0x84",
+        "0x85"
+      ],
+      "draw_rule": "wide_16x16_hflippable",
+      "sprite_size_override_reason": "NES Flippable dispatch (Z_01.asm:5301) draws two 8x8 sprites side-by-side (tiles $82+$84, 16x8 visible). Genesis renderer stores all 4 tiles ($82-$85, the full 2x2 NES CHR block) in a 2x2 SPRITE_SIZE so both the top row and bottom row are uploaded and accessible for Genesis column-major tile layout. SPRITE_SIZE(2,1) would omit bottom-row tiles needed for the sword cross-guard graphic."
+    },
+    {
+      "name": "boomerang",
+      "item": "boomerang",
+      "direction_class": "rotating",
+      "nes_frame_tile": "0x36",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x36",
+        "0x37",
+        "0x38",
+        "0x39",
+        "0x3A",
+        "0x3B",
+        "0x3C",
+        "0x3D"
+      ],
+      "draw_rule": "narrow_8x16_phase_cycle",
+      "nes_dispatch_note": "NES PPU 8x16 mode: each OAM entry tile $36/$38/$3A/$3C pairs with $37/$39/$3B/$3D as bottom half. Live BizHawk capture (probe_nes_throw.lua frame 280) confirmed: tile $36 has only rows 4-7 of curve; tile $37 has only rows 0-3 \u2014 combined 8x16 = full L-shape boomerang. Atlas idx 6/7, 8/9, 10/11, 12/13 are adjacent in items_chr_x4.",
+      "sprite_size_override_reason": "NES PPU runs in 8x16 sprite mode (PPUCTRL bit 5 = 1) during gameplay. verify_item_chr_manifest classify_nes_dispatch reads 'Narrow' as 8x8 (sprite_size [1,1]) but @Narrow refers to half-WIDTH not 8x8 height. Live BizHawk capture (probe_nes_throw.lua frame 280) shows OAM 'tile $X' renders both $X (top 8x8) + $X+1 (bottom 8x8) as one 8x16 sprite. Renderer must use SPRITE_SIZE(1,2). See Anim_WriteSpecificItemSprites @Narrow Z_01.asm:5288 + PPUCTRL setup."
+    },
+    {
+      "name": "arrow_vert",
+      "item": "arrow",
+      "direction_class": "vertical",
+      "nes_frame_tile": "0x28",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x28",
+        "0x29"
+      ],
+      "draw_rule": "narrow_8x16",
+      "sprite_size_override_reason": "NES uses 8x16 hardware sprites for the vertical arrow: tile $28 is the top 8x8, tile $29 is the bottom 8x8 (same OAM 8x16 entry). Anim_WriteSpecificItemSprites @Narrow (Z_01.asm:5288) emits a single 8x16 OAM entry. Genesis SPRITE_SIZE(1,2) matches NES rendered height. Same reasoning as sword_vert."
+    },
+    {
+      "name": "arrow_horz",
+      "item": "arrow",
+      "direction_class": "horizontal",
+      "nes_frame_tile": "0x86",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x86",
+        "0x87",
+        "0x88",
+        "0x89"
+      ],
+      "draw_rule": "wide_16x16_hflippable",
+      "sprite_size_override_reason": "NES Flippable dispatch draws two 8x8 sprites side-by-side (tiles $86+$88, 16x8 visible). Genesis renderer stores the full 2x2 NES CHR block ($86-$89) as SPRITE_SIZE(2,2) so the bottom-row tiles are available for the arrowhead graphic. Same reasoning as sword_horz."
+    },
+    {
+      "name": "bomb",
+      "item": "bomb",
+      "direction_class": "static",
+      "nes_frame_tile": "0x34",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x34",
+        "0x35"
+      ],
+      "draw_rule": "narrow_8x16",
+      "nes_dispatch_note": "DrawBomb (Z_07.asm:4869) -> DrawCloud -> Anim_WriteItemSprites with item slot $01, frame 0 -> ItemFrameTiles[$03] = $34. Tile $34 in [$20,$62) -> @Narrow path (Z_01.asm:5288), single 8x8 sprite.",
+      "sprite_size_override_reason": "NES PPU runs in 8x16 sprite mode (PPUCTRL bit 5 = 1) during gameplay. verify_item_chr_manifest classify_nes_dispatch reads 'Narrow' as 8x8 (sprite_size [1,1]) but @Narrow refers to half-WIDTH not 8x8 height. Live BizHawk capture (probe_nes_throw.lua frame 280) shows OAM 'tile $X' renders both $X (top 8x8) + $X+1 (bottom 8x8) as one 8x16 sprite. Renderer must use SPRITE_SIZE(1,2). See Anim_WriteSpecificItemSprites @Narrow Z_01.asm:5288 + PPUCTRL setup."
+    },
+    {
+      "name": "explosion",
+      "item": "explosion",
+      "direction_class": "static",
+      "nes_frame_tile": "0x70",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x70",
+        "0x71",
+        "0x72",
+        "0x73",
+        "0x74",
+        "0x75"
+      ],
+      "draw_rule": "wide_16x16_mirrored_8x16_phase_cycle",
+      "nes_dispatch_note": "DrawOtherBombClouds (Z_07.asm:4936) draws cloud cluster via DrawBombOrCloudNoFlashing -> Anim_WriteItemSprites with item slot $01, frames 1-3 -> ItemFrameTiles[$04..$06] = $70/$72/$74. Each tile in [$6C,$7C) -> @Wide -> Anim_WriteMirroredSpritePair (Z_01.asm:5304): 2 8x8 sprites side-by-side, right=left hflipped, total 16x8. Generator emits 2 Genesis tiles per NES tile (raw + hflipped) so SGDK SPRITE_SIZE(2,1) renders both halves.",
+      "sprite_size_override_reason": "NES @Wide_Mirrored writes 2 OAMs side-by-side. PPU 8x16 sprite mode (PPUCTRL bit 5 = 1) makes each OAM 8x16 (paired tiles), so visible explosion frame = 2*8x16 = 16x16. Live BizHawk capture (probe_nes_explode.lua frame 335) confirms 4 cluster positions \u00d7 2 OAMs each (hfl=0 left + hfl=1 right) for tile $70/$72/$74. Each tile pairs with $71/$73/$75 as bottom half. Genesis renderer needs SPRITE_SIZE(2,2) per cluster."
+    },
+    {
+      "name": "sword_diag",
+      "item": "sword",
+      "direction_class": "diagonal",
+      "nes_frame_tile": "0x48",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x48",
+        "0x49",
+        "0x4A",
+        "0x4B"
+      ],
+      "draw_rule": "wide_16x16_hflippable",
+      "sprite_size_override_reason": "Genesis-native ALttP-style diagonal sword swing (Redux mode). NES Z1 has no diagonal sword sprite; the diagonal swing is a Genesis extension with no NES dispatch equivalent. Tiles $48-$4B form the full 2x2 diagonal blade graphic. NES dispatch classification of nes_frame_tile $48 as Narrow is inapplicable here."
+    },
+    {
+      "name": "candle_fire_f0",
+      "item": "candle_fire",
+      "direction_class": "static",
+      "nes_frame_tile": "0x5C",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x5C",
+        "0x5D",
+        "0x5E",
+        "0x5F"
+      ],
+      "draw_rule": "wide_16x16_pair",
+      "frame_index": 0,
+      "frame_subpal": 2,
+      "nes_dispatch_note": "UpdateFire (Z_07.asm:4622) draws fire via DrawObjectWithType anim index $40 (uses $41 after INY) -> ObjAnimations[$41]=$08 -> ObjAnimFrameHeap[$08+frame] tile pairs ($5C/$5E, $9E/$A0, $44/$46, $CE/$D0). Each frame is 2 NES tiles side-by-side (left+2=right per DrawObjectWithAnimAndSpecificSprites). ObjAnimAttrHeap[$08+frame] sub_pal sequence = (2, 0, 0, 1). Animation: 4 frames @ 4 ticks each (LDA #$04 / Anim_AdvanceAnimCounter).",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "candle_fire_f1",
+      "item": "candle_fire",
+      "direction_class": "static",
+      "nes_frame_tile": "0x9E",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x9E",
+        "0x9F",
+        "0xA0",
+        "0xA1"
+      ],
+      "draw_rule": "wide_16x16_pair",
+      "frame_index": 1,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "UpdateFire (Z_07.asm:4622) draws fire via DrawObjectWithType anim index $40 (uses $41 after INY) -> ObjAnimations[$41]=$08 -> ObjAnimFrameHeap[$08+frame] tile pairs ($5C/$5E, $9E/$A0, $44/$46, $CE/$D0). Each frame is 2 NES tiles side-by-side (left+2=right per DrawObjectWithAnimAndSpecificSprites). ObjAnimAttrHeap[$08+frame] sub_pal sequence = (2, 0, 0, 1). Animation: 4 frames @ 4 ticks each (LDA #$04 / Anim_AdvanceAnimCounter).",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "candle_fire_f2",
+      "item": "candle_fire",
+      "direction_class": "static",
+      "nes_frame_tile": "0x44",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x44",
+        "0x45",
+        "0x46",
+        "0x47"
+      ],
+      "draw_rule": "wide_16x16_pair",
+      "frame_index": 2,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "UpdateFire (Z_07.asm:4622) draws fire via DrawObjectWithType anim index $40 (uses $41 after INY) -> ObjAnimations[$41]=$08 -> ObjAnimFrameHeap[$08+frame] tile pairs ($5C/$5E, $9E/$A0, $44/$46, $CE/$D0). Each frame is 2 NES tiles side-by-side (left+2=right per DrawObjectWithAnimAndSpecificSprites). ObjAnimAttrHeap[$08+frame] sub_pal sequence = (2, 0, 0, 1). Animation: 4 frames @ 4 ticks each (LDA #$04 / Anim_AdvanceAnimCounter).",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "candle_fire_f3",
+      "item": "candle_fire",
+      "direction_class": "static",
+      "nes_frame_tile": "0xCE",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0xCE",
+        "0xCF",
+        "0xD0",
+        "0xD1"
+      ],
+      "draw_rule": "wide_16x16_pair",
+      "frame_index": 3,
+      "frame_subpal": 1,
+      "nes_dispatch_note": "UpdateFire (Z_07.asm:4622) draws fire via DrawObjectWithType anim index $40 (uses $41 after INY) -> ObjAnimations[$41]=$08 -> ObjAnimFrameHeap[$08+frame] tile pairs ($5C/$5E, $9E/$A0, $44/$46, $CE/$D0). Each frame is 2 NES tiles side-by-side (left+2=right per DrawObjectWithAnimAndSpecificSprites). ObjAnimAttrHeap[$08+frame] sub_pal sequence = (2, 0, 0, 1). Animation: 4 frames @ 4 ticks each (LDA #$04 / Anim_AdvanceAnimCounter).",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "compass",
+      "item": "compass",
+      "direction_class": "static",
+      "nes_frame_tile": "0x2E",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x2E",
+        "0x2F"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K (2026-05-18): UW pickup compass. NES item slot 0x10 / UW_ITEM_ID_COMPASS. Anim_ItemFrameTiles[$10]=$2E (Narrow dispatch, single 8x16 OAM tile $2E top + $2F bottom). CHR from reference/aldonunez/dat/CommonSpritePatterns.dat tile 0x2E.",
+      "sprite_size_override_reason": "NES PPU 8x16 sprite mode (PPUCTRL bit 5 = 1 during gameplay): Anim_WriteSpecificItemSprites @Narrow (Z_01.asm:5288) emits ONE OAM whose hardware height is 16px (tile $2E top + $2F bottom). Genesis SPRITE_SIZE(1,2) matches NES visual output. The strict verifier's [1,1] = NES tile-count per OAM entry; renderer uses pixel dimensions."
+    },
+    {
+      "name": "map",
+      "item": "map",
+      "direction_class": "static",
+      "nes_frame_tile": "0x32",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x32",
+        "0x33"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K (2026-05-18): UW pickup map. NES item slot 0x11 / UW_ITEM_ID_MAP. Anim_ItemFrameTiles[$11]=$32 (Narrow dispatch). CHR from reference/aldonunez/dat/CommonSpritePatterns.dat tile 0x32.",
+      "sprite_size_override_reason": "NES PPU 8x16 mode: tile $32 top + $33 bottom = single 16-pixel-tall OAM via Z_01.asm:5288 @Narrow path. Genesis SPRITE_SIZE(1,2) preserves NES visual."
+    },
+    {
+      "name": "heart_container",
+      "item": "heart_container",
+      "direction_class": "static",
+      "nes_frame_tile": "0x68",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x68",
+        "0x69"
+      ],
+      "draw_rule": "wide_16x16_mirrored_8x16_slim",
+      "frame_index": 0,
+      "frame_subpal": 2,
+      "nes_dispatch_note": "Z_01.asm ItemIdToSlot: pickup $1A -> slot $18. Anim_ItemFrameOffsets[$18]=$1E; Anim_ItemFrameTiles[$1E]=$68. ItemSlotToPaletteOffsetsOrValues[$18]=2. Static heart container, not fairy slot $14.",
+      "sprite_size_override_reason": "NES Anim_WriteSpecificItemSprites @_Slim mirrors the 8x16 half at x+7. Bake the 15-pixel-wide pair into a 16x16 Genesis sprite, with one transparent trailing column."
+    },
+    {
+      "name": "big_key",
+      "item": "big_key",
+      "direction_class": "static",
+      "nes_frame_tile": "0x68",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x68",
+        "0x69"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K (2026-05-18): big (boss) key pickup. NES item slot 0x18. Per Anim_ItemFrameTiles[$18]=$68.",
+      "sprite_size_override_reason": "NES 8x16 mode. Tile $68 top + $69 bottom."
+    },
+    {
+      "name": "book_of_magic",
+      "item": "book_of_magic",
+      "direction_class": "static",
+      "nes_frame_tile": "0x46",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x46",
+        "0x47"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K (2026-05-18): book of magic pickup. NES item slot 0x0B.",
+      "sprite_size_override_reason": "NES 8x16 mode. Tile $46 top + $47 bottom."
+    },
+    {
+      "name": "raft",
+      "item": "raft",
+      "direction_class": "static",
+      "nes_frame_tile": "0x42",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x42",
+        "0x43"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K (2026-05-18): raft pickup. NES item slot 0x0A.",
+      "sprite_size_override_reason": "NES 8x16 mode. Tile $42 top + $43 bottom."
+    },
+    {
+      "name": "ladder",
+      "item": "ladder",
+      "direction_class": "static",
+      "nes_frame_tile": "0x2C",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x2C",
+        "0x2D"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K (2026-05-18): ladder pickup. NES item slot 0x0D.",
+      "sprite_size_override_reason": "NES 8x16 mode. Tile $2C top + $2D bottom."
+    },
+    {
+      "name": "ring",
+      "item": "ring",
+      "direction_class": "static",
+      "nes_frame_tile": "0x76",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x76",
+        "0x77"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3 (2026-05-18): ring pickup. NES item slot 0x0C / UW_ITEM_ID_RING. Tile $76/$77 from DemoSpritePatterns.dat (only available source; gameplay PPU bank not directly extractable).",
+      "sprite_size_override_reason": "NES 8x16 mode. Tile $76 top + $77 bottom."
+    },
+    {
+      "name": "magic_key",
+      "item": "magic_key",
+      "direction_class": "static",
+      "nes_frame_tile": "0x4E",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x4E",
+        "0x4F"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3: magic key pickup. NES item slot 0x0E.",
+      "sprite_size_override_reason": "NES 8x16. Tile $4E top + $4F bottom."
+    },
+    {
+      "name": "bracelet",
+      "item": "bracelet",
+      "direction_class": "static",
+      "nes_frame_tile": "0x4C",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x4C",
+        "0x4D"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3: bracelet pickup. NES item slot 0x0F.",
+      "sprite_size_override_reason": "NES 8x16. Tile $4C top + $4D bottom."
+    },
+    {
+      "name": "bow",
+      "item": "bow",
+      "direction_class": "static",
+      "nes_frame_tile": "0x2A",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x2A",
+        "0x2B"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3: bow pickup. NES item slot 0x04.",
+      "sprite_size_override_reason": "NES 8x16. Tile $2A top + $2B bottom."
+    },
+    {
+      "name": "recorder",
+      "item": "recorder",
+      "direction_class": "static",
+      "nes_frame_tile": "0x22",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x22",
+        "0x23"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3: recorder pickup. NES item slot 0x06.",
+      "sprite_size_override_reason": "NES 8x16. Tile $22 top + $23 bottom."
+    },
+    {
+      "name": "food",
+      "item": "food",
+      "direction_class": "static",
+      "nes_frame_tile": "0x40",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x40",
+        "0x41"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3: food/bait pickup. NES item slot 0x07.",
+      "sprite_size_override_reason": "NES 8x16. Tile $40 top + $41 bottom."
+    },
+    {
+      "name": "potion",
+      "item": "potion",
+      "direction_class": "static",
+      "nes_frame_tile": "0x4A",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x4A",
+        "0x4B"
+      ],
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Phase K cont. #3: potion pickup. NES item slot 0x08.",
+      "sprite_size_override_reason": "NES 8x16. Tile $4A top + $4B bottom."
+    },
+    {
+      "name": "triforce_piece",
+      "item": "triforce_piece",
+      "direction_class": "static",
+      "nes_frame_tile": "0x6E",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x6E",
+        "0x6F",
+        "0x70",
+        "0x71"
+      ],
+      "draw_rule": "wide_16x16_pair",
+      "frame_index": 0,
+      "frame_subpal": 2,
+      "nes_dispatch_note": "Anim_ItemFrameTiles[$20]=$6E (item slot 26 'PowerTriangle / TriforcePiece'). Wide dispatch in Anim_WriteSpecificItemSprites (Z_01.asm:5279): $6E >= $62 -> @Wide, right tile = $6E + 2 = $70. Renders as 2 sprites side-by-side via $07=1, $0A=8.",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "magic_shot_v",
+      "item": "magic_shot",
+      "direction_class": "vertical",
+      "nes_frame_tile": "0x7A",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x7A",
+        "0x7B"
+      ],
+      "draw_rule": "wide_16x16_mirrored_8x16_phase_cycle",
+      "frame_index": 0,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Anim_ItemFrameTiles[$2B]=$7A, [$2C]=$7C (item slot $23, magic-rod projectile). Z_07 DrawSwordShotOrMagicShot @WriteMagicSprites (line 3492) sets Y=$23 -> Anim_WriteItemSprites. Both tiles >= $62 -> @Wide. Vertical frame uses $7A+$7C; horizontal frame uses $7C+$7E.",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "magic_shot_h",
+      "item": "magic_shot",
+      "direction_class": "horizontal",
+      "nes_frame_tile": "0x7C",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x7C",
+        "0x7D",
+        "0x7E",
+        "0x7F"
+      ],
+      "draw_rule": "wide_16x16_pair",
+      "frame_index": 1,
+      "frame_subpal": 0,
+      "nes_dispatch_note": "Anim_ItemFrameTiles[$2B]=$7A, [$2C]=$7C (item slot $23, magic-rod projectile). Z_07 DrawSwordShotOrMagicShot @WriteMagicSprites (line 3492) sets Y=$23 -> Anim_WriteItemSprites. Both tiles >= $62 -> @Wide. Vertical frame uses $7A+$7C; horizontal frame uses $7C+$7E.",
+      "sprite_size_override_reason": "NES PPU runs 8x16 sprite mode (PPUCTRL bit 5 = 1). @Wide_Slim draws 2 OAMs side-by-side, each 8x16 (paired tile $X+1 as bottom). Visible cluster = 2*8x16 = 16x16, NOT 16x8. Renderer uses SPRITE_SIZE(2,2) with column-major fetch order LT, LB, RT, RB. Live BizHawk capture in probe_nes_audit.lua confirmed bottom-half tile bytes for $5D/$5F/$9F/$A1/$45/$47/$CF/$D1/$7B/$7D/$7F/$6F/$71."
+    },
+    {
+      "name": "fairy_spark_f0",
+      "item": "fairy_spark",
+      "direction_class": "static",
+      "nes_frame_tile": "0x50",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0xF0",
+        "0xF1"
+      ],
+      "atlas_alias_note": "Live NES dungeon drop: OAM $50/$52 reads the CommonSpritePatterns bank; atlas-local F0-F3 aliases those ROM-derived bytes. The earlier DemoSpritePatterns alias was contradicted by live CHR.",
+      "draw_rule": "narrow_8x16",
+      "frame_index": 0,
+      "frame_subpal": 1,
+      "nes_dispatch_note": "Anim_ItemFrameTiles[$19]=$50, [$1A]=$52 (item slot $14 'FairyMoving'). DrawFairy (Z_04.asm:11508) toggles frame every 4 video frames (ASL / AND FrameCounter / LSR LSR -> $0C). Both tiles in [$20,$62) -> @Narrow dispatch (single 8x16 sprite per OAM entry, NES PPU 8x16 obj-size mode). Anim_SetSpriteDescriptorRedPaletteRow forces sub-pal row 1 (red).",
+      "sprite_size_override_reason": "NES uses 8x16 hardware sprites (PPU OAM obj size bit). Tile $50 is the top 8x8, tile $51 is the bottom 8x8 of one 8x16 hardware sprite (and $52/$53 likewise for frame 1). Anim_WriteSpecificItemSprites @Narrow (Z_01.asm:5288) emits a single OAM entry whose hardware height is 16 px. Genesis SPRITE_SIZE(1,2) matches NES visual output exactly. Identical pattern to the existing sword_vert / arrow_vert manifest entries."
+    },
+    {
+      "name": "fairy_spark_f1",
+      "item": "fairy_spark",
+      "direction_class": "static",
+      "nes_frame_tile": "0x52",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0xF2",
+        "0xF3"
+      ],
+      "atlas_alias_note": "Live NES dungeon drop: OAM $50/$52 reads the CommonSpritePatterns bank; atlas-local F0-F3 aliases those ROM-derived bytes. The earlier DemoSpritePatterns alias was contradicted by live CHR.",
+      "draw_rule": "narrow_8x16",
+      "frame_index": 1,
+      "frame_subpal": 1,
+      "nes_dispatch_note": "Anim_ItemFrameTiles[$19]=$50, [$1A]=$52 (item slot $14 'FairyMoving'). DrawFairy (Z_04.asm:11508) toggles frame every 4 video frames (ASL / AND FrameCounter / LSR LSR -> $0C). Both tiles in [$20,$62) -> @Narrow dispatch (single 8x16 sprite per OAM entry, NES PPU 8x16 obj-size mode). Anim_SetSpriteDescriptorRedPaletteRow forces sub-pal row 1 (red).",
+      "sprite_size_override_reason": "NES uses 8x16 hardware sprites (PPU OAM obj size bit). Tile $50 is the top 8x8, tile $51 is the bottom 8x8 of one 8x16 hardware sprite (and $52/$53 likewise for frame 1). Anim_WriteSpecificItemSprites @Narrow (Z_01.asm:5288) emits a single OAM entry whose hardware height is 16 px. Genesis SPRITE_SIZE(1,2) matches NES visual output exactly. Identical pattern to the existing sword_vert / arrow_vert manifest entries."
+    },
+    {
+      "name": "drop_heart",
+      "item": "heart",
+      "direction_class": "static",
+      "nes_frame_tile": "0xF3",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0xE0",
+        "0xE1"
+      ],
+      "draw_rule": "narrow_8x16",
+      "atlas_alias_note": "NES OAM $F3 selects PT1 $F2/$F3 in 8x16 mode; atlas-local E0/E1 aliases those live tiles.",
+      "sprite_size_override_reason": "Z_01.asm Anim_WriteSpecificItemSprites @Narrow emits one NES 8x16 OAM entry; Genesis SIZE(1,2) stores both PT1 halves."
+    },
+    {
+      "name": "drop_clock",
+      "item": "clock",
+      "direction_class": "static",
+      "nes_frame_tile": "0x66",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x66",
+        "0x67"
+      ],
+      "draw_rule": "narrow_8x16",
+      "atlas_alias_note": "NES OAM $66 appears twice at x and x+7; the renderer emits two 8x16 sprites and uses the second OAM H-flip bit.",
+      "sprite_size_override_reason": "Z_01.asm Anim_WriteSpecificItemSprites @Wide_Slim emits two 8x16 OAM entries, each Genesis SIZE(1,2); the second uses hardware H-flip."
+    },
+    {
+      "name": "rod_horz",
+      "item": "rod",
+      "direction_class": "horizontal",
+      "nes_frame_tile": "0x8A",
+      "sprite_size": [
+        2,
+        2
+      ],
+      "tile_ids": [
+        "0x8A",
+        "0x8B",
+        "0x8C",
+        "0x8D"
+      ],
+      "draw_rule": "wide_16x16_hflippable",
+      "nes_dispatch_note": "UpdateSwordOrRod (Z_07.asm:4351) for the rod slot $12 -> Anim_WriteItemSprites item slot $08, frame 1 -> ItemFrameTiles[$10] = $8A (horizontal); frame 0 = $4A (vertical, shared with potion).",
+      "sprite_size_override_reason": "Same as sword_horz: Flippable pair $8A+$8C, full 2x2 NES CHR block stored."
+    },
+    {
+      "name": "sword_shot_spread",
+      "item": "sword_shot",
+      "direction_class": "static",
+      "nes_frame_tile": "0x30",
+      "sprite_size": [
+        1,
+        2
+      ],
+      "tile_ids": [
+        "0x30",
+        "0x31"
+      ],
+      "draw_rule": "narrow_8x16",
+      "nes_dispatch_note": "SpreadShot (Z_07.asm:3577) -> Anim_WriteItemSprites item slot $23, frame 2 -> ItemFrameTiles[$2D] = $30. Tile $30 in [$20,$62) -> @Narrow path.",
+      "sprite_size_override_reason": "NES 8x16 sprite mode: tile $30 renders $30 + $31."
+    }
+  ],
+  "variants": [
+    {
+      "rom_id": "orig",
+      "chr_dump": "engine/out/nes_item_chr_pt0_orig.bin",
+      "chr_dump_sha256": "1fc7f834bc02befc518c8409f7c08ddc337a481f9973f886e98f453cd5d38966",
+      "tiles": {
+        "0x20": {
+          "ppu_addr": "0x0200",
+          "source": "common_sprite_live_chr",
+          "sha256": "d236206ddc29f82e0fb072e74715416a48bd4851f59bfa3d6e33e8325e765949",
+          "flat_pattern": false,
+          "bytes_sha256": "d236206ddc29f82e0fb072e74715416a48bd4851f59bfa3d6e33e8325e765949"
+        },
+        "0x21": {
+          "ppu_addr": "0x0210",
+          "source": "common_sprite_live_chr",
+          "sha256": "1381d9990b60d2602afe978f741a06b449c04b4e1276090c94da2f85e4d6e691",
+          "flat_pattern": false,
+          "bytes_sha256": "1381d9990b60d2602afe978f741a06b449c04b4e1276090c94da2f85e4d6e691"
+        },
+        "0x82": {
+          "ppu_addr": "0x0820",
+          "source": "runtime_gap_live_chr",
+          "sha256": "596e9ee777bfbb225f21595cf5141a283ae123a749c09353f390fa0e7ecc2da1",
+          "flat_pattern": false,
+          "bytes_sha256": "596e9ee777bfbb225f21595cf5141a283ae123a749c09353f390fa0e7ecc2da1"
+        },
+        "0x83": {
+          "ppu_addr": "0x0830",
+          "source": "runtime_gap_live_chr",
+          "sha256": "a3e5c7f4ec7893d47f026ec0c54f6c0c7d4c7a70b621ae57cfda79c67070966d",
+          "flat_pattern": false,
+          "bytes_sha256": "a3e5c7f4ec7893d47f026ec0c54f6c0c7d4c7a70b621ae57cfda79c67070966d"
+        },
+        "0x84": {
+          "ppu_addr": "0x0840",
+          "source": "runtime_gap_live_chr",
+          "sha256": "295865c37e18cbac4e667c7531c47394c9c4411fc572e47bdfe790fdcbc51743",
+          "flat_pattern": false,
+          "bytes_sha256": "295865c37e18cbac4e667c7531c47394c9c4411fc572e47bdfe790fdcbc51743"
+        },
+        "0x85": {
+          "ppu_addr": "0x0850",
+          "source": "runtime_gap_live_chr",
+          "sha256": "ed734eb3250befe0d30282540ddfc3bab486ce9a33d1d19190f495255a7d1bab",
+          "flat_pattern": false,
+          "bytes_sha256": "ed734eb3250befe0d30282540ddfc3bab486ce9a33d1d19190f495255a7d1bab"
+        },
+        "0x36": {
+          "ppu_addr": "0x0360",
+          "source": "common_sprite_live_chr",
+          "sha256": "55e26359f0162ae50f0075a3aeee8830699bd2cb1e65ff4ee0cac623c49ab035",
+          "flat_pattern": false,
+          "bytes_sha256": "55e26359f0162ae50f0075a3aeee8830699bd2cb1e65ff4ee0cac623c49ab035"
+        },
+        "0x37": {
+          "ppu_addr": "0x0370",
+          "source": "common_sprite_live_chr",
+          "sha256": "0943a23d4a5cc5a3664c63cd2ee23b6fb2a91ab652605f6e60856749b27f5b83",
+          "flat_pattern": false,
+          "bytes_sha256": "0943a23d4a5cc5a3664c63cd2ee23b6fb2a91ab652605f6e60856749b27f5b83"
+        },
+        "0x38": {
+          "ppu_addr": "0x0380",
+          "source": "common_sprite_live_chr",
+          "sha256": "1dfd1283c8a2a00ebb8e683e202326ddcf0c6cbc89125a745ea063362ab43082",
+          "flat_pattern": false,
+          "bytes_sha256": "1dfd1283c8a2a00ebb8e683e202326ddcf0c6cbc89125a745ea063362ab43082"
+        },
+        "0x39": {
+          "ppu_addr": "0x0390",
+          "source": "common_sprite_live_chr",
+          "sha256": "3b78eab14a702760b6c86b01bc499d3b8dd22b89d610991a661159409aee53d9",
+          "flat_pattern": false,
+          "bytes_sha256": "3b78eab14a702760b6c86b01bc499d3b8dd22b89d610991a661159409aee53d9"
+        },
+        "0x3A": {
+          "ppu_addr": "0x03A0",
+          "source": "common_sprite_live_chr",
+          "sha256": "32ac3d53fd8b282a51e828258c2f583a3d8c004c18facf56549dda1358974bc7",
+          "flat_pattern": false,
+          "bytes_sha256": "32ac3d53fd8b282a51e828258c2f583a3d8c004c18facf56549dda1358974bc7"
+        },
+        "0x3B": {
+          "ppu_addr": "0x03B0",
+          "source": "common_sprite_live_chr",
+          "sha256": "c5fac516b1635ad1888ad766edf5c621746fc7ec9355ac142a9669225830490f",
+          "flat_pattern": false,
+          "bytes_sha256": "c5fac516b1635ad1888ad766edf5c621746fc7ec9355ac142a9669225830490f"
+        },
+        "0x3C": {
+          "ppu_addr": "0x03C0",
+          "source": "common_sprite_live_chr",
+          "sha256": "74188d485d985176424061e8b36cdf63c62d8c16cb60c4088b81df74c74b8fd0",
+          "flat_pattern": false,
+          "bytes_sha256": "74188d485d985176424061e8b36cdf63c62d8c16cb60c4088b81df74c74b8fd0"
+        },
+        "0x3D": {
+          "ppu_addr": "0x03D0",
+          "source": "common_sprite_live_chr",
+          "sha256": "5b84f7adc2b6f0626d324e9622d20409286ecd3b9d87b60d262c2214f819f7e2",
+          "flat_pattern": false,
+          "bytes_sha256": "5b84f7adc2b6f0626d324e9622d20409286ecd3b9d87b60d262c2214f819f7e2"
+        },
+        "0x28": {
+          "ppu_addr": "0x0280",
+          "source": "common_sprite_live_chr",
+          "sha256": "779dfb527dc7304cb1b212f1034505caf56a5072696f906dbbf0a231f6209889",
+          "flat_pattern": false,
+          "bytes_sha256": "779dfb527dc7304cb1b212f1034505caf56a5072696f906dbbf0a231f6209889"
+        },
+        "0x29": {
+          "ppu_addr": "0x0290",
+          "source": "common_sprite_live_chr",
+          "sha256": "476403bc1f109c8b0cac3a49898e1b9f7962a4aa343b855986102984f56e2a42",
+          "flat_pattern": false,
+          "bytes_sha256": "476403bc1f109c8b0cac3a49898e1b9f7962a4aa343b855986102984f56e2a42"
+        },
+        "0x86": {
+          "ppu_addr": "0x0860",
+          "source": "runtime_gap_live_chr",
+          "sha256": "08ccb906da7644127907ae0b5c1822425577f402b48a2e0fadc3eda09ebf1d0c",
+          "flat_pattern": false,
+          "bytes_sha256": "08ccb906da7644127907ae0b5c1822425577f402b48a2e0fadc3eda09ebf1d0c"
+        },
+        "0x87": {
+          "ppu_addr": "0x0870",
+          "source": "runtime_gap_live_chr",
+          "sha256": "a522c967afbfc59f7e1956960b61ee306e1c2a7214ccfe7f2c99751fed3ac46e",
+          "flat_pattern": false,
+          "bytes_sha256": "a522c967afbfc59f7e1956960b61ee306e1c2a7214ccfe7f2c99751fed3ac46e"
+        },
+        "0x88": {
+          "ppu_addr": "0x0880",
+          "source": "runtime_gap_live_chr",
+          "sha256": "d4d8bebf4395a0a1faea414f3a24474e33f36261e58bbf85d9ef4e6f589d860e",
+          "flat_pattern": false,
+          "bytes_sha256": "d4d8bebf4395a0a1faea414f3a24474e33f36261e58bbf85d9ef4e6f589d860e"
+        },
+        "0x89": {
+          "ppu_addr": "0x0890",
+          "source": "runtime_gap_live_chr",
+          "sha256": "df065f4871e06699366ccb668ce9b2a58f41b698fc7f95123d307a70c5379505",
+          "flat_pattern": false,
+          "bytes_sha256": "df065f4871e06699366ccb668ce9b2a58f41b698fc7f95123d307a70c5379505"
+        },
+        "0x34": {
+          "ppu_addr": "0x0340",
+          "source": "common_sprite_live_chr",
+          "sha256": "c0a311326c3e23e20f910c3639358ee82320691ff630411156a5d37c0a6c6a74",
+          "flat_pattern": false,
+          "bytes_sha256": "c0a311326c3e23e20f910c3639358ee82320691ff630411156a5d37c0a6c6a74"
+        },
+        "0x70": {
+          "ppu_addr": "0x0700",
+          "source": "runtime_gap_live_chr",
+          "sha256": "7fc3e80f993d374e4a7f97b5ac2b3151e884faf48a7efcd868825df896c90eb2",
+          "flat_pattern": false,
+          "bytes_sha256": "7fc3e80f993d374e4a7f97b5ac2b3151e884faf48a7efcd868825df896c90eb2"
+        },
+        "0x72": {
+          "ppu_addr": "0x0720",
+          "source": "runtime_gap_live_chr",
+          "sha256": "dd15122382188b1197e17fcf35b9022aa5ed7297c9285381735469be06c03c9d",
+          "flat_pattern": false,
+          "bytes_sha256": "dd15122382188b1197e17fcf35b9022aa5ed7297c9285381735469be06c03c9d"
+        },
+        "0x74": {
+          "ppu_addr": "0x0740",
+          "source": "runtime_gap_live_chr",
+          "sha256": "69ce1577cb03b43054e58707875959f85609a3f98677332f35671ea78db65bf2",
+          "flat_pattern": false,
+          "bytes_sha256": "69ce1577cb03b43054e58707875959f85609a3f98677332f35671ea78db65bf2"
+        },
+        "0x48": {
+          "ppu_addr": "0x0480",
+          "source": "common_sprite_live_chr",
+          "sha256": "59ff981dfefbd44e77f9d513e69f6f9ddf3231dca409edbcff5ef357e877cd46",
+          "flat_pattern": false,
+          "bytes_sha256": "59ff981dfefbd44e77f9d513e69f6f9ddf3231dca409edbcff5ef357e877cd46"
+        },
+        "0x49": {
+          "ppu_addr": "0x0490",
+          "source": "common_sprite_live_chr",
+          "sha256": "c0c9a56cf27231f5050c5aa8b25e86d735385099b2e1370d4f01165dffcb56f8",
+          "flat_pattern": false,
+          "bytes_sha256": "c0c9a56cf27231f5050c5aa8b25e86d735385099b2e1370d4f01165dffcb56f8"
+        },
+        "0x4A": {
+          "ppu_addr": "0x04A0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "a1a1d148073bc2cc021f301667cd4415b3d3bef77e17a6c901b9ce0223a05eaa"
+        },
+        "0x4B": {
+          "ppu_addr": "0x04B0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "f26da6ead755cc86927aebae70f814ee017ad9e719b17a507ec05bbe37df2781"
+        },
+        "0x44": {
+          "ppu_addr": "0x0440",
+          "source": "prg_dat_authoritative",
+          "sha256": "4631d916182a5b9e05a525d8ddc92eb81b6777a8c13e0d3475692b0238f6fa57",
+          "flat_pattern": false,
+          "bytes_sha256": "4631d916182a5b9e05a525d8ddc92eb81b6777a8c13e0d3475692b0238f6fa57"
+        },
+        "0x46": {
+          "ppu_addr": "0x0460",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "e9f3f3ba3099604d0349e3afe27bdb03f6720638810604d344c3233b74730ade"
+        },
+        "0x5C": {
+          "ppu_addr": "0x05C0",
+          "source": "prg_dat_authoritative",
+          "sha256": "9de250c805f2d5168166145dd1cdab4fba11183dcac1de3afd57cabd13dab82e",
+          "flat_pattern": false,
+          "bytes_sha256": "9de250c805f2d5168166145dd1cdab4fba11183dcac1de3afd57cabd13dab82e"
+        },
+        "0x5E": {
+          "ppu_addr": "0x05E0",
+          "source": "prg_dat_authoritative",
+          "sha256": "77569933e2909af284fd82276d61d299533856a1841cde882b2e37e15e0f54d4",
+          "flat_pattern": false,
+          "bytes_sha256": "77569933e2909af284fd82276d61d299533856a1841cde882b2e37e15e0f54d4"
+        },
+        "0x9E": {
+          "ppu_addr": "0x09E0",
+          "source": "prg_dat_authoritative",
+          "sha256": "e5ca75f8c3410f9a2606f0ff3fcf6f9105ad85f416bc728a7efccf016e7fe0bb",
+          "flat_pattern": false,
+          "bytes_sha256": "e5ca75f8c3410f9a2606f0ff3fcf6f9105ad85f416bc728a7efccf016e7fe0bb"
+        },
+        "0xA0": {
+          "ppu_addr": "0x0A00",
+          "source": "prg_dat_authoritative",
+          "sha256": "48837c07da27716f75fd16f1021ee0a96265c763f2151e65fb15993576592fc3",
+          "flat_pattern": false,
+          "bytes_sha256": "48837c07da27716f75fd16f1021ee0a96265c763f2151e65fb15993576592fc3"
+        },
+        "0xCE": {
+          "ppu_addr": "0x0CE0",
+          "source": "prg_dat_authoritative",
+          "sha256": "8a8e8ba6ff61161b9172a05f52a50175d3ba73e2b237f809949b94061d0e2614",
+          "flat_pattern": false,
+          "bytes_sha256": "8a8e8ba6ff61161b9172a05f52a50175d3ba73e2b237f809949b94061d0e2614"
+        },
+        "0xD0": {
+          "ppu_addr": "0x0D00",
+          "source": "prg_dat_authoritative",
+          "sha256": "c0bca0375bfad8bf640878f1739369cdb5b21756fda1d5015ed43821d8db9e31",
+          "flat_pattern": false,
+          "bytes_sha256": "c0bca0375bfad8bf640878f1739369cdb5b21756fda1d5015ed43821d8db9e31"
+        },
+        "0x50": {
+          "ppu_addr": "0x0500",
+          "source": "common_sprite_live_chr",
+          "sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac",
+          "flat_pattern": false,
+          "bytes_sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac"
+        },
+        "0x52": {
+          "ppu_addr": "0x0520",
+          "source": "common_sprite_live_chr",
+          "sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1",
+          "flat_pattern": false,
+          "bytes_sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1"
+        },
+        "0x6E": {
+          "ppu_addr": "0x06E0",
+          "source": "common_sprite_live_chr",
+          "sha256": "c4de171a2cf57a9951f3f3e67f7c84e138566ec8c424b0c9cf08a3f4b7981f69",
+          "flat_pattern": false,
+          "bytes_sha256": "c4de171a2cf57a9951f3f3e67f7c84e138566ec8c424b0c9cf08a3f4b7981f69"
+        },
+        "0x7A": {
+          "ppu_addr": "0x07A0",
+          "source": "uw_sprite_pattern_block_uwsp_live_chr",
+          "sha256": "bb230dcd8e1f58348060af3c9b880a65a438322adf4e955d6ffe94bf93c4561b",
+          "flat_pattern": false,
+          "bytes_sha256": "bb230dcd8e1f58348060af3c9b880a65a438322adf4e955d6ffe94bf93c4561b"
+        },
+        "0x7C": {
+          "ppu_addr": "0x07C0",
+          "source": "uw_sprite_pattern_block_uwsp_live_chr",
+          "sha256": "d7432888452191873fe4540d5c717887bd37218ebee24bc6c5b5c0afed1b9820",
+          "flat_pattern": false,
+          "bytes_sha256": "d7432888452191873fe4540d5c717887bd37218ebee24bc6c5b5c0afed1b9820"
+        },
+        "0x7E": {
+          "ppu_addr": "0x07E0",
+          "source": "uw_sprite_pattern_block_uwsp_live_chr",
+          "sha256": "fc73fe7a74abbc0689120eef0fc27151341b140c0625b833737b9ad1aee69a8e",
+          "flat_pattern": false,
+          "bytes_sha256": "fc73fe7a74abbc0689120eef0fc27151341b140c0625b833737b9ad1aee69a8e"
+        },
+        "0x51": {
+          "ppu_addr": "0x0510",
+          "source": "common_sprite_live_chr",
+          "sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f",
+          "flat_pattern": false,
+          "bytes_sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f"
+        },
+        "0x53": {
+          "ppu_addr": "0x0530",
+          "source": "common_sprite_live_chr",
+          "sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e",
+          "flat_pattern": false,
+          "bytes_sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e"
+        },
+        "0x35": {
+          "ppu_addr": "0x0350",
+          "source": "common_sprite_live_chr",
+          "sha256": "c80f64145b9e3b242f4c5090c5ec6b08264351e741e74e64cb5ee767be77440e",
+          "flat_pattern": false,
+          "bytes_sha256": "c80f64145b9e3b242f4c5090c5ec6b08264351e741e74e64cb5ee767be77440e"
+        },
+        "0x71": {
+          "ppu_addr": "0x0710",
+          "source": "common_sprite_live_chr",
+          "sha256": "44e0ee70a489d9ce30eeaaf257528d8d86b8f778240807cb7670d4c939a7688c",
+          "flat_pattern": false,
+          "bytes_sha256": "44e0ee70a489d9ce30eeaaf257528d8d86b8f778240807cb7670d4c939a7688c"
+        },
+        "0x73": {
+          "ppu_addr": "0x0073",
+          "source": "common_sprite_live_chr",
+          "sha256": "d360897bb3aef542f796b7c42feba5bd547b3c70f4b086c4393cbd09abdaf763",
+          "flat_pattern": false,
+          "bytes_sha256": "d360897bb3aef542f796b7c42feba5bd547b3c70f4b086c4393cbd09abdaf763"
+        },
+        "0x75": {
+          "ppu_addr": "0x0075",
+          "source": "common_sprite_live_chr",
+          "sha256": "614b3086dd30ca59a7e131cd00b72dc04b44a045d1e967f410d8946f11e23af8",
+          "flat_pattern": false,
+          "bytes_sha256": "614b3086dd30ca59a7e131cd00b72dc04b44a045d1e967f410d8946f11e23af8"
+        },
+        "0x5D": {
+          "ppu_addr": "0x05D0",
+          "source": "prg_dat_authoritative",
+          "sha256": "98cd9c625af7003751deb7cedfa5c537ee2e253ef77a94036c6405b395487b29",
+          "flat_pattern": false,
+          "bytes_sha256": "98cd9c625af7003751deb7cedfa5c537ee2e253ef77a94036c6405b395487b29"
+        },
+        "0x5F": {
+          "ppu_addr": "0x05F0",
+          "source": "prg_dat_authoritative",
+          "sha256": "e231b878449e4171c94cc4f62510e9249ec2a852f947c48678f701412e653b78",
+          "flat_pattern": false,
+          "bytes_sha256": "e231b878449e4171c94cc4f62510e9249ec2a852f947c48678f701412e653b78"
+        },
+        "0x9F": {
+          "ppu_addr": "0x09F0",
+          "source": "prg_dat_authoritative",
+          "sha256": "bb78b15190d8692d4336ae6d6bdb4c2123e8fb9487f1cad6a4218dee5a2a8945",
+          "flat_pattern": false,
+          "bytes_sha256": "bb78b15190d8692d4336ae6d6bdb4c2123e8fb9487f1cad6a4218dee5a2a8945"
+        },
+        "0xA1": {
+          "ppu_addr": "0x0A10",
+          "source": "prg_dat_authoritative",
+          "sha256": "92f15b534e3f968065de9089deb97042e9afcb63717db428e2758b84939c965f",
+          "flat_pattern": false,
+          "bytes_sha256": "92f15b534e3f968065de9089deb97042e9afcb63717db428e2758b84939c965f"
+        },
+        "0x45": {
+          "ppu_addr": "0x0450",
+          "source": "prg_dat_authoritative",
+          "sha256": "5121e10175618e441634bacae1744b5fa504f0556cadaed94559d7aee3aa740b",
+          "flat_pattern": false,
+          "bytes_sha256": "5121e10175618e441634bacae1744b5fa504f0556cadaed94559d7aee3aa740b"
+        },
+        "0x47": {
+          "ppu_addr": "0x0470",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "575d1b71612d736161de53722b203816572c764a0109d0dd70196d2850b105c9"
+        },
+        "0xD1": {
+          "ppu_addr": "0x0D10",
+          "source": "prg_dat_authoritative",
+          "sha256": "c027ef41c0d7bf2328c879b8be2e9c1811c87a1213abfa586216d5651d64e1dd",
+          "flat_pattern": false,
+          "bytes_sha256": "c027ef41c0d7bf2328c879b8be2e9c1811c87a1213abfa586216d5651d64e1dd"
+        },
+        "0x6F": {
+          "ppu_addr": "0x06F0",
+          "source": "common_sprite_live_chr",
+          "sha256": "a848ffe0db38fd21dc4fe5a5676be9f2fa36c5c42142bb324266d650faf53e3a",
+          "flat_pattern": false,
+          "bytes_sha256": "a848ffe0db38fd21dc4fe5a5676be9f2fa36c5c42142bb324266d650faf53e3a"
+        },
+        "0x7B": {
+          "ppu_addr": "0x07B0",
+          "source": "common_sprite_live_chr",
+          "sha256": "4f0d8f9f1e903f61a1a956508c9061b8dbd64a7f2ac2cc0075aafefc60b17994",
+          "flat_pattern": false,
+          "bytes_sha256": "4f0d8f9f1e903f61a1a956508c9061b8dbd64a7f2ac2cc0075aafefc60b17994"
+        },
+        "0x7D": {
+          "ppu_addr": "0x07D0",
+          "source": "common_sprite_live_chr",
+          "sha256": "3a9ac48fd73576e75d202a453cc5bdf58721300db7f89184eb0cb6b7a2f14477",
+          "flat_pattern": false,
+          "bytes_sha256": "3a9ac48fd73576e75d202a453cc5bdf58721300db7f89184eb0cb6b7a2f14477"
+        },
+        "0x7F": {
+          "ppu_addr": "0x07F0",
+          "source": "common_sprite_live_chr",
+          "sha256": "e3d91ab3854cdf6d59526c0ba765fb35084a4ee7e41a927ce8f37d3285f98eff",
+          "flat_pattern": false,
+          "bytes_sha256": "e3d91ab3854cdf6d59526c0ba765fb35084a4ee7e41a927ce8f37d3285f98eff"
+        },
+        "0xCF": {
+          "ppu_addr": "0x0CF0",
+          "source": "prg_dat_authoritative",
+          "sha256": "d909d8621f27189d4fd165f1c8a4e47ec7483bd3c998ade40c08bdb028727049",
+          "flat_pattern": false,
+          "bytes_sha256": "d909d8621f27189d4fd165f1c8a4e47ec7483bd3c998ade40c08bdb028727049"
+        },
+        "0x2E": {
+          "ppu_addr": "0x02E0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "6f379c59fbb660c937c92a5c7160d1751a23102a89327b1c4c4a403a28d38f3c"
+        },
+        "0x2F": {
+          "ppu_addr": "0x02F0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "b65da8afb0177efbf258884f18bf120f73edbfe2db61a03e75adf6ebe500b842"
+        },
+        "0x32": {
+          "ppu_addr": "0x0320",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "bb91b472ac7e2e09810b930816494a5e458fb174500bf9037482c4c4f3780681"
+        },
+        "0x33": {
+          "ppu_addr": "0x0330",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "3dbddb83bb7e7740c9583b02a37c569e493f05cb24581585af170da8adf09fe7"
+        },
+        "0x42": {
+          "ppu_addr": "0x0420",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "60c8462bcbc4cfbe71f0c79fb0c388f76877aa420841de508e9d54fc1164de07"
+        },
+        "0x43": {
+          "ppu_addr": "0x0430",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "b86ce8cd23c35fb888de148d8101b0a30c7d163d5773d832fe0cfbf0922e8f79"
+        },
+        "0x68": {
+          "ppu_addr": "0x0680",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "1ac18f397b44fae4fd83cda2dc65906d2cd6f07ac2c11c210c8674004e29fe64"
+        },
+        "0x69": {
+          "ppu_addr": "0x0690",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "e6882d504fef646bb6f935d276053b1fc7aa3c2804082200045f180273903cf7"
+        },
+        "0x2C": {
+          "ppu_addr": "0x02C0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "2838912b39bdb4c7722042aeab5af2562fc3651eb3d414c271b63cf35ca1547d"
+        },
+        "0x2D": {
+          "ppu_addr": "0x02D0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "2b68925892380935da3cc89cadac2108062751b2d3c73ca1f399b316284ca704"
+        },
+        "0x4E": {
+          "ppu_addr": "0x04E0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "7e77a8d54d2b07c482813be2c6175f9bdd7f124915825392f840036632217eb3"
+        },
+        "0x4F": {
+          "ppu_addr": "0x04F0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "83b4d6aa081867f04188e2d5f96bdb41bca222d128d0ff5749e148b91d077d96"
+        },
+        "0x4C": {
+          "ppu_addr": "0x04C0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "7db4b203847c5949e581b091b1a456f5b7f22fbe5615c7d5d76ff4d1782dd81b"
+        },
+        "0x4D": {
+          "ppu_addr": "0x04D0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "f80870cbe2b3d51678b8bb4444bb8c0f5412e3717763d87b1e00a0870c05913c"
+        },
+        "0x2A": {
+          "ppu_addr": "0x02A0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "2b9e0344a16bf105000887f62aa2ae8972d61596890a3fe8a69c6fb8907962a7"
+        },
+        "0x2B": {
+          "ppu_addr": "0x02B0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "f72b4b95c17c74ee4898c578069bc988bc764da75e8458141815ce5ded38f2aa"
+        },
+        "0x22": {
+          "ppu_addr": "0x0220",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "7925feb492726a9506a76e20e2487b3ef8a65d932b068fb0221e8c3dd4fc9944"
+        },
+        "0x23": {
+          "ppu_addr": "0x0230",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "9031c9ae4a4a3f5715ea56f8cdbcae2b8ac7db44447d2cff692e171da24a3f5d"
+        },
+        "0x40": {
+          "ppu_addr": "0x0400",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "38ccdc435574ce51ab395e6566e848e3eacc9aff3c381f19e4979140663d110d"
+        },
+        "0x41": {
+          "ppu_addr": "0x0410",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "5ccffbf578cde9f01318c385ae129ba93a2aecb30ec27c07d06a84464f5c8d79"
+        },
+        "0x76": {
+          "ppu_addr": "0x0760",
+          "source": "reference_aldonunez_DemoSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "171fb1aa584fd1a0d22978d81647da181fffb9dfd16dece1a087a8d83f59d889"
+        },
+        "0x77": {
+          "ppu_addr": "0x0770",
+          "source": "reference_aldonunez_DemoSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "204a076204a1be0e58b0aff9cde1771a4fd51868ca0784cd1337871686e2e57d"
+        },
+        "0xF0": {
+          "ppu_addr": "0x0500",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac",
+          "flat_pattern": false,
+          "bytes_sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac",
+          "atlas_alias_for_nes_tile": "0x50"
+        },
+        "0xF1": {
+          "ppu_addr": "0x0510",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f",
+          "flat_pattern": false,
+          "bytes_sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f",
+          "atlas_alias_for_nes_tile": "0x51"
+        },
+        "0xF2": {
+          "ppu_addr": "0x0520",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1",
+          "flat_pattern": false,
+          "bytes_sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1",
+          "atlas_alias_for_nes_tile": "0x52"
+        },
+        "0xF3": {
+          "ppu_addr": "0x0530",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e",
+          "flat_pattern": false,
+          "bytes_sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e",
+          "atlas_alias_for_nes_tile": "0x53"
+        },
+        "0xE0": {
+          "ppu_addr": "0x1F20",
+          "source": "CommonMiscPatterns_rom",
+          "sha256": "b58b929eb8a7305e717dfcce2d66313460c64f33252b28a9f1f70fb025d73d54",
+          "flat_pattern": false,
+          "bytes_sha256": "b58b929eb8a7305e717dfcce2d66313460c64f33252b28a9f1f70fb025d73d54",
+          "atlas_alias_for_nes_tile": "0xF2"
+        },
+        "0xE1": {
+          "ppu_addr": "0x1F30",
+          "source": "CommonMiscPatterns_rom",
+          "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+          "flat_pattern": true,
+          "bytes_sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+          "atlas_alias_for_nes_tile": "0xF3"
+        },
+        "0x66": {
+          "ppu_addr": "0x0660",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "8e8cd70e0a9d99510270813153415ffa8166f24e548a8f886bb7d03aa99e110e",
+          "flat_pattern": false,
+          "bytes_sha256": "8e8cd70e0a9d99510270813153415ffa8166f24e548a8f886bb7d03aa99e110e"
+        },
+        "0x67": {
+          "ppu_addr": "0x0670",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "9c810185477ace9a9ff8a8a2634dddabe21d31e00357ef4481820abe6d9ece95",
+          "flat_pattern": false,
+          "bytes_sha256": "9c810185477ace9a9ff8a8a2634dddabe21d31e00357ef4481820abe6d9ece95"
+        },
+        "0x30": {
+          "ppu_addr": "0x0300",
+          "source": "common_sprite_live_chr",
+          "sha256": "e0b5e2728cf30514105b240ee82df09f024beac879477bc1a2f259edc939468e",
+          "flat_pattern": false,
+          "bytes_sha256": "e0b5e2728cf30514105b240ee82df09f024beac879477bc1a2f259edc939468e"
+        },
+        "0x31": {
+          "ppu_addr": "0x0310",
+          "source": "common_sprite_live_chr",
+          "sha256": "4f95a76449fd2e38ede104a4a0fd8930671b20989c14034441efb05a666f8614",
+          "flat_pattern": false,
+          "bytes_sha256": "4f95a76449fd2e38ede104a4a0fd8930671b20989c14034441efb05a666f8614"
+        },
+        "0x8A": {
+          "ppu_addr": "0x08A0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "8c485bae3f6391396a25e84f8d5f98da77f1235718c6915c7a4e0d32081400ea",
+          "flat_pattern": false,
+          "bytes_sha256": "8c485bae3f6391396a25e84f8d5f98da77f1235718c6915c7a4e0d32081400ea"
+        },
+        "0x8B": {
+          "ppu_addr": "0x08B0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "3c03a4ed06216d55d36dc6483f5d2b49efc1d7eea741e6ee4ef01a3415e973a9",
+          "flat_pattern": false,
+          "bytes_sha256": "3c03a4ed06216d55d36dc6483f5d2b49efc1d7eea741e6ee4ef01a3415e973a9"
+        },
+        "0x8C": {
+          "ppu_addr": "0x08C0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "f59d80db97deb38fbbddf40f6c48f369200bb51d6b7623919ed3d5ad36fad1a5",
+          "flat_pattern": false,
+          "bytes_sha256": "f59d80db97deb38fbbddf40f6c48f369200bb51d6b7623919ed3d5ad36fad1a5"
+        },
+        "0x8D": {
+          "ppu_addr": "0x08D0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "56ebb5746ed16bb5a2af68f7fd474b9d990d370db5a2f790299d7b503100facd",
+          "flat_pattern": false,
+          "bytes_sha256": "56ebb5746ed16bb5a2af68f7fd474b9d990d370db5a2f790299d7b503100facd"
+        }
+      }
+    },
+    {
+      "rom_id": "redux",
+      "chr_dump": "engine/out/nes_item_chr_pt0_redux.bin",
+      "chr_dump_sha256": "a2b93a447d4c8df0619210a70a3afb1188c8cbc2dc45ee99da9bcd293ce985ae",
+      "tiles": {
+        "0x20": {
+          "ppu_addr": "0x0200",
+          "source": "common_sprite_live_chr",
+          "sha256": "d236206ddc29f82e0fb072e74715416a48bd4851f59bfa3d6e33e8325e765949",
+          "flat_pattern": false,
+          "bytes_sha256": "d236206ddc29f82e0fb072e74715416a48bd4851f59bfa3d6e33e8325e765949"
+        },
+        "0x21": {
+          "ppu_addr": "0x0210",
+          "source": "common_sprite_live_chr",
+          "sha256": "24f3b2dcd799168a64fecb3173e3b8e931fb89395d00ad49c0bfc4d8409ed298",
+          "flat_pattern": false,
+          "bytes_sha256": "24f3b2dcd799168a64fecb3173e3b8e931fb89395d00ad49c0bfc4d8409ed298"
+        },
+        "0x82": {
+          "ppu_addr": "0x0820",
+          "source": "runtime_gap_live_chr",
+          "sha256": "0566421277594df4e55979200ee76eab65410e55a5a5af0b8fc48b48555a0051",
+          "flat_pattern": false,
+          "bytes_sha256": "0566421277594df4e55979200ee76eab65410e55a5a5af0b8fc48b48555a0051"
+        },
+        "0x83": {
+          "ppu_addr": "0x0830",
+          "source": "runtime_gap_live_chr",
+          "sha256": "5715dcb74449bcd594cd9145c0ad2c7f00e2b33d39ba91d62f1042ff07ebd7fc",
+          "flat_pattern": false,
+          "bytes_sha256": "5715dcb74449bcd594cd9145c0ad2c7f00e2b33d39ba91d62f1042ff07ebd7fc"
+        },
+        "0x84": {
+          "ppu_addr": "0x0840",
+          "source": "runtime_gap_live_chr",
+          "sha256": "295865c37e18cbac4e667c7531c47394c9c4411fc572e47bdfe790fdcbc51743",
+          "flat_pattern": false,
+          "bytes_sha256": "295865c37e18cbac4e667c7531c47394c9c4411fc572e47bdfe790fdcbc51743"
+        },
+        "0x85": {
+          "ppu_addr": "0x0850",
+          "source": "runtime_gap_live_chr",
+          "sha256": "ed734eb3250befe0d30282540ddfc3bab486ce9a33d1d19190f495255a7d1bab",
+          "flat_pattern": false,
+          "bytes_sha256": "ed734eb3250befe0d30282540ddfc3bab486ce9a33d1d19190f495255a7d1bab"
+        },
+        "0x36": {
+          "ppu_addr": "0x0360",
+          "source": "common_sprite_live_chr",
+          "sha256": "55e26359f0162ae50f0075a3aeee8830699bd2cb1e65ff4ee0cac623c49ab035",
+          "flat_pattern": false,
+          "bytes_sha256": "55e26359f0162ae50f0075a3aeee8830699bd2cb1e65ff4ee0cac623c49ab035"
+        },
+        "0x37": {
+          "ppu_addr": "0x0370",
+          "source": "common_sprite_live_chr",
+          "sha256": "0943a23d4a5cc5a3664c63cd2ee23b6fb2a91ab652605f6e60856749b27f5b83",
+          "flat_pattern": false,
+          "bytes_sha256": "0943a23d4a5cc5a3664c63cd2ee23b6fb2a91ab652605f6e60856749b27f5b83"
+        },
+        "0x38": {
+          "ppu_addr": "0x0380",
+          "source": "common_sprite_live_chr",
+          "sha256": "1dfd1283c8a2a00ebb8e683e202326ddcf0c6cbc89125a745ea063362ab43082",
+          "flat_pattern": false,
+          "bytes_sha256": "1dfd1283c8a2a00ebb8e683e202326ddcf0c6cbc89125a745ea063362ab43082"
+        },
+        "0x39": {
+          "ppu_addr": "0x0390",
+          "source": "common_sprite_live_chr",
+          "sha256": "3b78eab14a702760b6c86b01bc499d3b8dd22b89d610991a661159409aee53d9",
+          "flat_pattern": false,
+          "bytes_sha256": "3b78eab14a702760b6c86b01bc499d3b8dd22b89d610991a661159409aee53d9"
+        },
+        "0x3A": {
+          "ppu_addr": "0x03A0",
+          "source": "common_sprite_live_chr",
+          "sha256": "32ac3d53fd8b282a51e828258c2f583a3d8c004c18facf56549dda1358974bc7",
+          "flat_pattern": false,
+          "bytes_sha256": "32ac3d53fd8b282a51e828258c2f583a3d8c004c18facf56549dda1358974bc7"
+        },
+        "0x3B": {
+          "ppu_addr": "0x03B0",
+          "source": "common_sprite_live_chr",
+          "sha256": "c5fac516b1635ad1888ad766edf5c621746fc7ec9355ac142a9669225830490f",
+          "flat_pattern": false,
+          "bytes_sha256": "c5fac516b1635ad1888ad766edf5c621746fc7ec9355ac142a9669225830490f"
+        },
+        "0x3C": {
+          "ppu_addr": "0x03C0",
+          "source": "common_sprite_live_chr",
+          "sha256": "74188d485d985176424061e8b36cdf63c62d8c16cb60c4088b81df74c74b8fd0",
+          "flat_pattern": false,
+          "bytes_sha256": "74188d485d985176424061e8b36cdf63c62d8c16cb60c4088b81df74c74b8fd0"
+        },
+        "0x3D": {
+          "ppu_addr": "0x03D0",
+          "source": "common_sprite_live_chr",
+          "sha256": "5b84f7adc2b6f0626d324e9622d20409286ecd3b9d87b60d262c2214f819f7e2",
+          "flat_pattern": false,
+          "bytes_sha256": "5b84f7adc2b6f0626d324e9622d20409286ecd3b9d87b60d262c2214f819f7e2"
+        },
+        "0x28": {
+          "ppu_addr": "0x0280",
+          "source": "common_sprite_live_chr",
+          "sha256": "779dfb527dc7304cb1b212f1034505caf56a5072696f906dbbf0a231f6209889",
+          "flat_pattern": false,
+          "bytes_sha256": "779dfb527dc7304cb1b212f1034505caf56a5072696f906dbbf0a231f6209889"
+        },
+        "0x29": {
+          "ppu_addr": "0x0290",
+          "source": "common_sprite_live_chr",
+          "sha256": "476403bc1f109c8b0cac3a49898e1b9f7962a4aa343b855986102984f56e2a42",
+          "flat_pattern": false,
+          "bytes_sha256": "476403bc1f109c8b0cac3a49898e1b9f7962a4aa343b855986102984f56e2a42"
+        },
+        "0x86": {
+          "ppu_addr": "0x0860",
+          "source": "runtime_gap_live_chr",
+          "sha256": "08ccb906da7644127907ae0b5c1822425577f402b48a2e0fadc3eda09ebf1d0c",
+          "flat_pattern": false,
+          "bytes_sha256": "08ccb906da7644127907ae0b5c1822425577f402b48a2e0fadc3eda09ebf1d0c"
+        },
+        "0x87": {
+          "ppu_addr": "0x0870",
+          "source": "runtime_gap_live_chr",
+          "sha256": "a522c967afbfc59f7e1956960b61ee306e1c2a7214ccfe7f2c99751fed3ac46e",
+          "flat_pattern": false,
+          "bytes_sha256": "a522c967afbfc59f7e1956960b61ee306e1c2a7214ccfe7f2c99751fed3ac46e"
+        },
+        "0x88": {
+          "ppu_addr": "0x0880",
+          "source": "runtime_gap_live_chr",
+          "sha256": "d4d8bebf4395a0a1faea414f3a24474e33f36261e58bbf85d9ef4e6f589d860e",
+          "flat_pattern": false,
+          "bytes_sha256": "d4d8bebf4395a0a1faea414f3a24474e33f36261e58bbf85d9ef4e6f589d860e"
+        },
+        "0x89": {
+          "ppu_addr": "0x0890",
+          "source": "runtime_gap_live_chr",
+          "sha256": "df065f4871e06699366ccb668ce9b2a58f41b698fc7f95123d307a70c5379505",
+          "flat_pattern": false,
+          "bytes_sha256": "df065f4871e06699366ccb668ce9b2a58f41b698fc7f95123d307a70c5379505"
+        },
+        "0x34": {
+          "ppu_addr": "0x0340",
+          "source": "common_sprite_live_chr",
+          "sha256": "c0a311326c3e23e20f910c3639358ee82320691ff630411156a5d37c0a6c6a74",
+          "flat_pattern": false,
+          "bytes_sha256": "c0a311326c3e23e20f910c3639358ee82320691ff630411156a5d37c0a6c6a74"
+        },
+        "0x70": {
+          "ppu_addr": "0x0700",
+          "source": "runtime_gap_live_chr",
+          "sha256": "7fc3e80f993d374e4a7f97b5ac2b3151e884faf48a7efcd868825df896c90eb2",
+          "flat_pattern": false,
+          "bytes_sha256": "7fc3e80f993d374e4a7f97b5ac2b3151e884faf48a7efcd868825df896c90eb2"
+        },
+        "0x72": {
+          "ppu_addr": "0x0720",
+          "source": "runtime_gap_live_chr",
+          "sha256": "dd15122382188b1197e17fcf35b9022aa5ed7297c9285381735469be06c03c9d",
+          "flat_pattern": false,
+          "bytes_sha256": "dd15122382188b1197e17fcf35b9022aa5ed7297c9285381735469be06c03c9d"
+        },
+        "0x74": {
+          "ppu_addr": "0x0740",
+          "source": "runtime_gap_live_chr",
+          "sha256": "69ce1577cb03b43054e58707875959f85609a3f98677332f35671ea78db65bf2",
+          "flat_pattern": false,
+          "bytes_sha256": "69ce1577cb03b43054e58707875959f85609a3f98677332f35671ea78db65bf2"
+        },
+        "0x48": {
+          "ppu_addr": "0x0480",
+          "source": "common_sprite_live_chr",
+          "sha256": "59ff981dfefbd44e77f9d513e69f6f9ddf3231dca409edbcff5ef357e877cd46",
+          "flat_pattern": false,
+          "bytes_sha256": "59ff981dfefbd44e77f9d513e69f6f9ddf3231dca409edbcff5ef357e877cd46"
+        },
+        "0x49": {
+          "ppu_addr": "0x0490",
+          "source": "common_sprite_live_chr",
+          "sha256": "c0c9a56cf27231f5050c5aa8b25e86d735385099b2e1370d4f01165dffcb56f8",
+          "flat_pattern": false,
+          "bytes_sha256": "c0c9a56cf27231f5050c5aa8b25e86d735385099b2e1370d4f01165dffcb56f8"
+        },
+        "0x4A": {
+          "ppu_addr": "0x04A0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "a1a1d148073bc2cc021f301667cd4415b3d3bef77e17a6c901b9ce0223a05eaa"
+        },
+        "0x4B": {
+          "ppu_addr": "0x04B0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "f26da6ead755cc86927aebae70f814ee017ad9e719b17a507ec05bbe37df2781"
+        },
+        "0x44": {
+          "ppu_addr": "0x0440",
+          "source": "prg_dat_authoritative",
+          "sha256": "4631d916182a5b9e05a525d8ddc92eb81b6777a8c13e0d3475692b0238f6fa57",
+          "flat_pattern": false,
+          "bytes_sha256": "4631d916182a5b9e05a525d8ddc92eb81b6777a8c13e0d3475692b0238f6fa57"
+        },
+        "0x46": {
+          "ppu_addr": "0x0460",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "e9f3f3ba3099604d0349e3afe27bdb03f6720638810604d344c3233b74730ade"
+        },
+        "0x5C": {
+          "ppu_addr": "0x05C0",
+          "source": "prg_dat_authoritative",
+          "sha256": "9de250c805f2d5168166145dd1cdab4fba11183dcac1de3afd57cabd13dab82e",
+          "flat_pattern": false,
+          "bytes_sha256": "9de250c805f2d5168166145dd1cdab4fba11183dcac1de3afd57cabd13dab82e"
+        },
+        "0x5E": {
+          "ppu_addr": "0x05E0",
+          "source": "prg_dat_authoritative",
+          "sha256": "77569933e2909af284fd82276d61d299533856a1841cde882b2e37e15e0f54d4",
+          "flat_pattern": false,
+          "bytes_sha256": "77569933e2909af284fd82276d61d299533856a1841cde882b2e37e15e0f54d4"
+        },
+        "0x9E": {
+          "ppu_addr": "0x09E0",
+          "source": "prg_dat_authoritative",
+          "sha256": "e5ca75f8c3410f9a2606f0ff3fcf6f9105ad85f416bc728a7efccf016e7fe0bb",
+          "flat_pattern": false,
+          "bytes_sha256": "e5ca75f8c3410f9a2606f0ff3fcf6f9105ad85f416bc728a7efccf016e7fe0bb"
+        },
+        "0xA0": {
+          "ppu_addr": "0x0A00",
+          "source": "prg_dat_authoritative",
+          "sha256": "48837c07da27716f75fd16f1021ee0a96265c763f2151e65fb15993576592fc3",
+          "flat_pattern": false,
+          "bytes_sha256": "48837c07da27716f75fd16f1021ee0a96265c763f2151e65fb15993576592fc3"
+        },
+        "0xCE": {
+          "ppu_addr": "0x0CE0",
+          "source": "prg_dat_authoritative",
+          "sha256": "8a8e8ba6ff61161b9172a05f52a50175d3ba73e2b237f809949b94061d0e2614",
+          "flat_pattern": false,
+          "bytes_sha256": "8a8e8ba6ff61161b9172a05f52a50175d3ba73e2b237f809949b94061d0e2614"
+        },
+        "0xD0": {
+          "ppu_addr": "0x0D00",
+          "source": "prg_dat_authoritative",
+          "sha256": "c0bca0375bfad8bf640878f1739369cdb5b21756fda1d5015ed43821d8db9e31",
+          "flat_pattern": false,
+          "bytes_sha256": "c0bca0375bfad8bf640878f1739369cdb5b21756fda1d5015ed43821d8db9e31"
+        },
+        "0x50": {
+          "ppu_addr": "0x0500",
+          "source": "common_sprite_live_chr",
+          "sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac",
+          "flat_pattern": false,
+          "bytes_sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac"
+        },
+        "0x52": {
+          "ppu_addr": "0x0520",
+          "source": "common_sprite_live_chr",
+          "sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1",
+          "flat_pattern": false,
+          "bytes_sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1"
+        },
+        "0x6E": {
+          "ppu_addr": "0x06E0",
+          "source": "common_sprite_live_chr",
+          "sha256": "c4de171a2cf57a9951f3f3e67f7c84e138566ec8c424b0c9cf08a3f4b7981f69",
+          "flat_pattern": false,
+          "bytes_sha256": "c4de171a2cf57a9951f3f3e67f7c84e138566ec8c424b0c9cf08a3f4b7981f69"
+        },
+        "0x7A": {
+          "ppu_addr": "0x07A0",
+          "source": "uw_sprite_pattern_block_uwsp_live_chr",
+          "sha256": "bb230dcd8e1f58348060af3c9b880a65a438322adf4e955d6ffe94bf93c4561b",
+          "flat_pattern": false,
+          "bytes_sha256": "bb230dcd8e1f58348060af3c9b880a65a438322adf4e955d6ffe94bf93c4561b"
+        },
+        "0x7C": {
+          "ppu_addr": "0x07C0",
+          "source": "uw_sprite_pattern_block_uwsp_live_chr",
+          "sha256": "d7432888452191873fe4540d5c717887bd37218ebee24bc6c5b5c0afed1b9820",
+          "flat_pattern": false,
+          "bytes_sha256": "d7432888452191873fe4540d5c717887bd37218ebee24bc6c5b5c0afed1b9820"
+        },
+        "0x7E": {
+          "ppu_addr": "0x07E0",
+          "source": "uw_sprite_pattern_block_uwsp_live_chr",
+          "sha256": "fc73fe7a74abbc0689120eef0fc27151341b140c0625b833737b9ad1aee69a8e",
+          "flat_pattern": false,
+          "bytes_sha256": "fc73fe7a74abbc0689120eef0fc27151341b140c0625b833737b9ad1aee69a8e"
+        },
+        "0x51": {
+          "ppu_addr": "0x0510",
+          "source": "common_sprite_live_chr",
+          "sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f",
+          "flat_pattern": false,
+          "bytes_sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f"
+        },
+        "0x53": {
+          "ppu_addr": "0x0530",
+          "source": "common_sprite_live_chr",
+          "sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e",
+          "flat_pattern": false,
+          "bytes_sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e"
+        },
+        "0x35": {
+          "ppu_addr": "0x0350",
+          "source": "common_sprite_live_chr",
+          "sha256": "c80f64145b9e3b242f4c5090c5ec6b08264351e741e74e64cb5ee767be77440e",
+          "flat_pattern": false,
+          "bytes_sha256": "c80f64145b9e3b242f4c5090c5ec6b08264351e741e74e64cb5ee767be77440e"
+        },
+        "0x71": {
+          "ppu_addr": "0x0710",
+          "source": "common_sprite_live_chr",
+          "sha256": "44e0ee70a489d9ce30eeaaf257528d8d86b8f778240807cb7670d4c939a7688c",
+          "flat_pattern": false,
+          "bytes_sha256": "44e0ee70a489d9ce30eeaaf257528d8d86b8f778240807cb7670d4c939a7688c"
+        },
+        "0x73": {
+          "ppu_addr": "0x0073",
+          "source": "common_sprite_live_chr",
+          "sha256": "d360897bb3aef542f796b7c42feba5bd547b3c70f4b086c4393cbd09abdaf763",
+          "flat_pattern": false,
+          "bytes_sha256": "d360897bb3aef542f796b7c42feba5bd547b3c70f4b086c4393cbd09abdaf763"
+        },
+        "0x75": {
+          "ppu_addr": "0x0075",
+          "source": "common_sprite_live_chr",
+          "sha256": "614b3086dd30ca59a7e131cd00b72dc04b44a045d1e967f410d8946f11e23af8",
+          "flat_pattern": false,
+          "bytes_sha256": "614b3086dd30ca59a7e131cd00b72dc04b44a045d1e967f410d8946f11e23af8"
+        },
+        "0x5D": {
+          "ppu_addr": "0x05D0",
+          "source": "prg_dat_authoritative",
+          "sha256": "98cd9c625af7003751deb7cedfa5c537ee2e253ef77a94036c6405b395487b29",
+          "flat_pattern": false,
+          "bytes_sha256": "98cd9c625af7003751deb7cedfa5c537ee2e253ef77a94036c6405b395487b29"
+        },
+        "0x5F": {
+          "ppu_addr": "0x05F0",
+          "source": "prg_dat_authoritative",
+          "sha256": "e231b878449e4171c94cc4f62510e9249ec2a852f947c48678f701412e653b78",
+          "flat_pattern": false,
+          "bytes_sha256": "e231b878449e4171c94cc4f62510e9249ec2a852f947c48678f701412e653b78"
+        },
+        "0x9F": {
+          "ppu_addr": "0x09F0",
+          "source": "prg_dat_authoritative",
+          "sha256": "bb78b15190d8692d4336ae6d6bdb4c2123e8fb9487f1cad6a4218dee5a2a8945",
+          "flat_pattern": false,
+          "bytes_sha256": "bb78b15190d8692d4336ae6d6bdb4c2123e8fb9487f1cad6a4218dee5a2a8945"
+        },
+        "0xA1": {
+          "ppu_addr": "0x0A10",
+          "source": "prg_dat_authoritative",
+          "sha256": "92f15b534e3f968065de9089deb97042e9afcb63717db428e2758b84939c965f",
+          "flat_pattern": false,
+          "bytes_sha256": "92f15b534e3f968065de9089deb97042e9afcb63717db428e2758b84939c965f"
+        },
+        "0x45": {
+          "ppu_addr": "0x0450",
+          "source": "prg_dat_authoritative",
+          "sha256": "5121e10175618e441634bacae1744b5fa504f0556cadaed94559d7aee3aa740b",
+          "flat_pattern": false,
+          "bytes_sha256": "5121e10175618e441634bacae1744b5fa504f0556cadaed94559d7aee3aa740b"
+        },
+        "0x47": {
+          "ppu_addr": "0x0470",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "575d1b71612d736161de53722b203816572c764a0109d0dd70196d2850b105c9"
+        },
+        "0xD1": {
+          "ppu_addr": "0x0D10",
+          "source": "prg_dat_authoritative",
+          "sha256": "c027ef41c0d7bf2328c879b8be2e9c1811c87a1213abfa586216d5651d64e1dd",
+          "flat_pattern": false,
+          "bytes_sha256": "c027ef41c0d7bf2328c879b8be2e9c1811c87a1213abfa586216d5651d64e1dd"
+        },
+        "0x6F": {
+          "ppu_addr": "0x06F0",
+          "source": "common_sprite_live_chr",
+          "sha256": "a848ffe0db38fd21dc4fe5a5676be9f2fa36c5c42142bb324266d650faf53e3a",
+          "flat_pattern": false,
+          "bytes_sha256": "a848ffe0db38fd21dc4fe5a5676be9f2fa36c5c42142bb324266d650faf53e3a"
+        },
+        "0x7B": {
+          "ppu_addr": "0x07B0",
+          "source": "common_sprite_live_chr",
+          "sha256": "4f0d8f9f1e903f61a1a956508c9061b8dbd64a7f2ac2cc0075aafefc60b17994",
+          "flat_pattern": false,
+          "bytes_sha256": "4f0d8f9f1e903f61a1a956508c9061b8dbd64a7f2ac2cc0075aafefc60b17994"
+        },
+        "0x7D": {
+          "ppu_addr": "0x07D0",
+          "source": "common_sprite_live_chr",
+          "sha256": "3a9ac48fd73576e75d202a453cc5bdf58721300db7f89184eb0cb6b7a2f14477",
+          "flat_pattern": false,
+          "bytes_sha256": "3a9ac48fd73576e75d202a453cc5bdf58721300db7f89184eb0cb6b7a2f14477"
+        },
+        "0x7F": {
+          "ppu_addr": "0x07F0",
+          "source": "common_sprite_live_chr",
+          "sha256": "e3d91ab3854cdf6d59526c0ba765fb35084a4ee7e41a927ce8f37d3285f98eff",
+          "flat_pattern": false,
+          "bytes_sha256": "e3d91ab3854cdf6d59526c0ba765fb35084a4ee7e41a927ce8f37d3285f98eff"
+        },
+        "0xCF": {
+          "ppu_addr": "0x0CF0",
+          "source": "prg_dat_authoritative",
+          "sha256": "d909d8621f27189d4fd165f1c8a4e47ec7483bd3c998ade40c08bdb028727049",
+          "flat_pattern": false,
+          "bytes_sha256": "d909d8621f27189d4fd165f1c8a4e47ec7483bd3c998ade40c08bdb028727049"
+        },
+        "0x2E": {
+          "ppu_addr": "0x02E0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "6f379c59fbb660c937c92a5c7160d1751a23102a89327b1c4c4a403a28d38f3c"
+        },
+        "0x2F": {
+          "ppu_addr": "0x02F0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "b65da8afb0177efbf258884f18bf120f73edbfe2db61a03e75adf6ebe500b842"
+        },
+        "0x32": {
+          "ppu_addr": "0x0320",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "bb91b472ac7e2e09810b930816494a5e458fb174500bf9037482c4c4f3780681"
+        },
+        "0x33": {
+          "ppu_addr": "0x0330",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "3dbddb83bb7e7740c9583b02a37c569e493f05cb24581585af170da8adf09fe7"
+        },
+        "0x42": {
+          "ppu_addr": "0x0420",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "60c8462bcbc4cfbe71f0c79fb0c388f76877aa420841de508e9d54fc1164de07"
+        },
+        "0x43": {
+          "ppu_addr": "0x0430",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "b86ce8cd23c35fb888de148d8101b0a30c7d163d5773d832fe0cfbf0922e8f79"
+        },
+        "0x68": {
+          "ppu_addr": "0x0680",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "1ac18f397b44fae4fd83cda2dc65906d2cd6f07ac2c11c210c8674004e29fe64"
+        },
+        "0x69": {
+          "ppu_addr": "0x0690",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "e6882d504fef646bb6f935d276053b1fc7aa3c2804082200045f180273903cf7"
+        },
+        "0x2C": {
+          "ppu_addr": "0x02C0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "2838912b39bdb4c7722042aeab5af2562fc3651eb3d414c271b63cf35ca1547d"
+        },
+        "0x2D": {
+          "ppu_addr": "0x02D0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "2b68925892380935da3cc89cadac2108062751b2d3c73ca1f399b316284ca704"
+        },
+        "0x4E": {
+          "ppu_addr": "0x04E0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "7e77a8d54d2b07c482813be2c6175f9bdd7f124915825392f840036632217eb3"
+        },
+        "0x4F": {
+          "ppu_addr": "0x04F0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "83b4d6aa081867f04188e2d5f96bdb41bca222d128d0ff5749e148b91d077d96"
+        },
+        "0x4C": {
+          "ppu_addr": "0x04C0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "7db4b203847c5949e581b091b1a456f5b7f22fbe5615c7d5d76ff4d1782dd81b"
+        },
+        "0x4D": {
+          "ppu_addr": "0x04D0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "f80870cbe2b3d51678b8bb4444bb8c0f5412e3717763d87b1e00a0870c05913c"
+        },
+        "0x2A": {
+          "ppu_addr": "0x02A0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "2b9e0344a16bf105000887f62aa2ae8972d61596890a3fe8a69c6fb8907962a7"
+        },
+        "0x2B": {
+          "ppu_addr": "0x02B0",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "f72b4b95c17c74ee4898c578069bc988bc764da75e8458141815ce5ded38f2aa"
+        },
+        "0x22": {
+          "ppu_addr": "0x0220",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "7925feb492726a9506a76e20e2487b3ef8a65d932b068fb0221e8c3dd4fc9944"
+        },
+        "0x23": {
+          "ppu_addr": "0x0230",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "9031c9ae4a4a3f5715ea56f8cdbcae2b8ac7db44447d2cff692e171da24a3f5d"
+        },
+        "0x40": {
+          "ppu_addr": "0x0400",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "38ccdc435574ce51ab395e6566e848e3eacc9aff3c381f19e4979140663d110d"
+        },
+        "0x41": {
+          "ppu_addr": "0x0410",
+          "source": "reference_aldonunez_CommonSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "5ccffbf578cde9f01318c385ae129ba93a2aecb30ec27c07d06a84464f5c8d79"
+        },
+        "0x76": {
+          "ppu_addr": "0x0760",
+          "source": "reference_aldonunez_DemoSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "171fb1aa584fd1a0d22978d81647da181fffb9dfd16dece1a087a8d83f59d889"
+        },
+        "0x77": {
+          "ppu_addr": "0x0770",
+          "source": "reference_aldonunez_DemoSpritePatterns_dat",
+          "sha256": "phase_k_2026_05_18",
+          "flat_pattern": false,
+          "bytes_sha256": "204a076204a1be0e58b0aff9cde1771a4fd51868ca0784cd1337871686e2e57d"
+        },
+        "0xF0": {
+          "ppu_addr": "0x0500",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac",
+          "flat_pattern": false,
+          "bytes_sha256": "0e50fe5e7b572a8da93b1d4c9b031d410850e6a8480a4c4ef592461521dc67ac",
+          "atlas_alias_for_nes_tile": "0x50"
+        },
+        "0xF1": {
+          "ppu_addr": "0x0510",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f",
+          "flat_pattern": false,
+          "bytes_sha256": "f627c4ca92c6d5439a6b7d3b0cf0f73943a255082bb29b7a9a82da6e97f0f65f",
+          "atlas_alias_for_nes_tile": "0x51"
+        },
+        "0xF2": {
+          "ppu_addr": "0x0520",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1",
+          "flat_pattern": false,
+          "bytes_sha256": "d7023bf09dd932da1a4ed2aceecf8f5f184360ca018753df412a764d44d71ae1",
+          "atlas_alias_for_nes_tile": "0x52"
+        },
+        "0xF3": {
+          "ppu_addr": "0x0530",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e",
+          "flat_pattern": false,
+          "bytes_sha256": "af073b11bd06206e4b1685b585d333067132594b14e6ad50ecb350284efe6c3e",
+          "atlas_alias_for_nes_tile": "0x53"
+        },
+        "0xE0": {
+          "ppu_addr": "0x1F20",
+          "source": "CommonMiscPatterns_rom",
+          "sha256": "b58b929eb8a7305e717dfcce2d66313460c64f33252b28a9f1f70fb025d73d54",
+          "flat_pattern": false,
+          "bytes_sha256": "b58b929eb8a7305e717dfcce2d66313460c64f33252b28a9f1f70fb025d73d54",
+          "atlas_alias_for_nes_tile": "0xF2"
+        },
+        "0xE1": {
+          "ppu_addr": "0x1F30",
+          "source": "CommonMiscPatterns_rom",
+          "sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+          "flat_pattern": true,
+          "bytes_sha256": "374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb",
+          "atlas_alias_for_nes_tile": "0xF3"
+        },
+        "0x66": {
+          "ppu_addr": "0x0660",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "8e8cd70e0a9d99510270813153415ffa8166f24e548a8f886bb7d03aa99e110e",
+          "flat_pattern": false,
+          "bytes_sha256": "8e8cd70e0a9d99510270813153415ffa8166f24e548a8f886bb7d03aa99e110e"
+        },
+        "0x67": {
+          "ppu_addr": "0x0670",
+          "source": "CommonSpritePatterns_rom",
+          "sha256": "9c810185477ace9a9ff8a8a2634dddabe21d31e00357ef4481820abe6d9ece95",
+          "flat_pattern": false,
+          "bytes_sha256": "9c810185477ace9a9ff8a8a2634dddabe21d31e00357ef4481820abe6d9ece95"
+        },
+        "0x30": {
+          "ppu_addr": "0x0300",
+          "source": "common_sprite_live_chr",
+          "sha256": "e0b5e2728cf30514105b240ee82df09f024beac879477bc1a2f259edc939468e",
+          "flat_pattern": false,
+          "bytes_sha256": "e0b5e2728cf30514105b240ee82df09f024beac879477bc1a2f259edc939468e"
+        },
+        "0x31": {
+          "ppu_addr": "0x0310",
+          "source": "common_sprite_live_chr",
+          "sha256": "4f95a76449fd2e38ede104a4a0fd8930671b20989c14034441efb05a666f8614",
+          "flat_pattern": false,
+          "bytes_sha256": "4f95a76449fd2e38ede104a4a0fd8930671b20989c14034441efb05a666f8614"
+        },
+        "0x8A": {
+          "ppu_addr": "0x08A0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "8c485bae3f6391396a25e84f8d5f98da77f1235718c6915c7a4e0d32081400ea",
+          "flat_pattern": false,
+          "bytes_sha256": "8c485bae3f6391396a25e84f8d5f98da77f1235718c6915c7a4e0d32081400ea"
+        },
+        "0x8B": {
+          "ppu_addr": "0x08B0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "3c03a4ed06216d55d36dc6483f5d2b49efc1d7eea741e6ee4ef01a3415e973a9",
+          "flat_pattern": false,
+          "bytes_sha256": "3c03a4ed06216d55d36dc6483f5d2b49efc1d7eea741e6ee4ef01a3415e973a9"
+        },
+        "0x8C": {
+          "ppu_addr": "0x08C0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "f59d80db97deb38fbbddf40f6c48f369200bb51d6b7623919ed3d5ad36fad1a5",
+          "flat_pattern": false,
+          "bytes_sha256": "f59d80db97deb38fbbddf40f6c48f369200bb51d6b7623919ed3d5ad36fad1a5"
+        },
+        "0x8D": {
+          "ppu_addr": "0x08D0",
+          "source": "runtime_gap_live_chr",
+          "sha256": "56ebb5746ed16bb5a2af68f7fd474b9d990d370db5a2f790299d7b503100facd",
+          "flat_pattern": false,
+          "bytes_sha256": "56ebb5746ed16bb5a2af68f7fd474b9d990d370db5a2f790299d7b503100facd"
+        }
+      }
+    }
+  ]
+}

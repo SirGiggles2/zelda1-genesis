@@ -4,7 +4,7 @@
 /* NES source: reference/aldonunez/Z_07.asm:GetCollidingTileMoving,
  *             GetCollidableTile; reference/aldonunez/Z_05.asm:
  *             Link_ModifyDirInDoorway, CheckDoorway
- * Drained C:  NONE in RoomRom active scope
+ * Drained C:  NONE in engine active scope
  * Coverage:   PARTIAL (Link walking, wall samples, doorway geometry)
  * Stance:     REPLACE
  */

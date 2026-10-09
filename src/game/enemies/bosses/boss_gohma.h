@@ -21,7 +21,7 @@
  *             type 86 + tail-call to AnimateAndDraw + CheckCollisions).
  *             Arrow-only damage handled by Gohma_HandleWeaponCollision
  *             reachable through c_gohma_check_collisions asm shim
- *             (Z_04 body still linked into Debug.md).
+ *             (Z_04 body still linked into Zelda.md).
  * Stance:     ADOPT — drained Gohma primitives consumed verbatim. All
  *             callee primitives (c_reverse_obj_dir8 / c_shoot_fireball /
  *             c_gohma_animate_and_draw / c_gohma_check_collisions)

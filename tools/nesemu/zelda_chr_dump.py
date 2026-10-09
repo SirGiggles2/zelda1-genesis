@@ -1,12 +1,12 @@
-"""Offline replacement for RoomRom/probe_nes_uw_chr_dump.lua.
+"""Offline replacement for engine/probe_nes_uw_chr_dump.lua.
 
 Boots the ROM to the overworld (controller only), warps to level 1 with
 the probe's settle rule, waits 60 frames and writes PPU $1000-$1FFF (the
-UW background pattern table, 4096 bytes). RoomRom/tools/gen_redux_uw_bg.py
-converts the Redux dump to RoomRom/src/redux_uw_bg.c.
+UW background pattern table, 4096 bytes). engine/tools/gen_redux_uw_bg.py
+converts the Redux dump to engine/src/redux_uw_bg.c.
 
 Usage:
-    python tools/nesemu/zelda_chr_dump.py --rom <rom.nes> --out RoomRom/out/nes_uw_chr_redux.bin
+    python tools/nesemu/zelda_chr_dump.py --rom <rom.nes> --out engine/out/nes_uw_chr_redux.bin
 """
 from __future__ import annotations
 

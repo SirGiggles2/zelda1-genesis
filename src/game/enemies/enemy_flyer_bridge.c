@@ -23,7 +23,7 @@
  *                                         draw_object_mirrored_with_frame
  *                                         (world/draw_dispatch.c:421).
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  *
  * Primitives consumed by the keese chain (enrt_update_keese,
  * enrt_init_blue_keese, enrt_init_red_or_black_keese in
@@ -59,7 +59,7 @@ extern unsigned char z07_anim_fetch_obj_pos(unsigned int slot);
 static void flyer_wander(unsigned int slot);
 
 /* z04_* / z07_*: c_shims.asm xrefs that forward to transpiled NES bodies.
- * Debug.md does not link the transpiled bank, so these symbols must
+ * Zelda.md does not link the transpiled bank, so these symbols must
  * resolve via native equivalents. The drained C twins are
  * enrt_*-prefixed; re-export them under the z*_* names the oracle TU
  * calls. */
@@ -529,7 +529,7 @@ extern unsigned char enrt_rotate_object_location(unsigned char cosine_bits,
                                                  unsigned int slot);
 
 #define PF_WORLD_IS_FILLING_HEARTS RAM(0x0063u)
-extern void roomrom_main_link_end_move_from_object(void);   /* RoomRom main.c */
+extern void roomrom_main_link_end_move_from_object(void);   /* engine main.c */
 #define PF_LINK_STATE              RAM(0x00ACu)
 #define PF_LINK_X                  RAM(0x0070u)
 #define PF_LINK_Y                  RAM(0x0084u)

@@ -4,7 +4,7 @@
  *                (line 7795-7801) — dark = (AttrsE[room] & $80).
  * Drained C:     src/game/room/room_dispatch.c:room_is_dark_room (75)
  *                — generator-time only call site (G1: $0A7E OOB on
- *                RoomRom 2 KB nes_ram).
+ *                engine 2 KB nes_ram).
  *
  * Slice-1 Phase 5.8 ships the master `uw_dark_rooms` table for all
  * L1-L9 × Q1-Q2 quest-levels.
@@ -18,7 +18,7 @@ unsigned char roomrom_uw_room_is_dark(unsigned char level,
                                       unsigned char quest,
                                       unsigned char room_id);
 
-/* Per-room candle-lit state (RoomRom-local extension, NES-mirroring
+/* Per-room candle-lit state (engine-local extension, NES-mirroring
  * UsedCandle but per-room indexed for slice-1 persistence). */
 unsigned char roomrom_uw_room_lit(unsigned char room_id);
 void          roomrom_uw_room_set_lit(unsigned char room_id);

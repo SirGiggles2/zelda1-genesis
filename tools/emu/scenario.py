@@ -9,7 +9,7 @@ and the final capture is written
 in the layout tools/lockstep/verify_sprites.py reads:
 
     nes.oam nes.chr nes.palram nes.ram   (tools/nesemu, the user's ROM)
-    gen.vram gen.cram gen.ram gen.png    (tools/emu/gpgx.py, Debug.md)
+    gen.vram gen.cram gen.ram gen.png    (tools/emu/gpgx.py, Zelda.md)
 
     python tools/emu/scenario.py ROM.nes scenario.json OUTDIR
 
@@ -84,7 +84,7 @@ def main() -> int:
     ap.add_argument("rom", type=Path, help="user's NES Zelda ROM")
     ap.add_argument("scenario", type=Path)
     ap.add_argument("out", type=Path)
-    ap.add_argument("--debug-rom", type=Path, default=ROOT / "builds" / "Debug.md")
+    ap.add_argument("--debug-rom", type=Path, default=ROOT / "builds" / "Zelda.md")
     a = ap.parse_args()
     sc = json.loads(a.scenario.read_text())
     spec = json.loads((ROOT / "tools" / "lockstep" / "presets" / f"{sc['preset']}.json").read_text())

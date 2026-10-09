@@ -26,7 +26,7 @@ from collections import defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-UW_BLOB_C = REPO / "RoomRom" / "src" / "uw_room_blob.c"
+UW_BLOB_C = REPO / "engine" / "src" / "uw_room_blob.c"
 OW_C = REPO / "data" / "rooms" / "overworld.c"
 
 
@@ -77,7 +77,7 @@ def collect_uw_per_tile_subpals(rooms):
         shift  = (((nt_row >> 1) & 1) << 2) | (((nt_col >> 1) & 1) << 1)
         sub_pal = (attr[at_idx] >> shift) & 0x03
 
-    UW room nt is 22 rows x 32 cols (RoomRom/src/uw_room_blob.h
+    UW room nt is 22 rows x 32 cols (engine/src/uw_room_blob.h
     ROOMROM_UW_BLOB_ROWS/COLS). Cell index = row * 32 + col.
     Cells render starting at nt_row = row + 8 (HUD occupies 0..7).
     T-114: the loops were transposed (32 rows x 22 cols), so columns

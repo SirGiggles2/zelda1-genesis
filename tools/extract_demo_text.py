@@ -171,7 +171,7 @@ def write_manifest(out_dir, all_blocks_meta, rom_sha256):
     script used to clobber it wholesale, so whichever ran last won: a full
     builder run left 2 blocks instead of 47 and silently dropped every
     frontend entry. Merging by block name makes the result independent of
-    extractor order, which is the only way `python tools/builder/build.py
+    extractor order, which is the only way `python tools/converter/build.py
     <rom>` can be correct regardless of how EXTRACTORS is sequenced.
     """
     path = os.path.join(out_dir, "MANIFEST.json")

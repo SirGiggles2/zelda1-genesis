@@ -1,9 +1,9 @@
 /* world_dispatch.h — native overworld + object subsystem dispatch
  * (debate 006 D2 follow-up; Phase 4 entry point per master plan).
  *
- * Both ROMs link this. Debug.md (post-cutover) replaces
+ * Both ROMs link this. Zelda.md (post-cutover) replaces
  * src/gen/z_01.c worldrt_* / objrt_* / sprrt_* / progrt_* / trprt_*
- * callsites with native equivalents from src/game/world/. RoomRom
+ * callsites with native equivalents from src/game/world/. engine
  * calls directly from main.c when SCENE_OW logic ports.
  *
  * Native impl mirrors src/oracle/world/ reference (drained C, MATCH-

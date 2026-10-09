@@ -6,7 +6,7 @@
  * Coverage: PARTIAL (Ganon-specific attack/death integration pending).
  * Stance: EXTEND the already-linked native collision/sprite dispatchers.
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  *
  * Symbol map (resolves Ganon runtime undefined refs):
  *   GanonStartXs                 -> NES Z_04.asm line 10488. $30,$B0.

@@ -7,7 +7,7 @@
  * Per-row tile_ids are NES BG tile indices. write_inventory_row()
  * resolves each via bg_sparse_tile_lut[tile_id][sub_pal] -> Genesis
  * VRAM slot. Force-includes for all referenced tile_ids added in
- * RoomRom/tools/gen_bg_sparse.py.
+ * engine/tools/gen_bg_sparse.py.
  */
 #include "inventory_tilemap.h"
 

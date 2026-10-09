@@ -9,9 +9,9 @@
  * Drain Rule D1 stance: GREENFIELD (debate 004 — Redux extension; NES
  * Z1 has no options menu). No drain candidate.
  *
- * Hard rule: keep this header free of any RoomRom / game subsystem
+ * Hard rule: keep this header free of any engine / game subsystem
  * includes. Consumers route through narrow accessors so the call sites
- * inside RoomRom remain the only places that touch both worlds.
+ * inside engine remain the only places that touch both worlds.
  */
 
 #ifndef SRC_GAME_OPTIONS_OPTIONS_CONSUMER_H

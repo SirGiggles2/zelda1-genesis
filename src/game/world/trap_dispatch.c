@@ -193,7 +193,7 @@ void trap_draw_whirlwind(unsigned int slot)
     draw_object_not_mirrored_with_frame(0u, slot);
 }
 
-/* The Genesis owns Link's position/facing in RoomRom/src/main.c; the
+/* The Genesis owns Link's position/facing in engine/src/main.c; the
  * whirlwind writes the NES cells (ObjX, ObjDir), so hand them over
  * (T-171 t171_flute_whirlwind t282: Link kept facing up). */
 extern void roomrom_main_set_link_story_pose(unsigned char x, unsigned char y,
@@ -370,7 +370,7 @@ void trap_init_mode_b_enter_cave_bank5(void)
      *   - native room_reset_inv_obj_state
      *   - Link teleport coords + cellar flag
      * Skipped: DrawSpritesBetweenRooms, level-attr-F cache,
-     * Link_EndMoveAndAnimate, RunCrossRoomTasks. Debug.md
+     * Link_EndMoveAndAnimate, RunCrossRoomTasks. Zelda.md
      * NATIVE_TRAP=off keeps full asm path intact. */
     const unsigned char submode = (unsigned char)SUBMODE_VALUE;
 

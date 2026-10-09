@@ -12,17 +12,17 @@
 #include "../../enemies/enemy_render.h"
 #include "render_abi.h"
 #include "sprite_slots.h"
-#include "../../../../RoomRom/src/roomrom_vram_map.h"
+#include "../../../../engine/src/vram_layout.h"
 /* FU3+FU4: renderer reads from atlas/items_chr_x4 (byte-identical to
  * legacy expanded_sprite_chr via FU2).  ROOMROM_ITEM_TILE_* tile-index
  * constants are now in atlas/items_chr_x4.h (supersede roomrom_item_chr.h,
- * same values).  roomrom_vram_map.h includes atlas/items_chr_x4.h, so
+ * same values).  vram_layout.h includes atlas/items_chr_x4.h, so
  * ROOMROM_ITEM_TILE_* are already visible through that path.
  * P4a: atlas headers for ATLAS_ASSERT_SIZE and named dispatch constants. */
-#include "../../../../RoomRom/src/atlas/items_chr_x4.h"
-#include "../../../../RoomRom/src/atlas/items_chr.h"
+#include "../../../../engine/src/atlas/items_chr_x4.h"
+#include "../../../../engine/src/atlas/items_chr.h"
 #include "../../inventory/inventory_sprite_chr.h"
-#include "../../../../RoomRom/src/atlas/atlas_dispatch.h"
+#include "../../../../engine/src/atlas/atlas_dispatch.h"
 
 /* Phase AA (2026-05-18 cleanup org): sub-pal routing moved to the
  * shared API in src/game/world/render/subpal_routing.h. The
@@ -67,7 +67,7 @@ ATLAS_ASSERT_SIZE(BOOMERANG3, 1, 2);
 
 /* Sprite CHR source.
  * common_chr (data/chr/common.c) holds the always-loaded sprites including
- * Link, sword, heart. sprites_chr (OW enemies) is OUT-OF-SCOPE for RoomRom
+ * Link, sword, heart. sprites_chr (OW enemies) is OUT-OF-SCOPE for engine
  * currently and is no longer uploaded -- frees ~232 tiles in the SPR bank.
  * NES tile IDs in common_chr are 1:1 (NES tile $58 = common_chr + 0x58*32). */
 extern const unsigned char common_chr[7616];
@@ -102,7 +102,7 @@ _Static_assert(ROOMROM_LINK_ATTACK_FLASH3_TILE_COUNT ==
 
 /* HUD backdrop sprite strip retired 2026-05-15. H32 SAT is gameplay-only;
  * opaque black HUD underlay comes from BG_A tile 0 (PAL0 color 0) via
- * clear_hud_underlay_for_row_base() in RoomRom/src/main.c. Slot contract
+ * clear_hud_underlay_for_row_base() in engine/src/main.c. Slot contract
  * lives in sprite_slots.h: 0..9 gameplay, 10..63 enemy bridge. */
 
 /* Phase 1: item atlas tiles live in their own contiguous block starting
@@ -116,14 +116,14 @@ _Static_assert(ROOMROM_LINK_ATTACK_FLASH3_TILE_COUNT ==
  * confirmed slot 819 = blank, slot 820 = actual sword vert top. */
 #define ITEM_VRAM_TILE          ROOMROM_ITEM_TILE_BASE_PAL(0)
 
-/* Compile-time guard: VRAM bases must match canonical roomrom_vram_map.h
+/* Compile-time guard: VRAM bases must match canonical vram_layout.h
  * layout. Off-by-one here = blank-tile beam / weapon sprites (regressed
  * 2026-05-20 by hand-math drift). DO NOT redefine ITEM_VRAM_TILE without
  * updating this assertion. */
 #ifdef __STDC_VERSION__
 _Static_assert(ITEM_VRAM_TILE == ROOMROM_ITEM_TILE_BASE_PAL(0),
                "ITEM_VRAM_TILE must equal canonical ROOMROM_ITEM_TILE_BASE_PAL(0). "
-               "Hand-computed math drifts; always derive from roomrom_vram_map.h.");
+               "Hand-computed math drifts; always derive from vram_layout.h.");
 #endif
 
 #define SWORD_VERT_VRAM_TILE    (ITEM_VRAM_TILE + ROOMROM_ITEM_TILE_SWORD_VERT)
@@ -906,7 +906,7 @@ void roomrom_sprites_set_room_item(short x, short y,
                           ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_ROOM_ITEM));
         return;
     }
-    /* UW_ITEM_ID_TRIFORCE = 0x1B per RoomRom/data/uw_item_rooms.h.
+    /* UW_ITEM_ID_TRIFORCE = 0x1B per engine/data/uw_item_rooms.h.
      * Triforce piece renders as 2x2 (wide_16x16_pair: 4 tiles
      * LT/LB/RT/RB in column-major), sub-pal 2 (gold/yellow). */
     if (item_id == 0x1Bu) {

@@ -11,7 +11,7 @@
  *
  * Z_07.asm:472 dispatch tests `Paused != 0` and skips the per-frame
  * gameplay update when paused (the status-mode draw + heart fill loop
- * still runs). RoomRom mirrors that gate via roomrom_pause_is_active().
+ * still runs). engine mirrors that gate via roomrom_pause_is_active().
  *
  * Genesis input mapping: bare START edge-press toggles voluntary pause
  * (NES Select equivalent). Modifier chords (Z/C/A+B+C with START) keep

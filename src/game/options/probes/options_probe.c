@@ -3,12 +3,12 @@
  * Boot-time self-test for the GREENFIELD options runtime. Drives
  * options_runtime_init -> options_set / options_get -> serialize ->
  * apply round-trip + invalid-image rejection. Publishes a 16-byte
- * result block at OPTIONS_PROBE_BASE for tools/debug/probes/
+ * result block at OPTIONS_PROBE_BASE for tools/build/probes/
  * probe_options_runtime.lua to verify.
  *
- * Hard rule WT-5: lives at src/game/options/probes/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/options/probes/, not engine/.
  *
- * Block layout @ OPTIONS_PROBE_BASE = 0xFF7E80 (free per RoomRom
+ * Block layout @ OPTIONS_PROBE_BASE = 0xFF7E80 (free per engine
  * Debug RAM Map; OW raw-tile + UW door persistence at $7400..$77CF;
  * enemy probe blocks own $7E00..$7FE7):
  *   [0]   = 'O'  (0x4F) magic

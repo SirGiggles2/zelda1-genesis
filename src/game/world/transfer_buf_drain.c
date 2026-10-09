@@ -5,8 +5,8 @@
 #include "bg_palette.h"           /* roomrom_bg_palette_nes_to_cram */
 #include "render_abi.h"           /* render_cram_write_color, render_set_plane_a_word */
 #include "platform_abi.h"         /* RAM macro */
-#include "../../../RoomRom/src/roomrom_vram_map.h" /* ROOMROM_BG_TILE_BASE */
-#include "../../../RoomRom/src/roomrom_main_state.h" /* roomrom_main_current_scene */
+#include "../../../engine/src/vram_layout.h" /* ROOMROM_BG_TILE_BASE */
+#include "../../../engine/src/engine_state.h" /* roomrom_main_current_scene */
 #include "render/ow_render.h"    /* roomrom_ow_room_render_set_tile */
 #include "../dungeon/uw_render.h"  /* roomrom_uw_room_render_palette_at */
 #include "../hud/hud_runtime.h"    /* roomrom_hud_status_bar_map_cue */

@@ -31,7 +31,7 @@ Your input files are only read, never changed.
 ## Command line
 
 ```
-python tools/builder/build.py "<zelda.nes>" --redux-patch "<Redux zip or .ips>" --output "<out.md>"
+python tools/converter/build.py "<zelda.nes>" --redux-patch "<Redux zip or .ips>" --output "<out.md>"
 ```
 
 `--redux "<Zelda Redux.nes>"` accepts an already patched Redux ROM
@@ -39,7 +39,7 @@ instead of the patch.
 
 Linux: the same command works. The bundled SGDK toolchain is Windows
 software and runs under Wine (`wine` must be on PATH). Install the Python requirements with
-`python3 -m pip install -r tools/builder/requirements.txt`.
+`python3 -m pip install -r tools/converter/requirements.txt`.
 
 ## Problems
 

@@ -6,7 +6,7 @@
  * chase-target, HUD readers) see live values without per-call adapters.
  *
  * Each entry-point is called once per roomrom_debug_tick() frame from
- * RoomRom/src/main.c. All three are byte-wide writes into nes_ram[];
+ * engine/src/main.c. All three are byte-wide writes into nes_ram[];
  * cost is negligible (<10 cycles each).
  *
  *   T1.1  nes_ram_sync_input        — $00F8 ButtonsPressed (edge)
@@ -42,7 +42,7 @@ extern "C" {
  *   $80 A   $40 B   $20 Select   $10 Start
  *   $08 Up  $04 Down $02 Left    $01 Right
  *
- * Caller passes both pre-computed because RoomRom main already derives
+ * Caller passes both pre-computed because engine main already derives
  * `pressed = joy & ~s_joy_prev` before this call and may AB-swap it;
  * recomputing prev->edge inside this helper would race that flow.
  *
@@ -113,7 +113,7 @@ void nes_ram_sync_sword(void);
 /* Plan v5 — seed ITEM_SWORD_LEVEL ($0657 ITEMS_BY_LEVEL[0]) to wood-
  * sword tier on gameplay enter. Without a non-zero value the damage
  * table k_sword_damage_points[level-1] indexes out-of-range / picks 0.
- * RoomRom currently has no inventory pickup UI so the level is seeded
+ * engine currently has no inventory pickup UI so the level is seeded
  * directly. */
 void nes_ram_seed_sword_level(unsigned char level);
 

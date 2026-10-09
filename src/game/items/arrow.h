@@ -1,7 +1,7 @@
 #ifndef ROOMROM_ARROW_H
 #define ROOMROM_ARROW_H
 
-/* RoomRom S7 v7 arrow.
+/* engine S7 v7 arrow.
  *
  * NES Z1 reference: Z_05.asm WieldArrow + Z_07.asm OffsetAndDrawArrow
  * (item slot Y=2). Anim_ItemFrameOffsets[2] = $07. Tiles:

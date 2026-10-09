@@ -45,16 +45,16 @@ void fs_handoff_to_transpiled(uint8_t slot) {
 
     /* Hand control back to the host instead of jumping away.
      *
-     * The two original exits do not work in Debug.md:
+     * The two original exits do not work in Zelda.md:
      *   fs_to_transpiled_trampoline lives in genesis_shell.asm, which is
      *   not linked (that whole transpiled path is retired), and
      *   ow_debug_entry only renders a static room and spins forever —
      *   it is not a gameplay entry and is also unlinked.
      *
-     * So this records the request and returns. src/debug/a4_probe_main.c
+     * So this records the request and returns. src/platform/game_main.c
      * polls it and performs the actual entry into the gameplay runtime.
      * Keeping the jump out of here means src/frontend/ stays free of any
-     * dependency on src/game/ or RoomRom/, which is the direction WT-3
+     * dependency on src/game/ or engine/, which is the direction WT-3
      * cares about.
      *
      * CurSaveSlot ($0016) is already seeded above, so whatever the host

@@ -4,7 +4,7 @@
  * new-build per master plan §Phase 9 (debate 004).
  *
  * Hard rule WT-1: edits live in main worktree only (substrate path
- * src/game/options/). Hard rule BT-1: builds via Debug.bat.
+ * src/game/options/). Hard rule BT-1: builds via Build.bat.
  */
 
 #include "options_runtime.h"

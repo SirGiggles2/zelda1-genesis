@@ -14,7 +14,7 @@
  * obj_list_for_room() is a stub returning NULL.
  *
  * Drain Rule D1: ADOPT (data port, function drain N/A).
- * Hard rule WT-5: file lives at src/game/enemies/, not RoomRom/data/.
+ * Hard rule WT-5: file lives at src/game/enemies/, not engine/data/.
  */
 
 #ifdef __cplusplus

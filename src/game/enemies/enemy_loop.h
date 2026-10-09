@@ -4,8 +4,8 @@
 /* Enemy slot iterator + type dispatch.
  *
  * Phase 7 Task 7.2 step 2 framework. Wires drained walker family
- * (src/oracle/enemies/ runtime files, linked into Debug.md per
- * commit b5026c1a) into Debug.md gameplay tick.
+ * (src/oracle/enemies/ runtime files, linked into Zelda.md per
+ * commit b5026c1a) into Zelda.md gameplay tick.
  *
  * Verdict source: debates/2026-05-09-phase7-task-7-2-design/synthesis.md
  *   Q1=(a) port ObjLists, Q2=(c) scroll-stable branch only,
@@ -15,8 +15,8 @@
  * Drain Rule D1 stance: EXTEND. This file owns the iterator + dispatch
  * shell; every enrt_init_/enrt_update_ call goes to drained C.
  *
- * Hard rule WT-5 (RoomRom freeze, 2026-05-09): new gameplay code lives
- * here under src/game/enemies/, not RoomRom/src/. Tasks 7.3-7.7 fan out
+ * Hard rule WT-5 (engine freeze, 2026-05-09): new gameplay code lives
+ * here under src/game/enemies/, not engine/src/. Tasks 7.3-7.7 fan out
  * by filling NULL slots in enemy_init_fns[ENEMY_TYPE_MAX] /
  * enemy_update_fns[ENEMY_TYPE_MAX] without modifying this file.
  */
@@ -72,7 +72,7 @@ void enemy_loop_play_tail(unsigned char in_uw);
 
 /* Test hook (Phase 7 first probe — Q4=c overworld $7C):
  * Forcibly spawn one slow octorok in slot N at (x,y) with a fixed
- * direction. Used by tools/debug/probe_walker_parity.lua to seed a
+ * direction. Used by tools/build/probe_walker_parity.lua to seed a
  * deterministic frame trace before the per-room template lookup
  * lands in Task 7.7.
  */

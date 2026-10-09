@@ -1,4 +1,4 @@
-/* RoomRom warp coordinator (Task 5.4).
+/* engine warp coordinator (Task 5.4).
  *
  * NES source: reference/aldonunez/Z_05.asm:CheckWarps (line 7213) +
  *             HandleWarpOW (line 7313).
@@ -6,7 +6,7 @@
  * Owns a 4-state warp machine (IDLE / PREPARE / ANIM / LOAD / RESUME +
  * ABORT). Decision logic mirrors the OW half of HandleWarpOW; the LOAD
  * step calls roomrom_main_apply_warp_outcome() through
- * roomrom_main_state.h to apply the outcome atomically.
+ * engine_state.h to apply the outcome atomically.
  *
  * Slice 1 (Task 5.4) implements OW->UW Level 1 entry only. Cave
  * (selector >= 0x40), L2-L9, Q2 entry, mode-$10 visible semantics, and
@@ -16,7 +16,7 @@
 #ifndef ROOMROM_WORLD_TRANSITION_H
 #define ROOMROM_WORLD_TRANSITION_H
 
-#include "roomrom_main_state.h"
+#include "engine_state.h"
 
 typedef enum {
     RR_WARP_IDLE    = 0,
@@ -76,7 +76,7 @@ unsigned char roomrom_world_transition_cellar_entry_count(void);
 unsigned char roomrom_world_transition_cellar_exit_count(void);
 
 /* Slice-1 stub: NES `Tune1Request = 0` / `FluteTimer = 0` post-warp
- * silence ([Z_05.asm:7290-7294]). RoomRom has no high-level audio
+ * silence ([Z_05.asm:7290-7294]). engine has no high-level audio
  * driver wrapper; this is a no-op until the audio bridge lands.
  * Defined in the .c so the call site is correct today. */
 void roomrom_audio_silence_for_warp(void);

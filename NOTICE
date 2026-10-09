@@ -6,7 +6,7 @@ data or program bytes: the converter derives them from a ROM you supply, on
 your own computer. The game logic is reimplemented in C; like other
 reimplementations it writes out some small lookup tables of the original
 (item, enemy, palette and sound tables, about 2.5 KB in total as measured by
-tools/builder/rom_bytes_scan.py).
+tools/converter/rom_bytes_scan.py).
 
 Zelda Redux (ShadowOne333) is not included. You download its v3.3.3 patch
 yourself; the converter applies it locally.

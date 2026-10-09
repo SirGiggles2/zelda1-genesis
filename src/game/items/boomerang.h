@@ -1,7 +1,7 @@
 #ifndef ROOMROM_BOOMERANG_H
 #define ROOMROM_BOOMERANG_H
 
-/* RoomRom S7 v6 boomerang.
+/* engine S7 v6 boomerang.
  *
  * NES Z1 reference (reference/aldonunez/Z_05.asm WieldBoomerang +
  * Z_07.asm UpdateBoomerangOrFood + AnimateBoomerangAndCheckCollision
@@ -19,7 +19,7 @@
  *     cycle to imply spin. Plus per-phase attr (vflip+hflip) for 8
  *     visual orientations.
  *
- * Simplified RoomRom v6 model:
+ * Simplified engine v6 model:
  *   - Triggered by Z button (no inventory cycle yet).
  *   - 32 frames out, 32 frames return, despawn.
  *   - 8-phase rotation cycle ticks every 2 frames.

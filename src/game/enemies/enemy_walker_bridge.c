@@ -3,13 +3,13 @@
  *
  * Per debate 2026-05-09 verdict (Option C, Sonnet evidence): 6 of 7
  * walker UPDATE primitives already exist as drained native functions
- * linked into Debug.md. Step-5 closes the last gap with a native
+ * linked into Zelda.md. Step-5 closes the last gap with a native
  * Walker_Move drain composed from drained primitives.
  *
  * Drain Rule D1 stance: EXTEND. All callees here are drained C
  * (PRIMARY evidence). No NES asm linkage. No vasm/gas dialect bridge.
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  *
  * Symbol map:
  *   c_walker_move                         -> NATIVE (this file, step 5)
@@ -46,10 +46,10 @@
 #include "combat_state.h"            /* ROOM_KILL_COUNT (step 20 drop conv) */
 #include "room_state.h"              /* ROOM_OW_CUR_KILL_TOTAL ($034F NES RoomKillCount) */
 #include "platform_abi.h"            /* RAM, OBJ, NES_OBJ_DIR, NES_SHOT_COLLISION_FLAG */
-#include "roomrom_enemy_state.h"     /* ENEMY_* macros (re-export of state/enemy_state.h) */
+#include "enemy_state.h"     /* ENEMY_* macros (re-export of state/enemy_state.h) */
 #include "enemy_render.h"            /* Phase D: enemy_render_publish_meta */
 #include "enemy_loop.h"              /* enemy_init_fn, ENEMY_LOOP_TYPE_MAX */
-#include "../../../RoomRom/src/roomrom_main_state.h" /* Link story-pose owner */
+#include "../../../engine/src/engine_state.h" /* Link story-pose owner */
 
 /* NES non-Link offsets (cell-level; OBJ macro adds slot index).
  * ObjStunTimer  = $003D  (per-slot)
@@ -76,7 +76,7 @@ void c_walker_check_tile_collision(unsigned int slot);
 void c_walker_move(unsigned int slot)
 {
     /* NES Walker_Move (Z_07.asm:2555). Non-Link path only — slot 0
-     * (Link) movement still runs through the RoomRom debug runtime so
+     * (Link) movement still runs through the engine debug runtime so
      * Walker_Move is never called for it under Phase 7 Task 7.2.
      *
      * Drained scope (step 5):
@@ -96,7 +96,7 @@ void c_walker_move(unsigned int slot)
      *   - Walker_CheckTileCollision — needs room tile data; without it
      *                                octoroks would freeze in walls
      *                                instead of bouncing. Defer until
-     *                                room subsystem hooked into Debug.md.
+     *                                room subsystem hooked into Zelda.md.
      *
      * NES ReverseDirections table { $08, $04, $02, $01 } — selects the
      * lowest-bit single direction from a (possibly diagonal) input mask
@@ -204,7 +204,7 @@ void z07_anim_set_obj_hflip(unsigned int slot)
 {
     /* Step 7: forwarder for enrt_animate_and_draw_common_object below.
      * Mirrors src/gen/z_07.c NATIVE_SPRITE branch — that file is not
-     * linked into Debug.md so we route directly. */
+     * linked into Zelda.md so we route directly. */
     sprite_anim_set_obj_hflip(slot);
 }
 

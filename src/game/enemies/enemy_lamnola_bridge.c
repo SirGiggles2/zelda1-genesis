@@ -1,10 +1,10 @@
 /* enemy_lamnola_bridge.c — Phase 8 Task 8.9 Lamnola+Moldorm shim bridge.
  *
  * Drain Rule D1 stance: EXTEND. All forwarders to dispatcher entry points
- * + drained boss-runtime entries already linked into Debug.md. No NES asm
+ * + drained boss-runtime entries already linked into Zelda.md. No NES asm
  * linkage. No vasm/gas dialect bridge.
  *
- * Hard rule WT-5: lives at src/game/enemies/, not RoomRom/.
+ * Hard rule WT-5: lives at src/game/enemies/, not engine/.
  *
  * Symbol map (resolves Lamnola+Moldorm runtime undefined refs):
  *   c_anim_write_sprite           -> stub (Z_01.asm:5365 single-OAM

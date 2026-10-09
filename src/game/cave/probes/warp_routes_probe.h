@@ -2,7 +2,7 @@
  *
  * Boot-time self-test: calls cave_entrance_check(0x24, room_id) for
  * all 128 OW rooms + publishes results at WARP_ROUTES_PROBE_BASE for
- * tools/debug/probes/probe_warp_routes.lua to byte-diff against
+ * tools/build/probes/probe_warp_routes.lua to byte-diff against
  * tools/parity/warp_routes_expected.json.
  *
  * Does NOT require BizHawk joypad scripting: the dispatch is pure-
@@ -10,7 +10,7 @@
  * so running once after level_info_install_ow() loads LBA_B is
  * sufficient.
  *
- * Block layout @ WARP_ROUTES_PROBE_BASE = 0xFF7C00 (free per RoomRom
+ * Block layout @ WARP_ROUTES_PROBE_BASE = 0xFF7C00 (free per engine
  * Debug RAM Map; OW raw-tile + UW door at $7400..$77CF, UW walkability
  * cache at $7800..$7AC3, pushblock persist at $7B00..$7BFF, options
  * own $7E80, enemy own $7E00..$7FE7. The $7C00..$7DFF gap is free):

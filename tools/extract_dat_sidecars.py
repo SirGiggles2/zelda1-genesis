@@ -251,7 +251,7 @@ def extract_bank1(prg_data, z01_path):
 #
 # Sidecars the anchor searches above cannot locate (they are themselves
 # the anchors, or nothing in the asm describes them). The input ROM is
-# hash-pinned by tools/builder/build.py, so PRG offsets are exact. The
+# hash-pinned by tools/converter/build.py, so PRG offsets are exact. The
 # .dat offsets agree with upstream aldonunez/zelda1-disassembly
 # src/bins.xml; every block is a unique match in the pinned ROM.
 # (name, PRG offset, length)

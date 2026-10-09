@@ -6,13 +6,13 @@
  * Runs at boot AFTER enemy_loop_room_init() + a deterministic
  * enemy_loop_force_spawn_slow_octorock() seed. Publishes (actual,
  * expected) u16 pairs to ENEMY_LOOP_PROBE_BASE so
- * tools/debug/probes/probe_walker_parity.lua can verify:
+ * tools/build/probes/probe_walker_parity.lua can verify:
  *   - room_init clears slots
  *   - force_spawn writes the right cells (TYPE/X/Y/DIR/STATE_TIMER/ALIVE)
  *   - enemy_loop_alive_count + enemy_loop_get_type accessors agree
  *
  * Block layout @ ENEMY_LOOP_PROBE_BASE = 0xFF7E00 (free per
- * RoomRom Debug RAM Map; $FF7400..$FF77CF is OW raw-tile + UW door
+ * engine Debug RAM Map; $FF7400..$FF77CF is OW raw-tile + UW door
  * persistence — DO NOT collide):
  *   [0]  = 'E'                        (0x45) magic
  *   [1]  = 'L'                        (0x4C) magic
@@ -159,7 +159,7 @@
 /* Opt-in control for the heavy in-ROM enemy stress probe. Normal debug
  * gameplay must not run enemy_loop_probe_run(), because that force-spawns
  * an 11-slot stress harness and makes A+B+C debug mode crawl. Probe Lua
- * scripts that need the harness write "EP" here before entering RoomRom. */
+ * scripts that need the harness write "EP" here before entering engine. */
 #define ENEMY_LOOP_PROBE_CONTROL_BASE 0x00FF73FCUL
 #define ENEMY_LOOP_PROBE_ARM0         0x45u  /* 'E' */
 #define ENEMY_LOOP_PROBE_ARM1         0x50u  /* 'P' */

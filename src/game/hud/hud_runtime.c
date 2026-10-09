@@ -8,8 +8,8 @@
 #include "platform_abi.h"
 #include "../world/render/ow_render.h"  /* Phase 12.2 promoted */
 #include "render_abi.h"
-#include "../../../RoomRom/src/roomrom_vram_map.h"
-#include "../../../RoomRom/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
+#include "../../../engine/src/vram_layout.h"
+#include "../../../engine/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
 #include "../../state/inventory.h"
 /* P4c: atlas header included for named constant reference and future
  * ATLAS_ASSERT_SIZE hooks.
@@ -352,7 +352,7 @@ static void apply_transfer_macro(const unsigned char *macro)
  * value < 100, and a trailing space when value < 10 (single low digit
  * shifted left into tens, ones blanked).
  *
- * NES is byte-wide (0..255) for each count. RoomRom widens rupees to
+ * NES is byte-wide (0..255) for each count. engine widens rupees to
  * 16-bit; clamp display to 999 so the 3-digit window stays legal. */
 /* T-118: HUD draw cache. A full HUD draw sets s_hud_force; incremental
  * refreshes (every inventory/heart change during play) then write only the
@@ -616,7 +616,7 @@ void roomrom_hud_upload_chr(void)
      *
      * Pre-Phase-J this function uploaded 4x sub-pal copies of HUD CHR
      * via legacy bank stride. Post-Phase-J: no-op. Kept for API stability
-     * (single caller at RoomRom/src/main.c:1009; renaming would require
+     * (single caller at engine/src/main.c:1009; renaming would require
      * touching that file too). */
     (void)0;
 }

@@ -12,7 +12,7 @@
 #include "../items/sword_shot.h"        /* T-116 slot $0E */
 #include "../world/draw_dispatch.h"     /* draw_item_frame_tile */
 
-/* RoomRom S7 v4 combat — sword swing.
+/* engine S7 v4 combat — sword swing.
  *
  * NES Z1 model (reference/aldonunez/Z_05.asm WieldSword + Z_07.asm
  * UpdateSwordOrRod + PlayerToWeaponOffsets[XY]):
@@ -79,7 +79,7 @@ link_face_t   roomrom_combat_get_swing_face(void)  { return s_pub_face; }
 /* Sword visual Y bias; see recompute_y_bias (0 except Redux UW). */
 static short s_uw_y_bias = 0;
 
-/* RoomRom currently boots with wood sword (Items=1). NES
+/* engine currently boots with wood sword (Items=1). NES
  * @CalcSwordAttrs (Z_07.asm:4471) computes sub-pal = base_attr +
  * Items - 1 with base_attr = 0 (RDirectionToWeaponBaseAttribute),
  * so sub-pal == Items - 1. Future white sword (Items=2) -> 1,
@@ -139,7 +139,7 @@ static void recompute_y_bias(void)
  * the facing direction.
  *
  * Direction order: NES tables use UP, DOWN, LEFT, RIGHT (reverse-direction
- * index). RoomRom link_face_t uses DOWN, UP, LEFT, RIGHT — tables below
+ * index). engine link_face_t uses DOWN, UP, LEFT, RIGHT — tables below
  * are reordered to match.
  */
 #define REDUX_TOTAL_FRAMES   8u
@@ -193,7 +193,7 @@ static const unsigned char redux_vflip[4][8] = {
 /* Per-state, per-facing X offset. Index: [state-1][face].
  * face order: 0=DOWN, 1=UP, 2=LEFT, 3=RIGHT.
  * NES tables are in reverse direction order (up, down, left, right);
- * reordered here to match RoomRom's link_face_t enum. */
+ * reordered here to match engine's link_face_t enum. */
 static const signed char sword_offset_x[4][4] = {
     /*               DOWN UP   LEFT  RIGHT */
     /* state 1 */ {  +1, -1,    0,   -8 },
@@ -438,7 +438,7 @@ static unsigned char compute_state(unsigned char frame)
  * BEAM_ALWAYS  : always spawn beam regardless of HP (Redux easy-mode).
  *
  * The pre-9.4 implementation always spawned the beam (the
- * "RoomRom approximates Z1's full HP check" comment below); this
+ * "engine approximates Z1's full HP check" comment below); this
  * function replaces that approximation with the option-driven gate. */
 static unsigned char sword_style_allows_beam(void)
 {

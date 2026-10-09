@@ -56,7 +56,7 @@
 
 extern unsigned char room_get_unique_room_id(void);
 extern void roomrom_combat_animate_link_base(void);
-/* Main-loop sprite hooks (RoomRom/src/main.c). */
+/* Main-loop sprite hooks (engine/src/main.c). */
 extern void roomrom_mode11_hide_sprites(void);   /* HideAllSprites */
 
 /* 0 = Link drawn, 1 = spark in Sprites+72..79, 2 = both hidden. */

@@ -26,7 +26,7 @@
  * incremental promotion.
  *
  * NOTE: this header is included from contexts that pull in SGDK
- * `<types.h>` (RoomRom main.c via `<genesis.h>`) AND from drained C
+ * `<types.h>` (engine main.c via `<genesis.h>`) AND from drained C
  * that does not. SGDK's types.h `#define`s `int16_t`/`uint8_t` to
  * its own short names if stdint hasn't been seen first, which then
  * makes a later `<stdint.h>` clash. We sidestep the whole tangle by
@@ -37,13 +37,13 @@
  * ------------------------------------------------------------------------ */
 
 /* Facing / direction constants are intentionally NOT redefined here.
- * RoomRom (`roomrom_sprites.h` + `RoomRom/src/main.c`) ships its own
+ * engine (`roomrom_sprites.h` + `engine/src/main.c`) ships its own
  * `link_face_t` and `link_dir_t` enums whose tokens (`LINK_FACE_DOWN`,
  * `LINK_DIR_NONE`, …) collide with any preprocessor `#define` of the
  * same name — the macro expansion turns the enum body into garbage at
  * preprocess time. Phase 6 code that wants the NES bitfield encoding of
  * `dir` uses raw literals (0x01 RIGHT, 0x02 LEFT, 0x04 DOWN, 0x08 UP)
- * or a future per-subsystem header. RoomRom keeps its ordinal enum
+ * or a future per-subsystem header. engine keeps its ordinal enum
  * until Phase 6 sweeps it. */
 
 typedef struct LinkState {

@@ -1,16 +1,16 @@
 /* Task 5.8: UW dark-room manifest lookup + lit-state.
  *
  * NES authority: Z_05.asm:7795-7801 (IsDarkRoom_Bank5).
- * Manifest:      RoomRom/data/uw_dark_rooms.{c,h} (master, all 18
+ * Manifest:      engine/data/uw_dark_rooms.{c,h} (master, all 18
  *                quest-levels, generated from blob AttrsE & $80).
  *
- * RoomRom never calls dispatch room_is_dark_room() at runtime — it
- * reads $0A7E in NES SRAM, which is OOB on standalone RoomRom's 2 KB
+ * engine never calls dispatch room_is_dark_room() at runtime — it
+ * reads $0A7E in NES SRAM, which is OOB on standalone engine's 2 KB
  * nes_ram (G1).
  */
 
 #include "dark_meta.h"
-#include "../../../RoomRom/data/uw_dark_rooms.h"
+#include "../../../engine/data/uw_dark_rooms.h"
 
 static unsigned char s_room_lit[256];
 static unsigned char s_candle_used_count;
