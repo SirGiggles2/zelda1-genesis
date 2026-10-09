@@ -93,7 +93,11 @@ This port stands on a lot of other people's work. Thank you, all of you.
 **Music**
 
 - **Inglebard** — the Genesis/Mega Drive covers of the Overworld and
-  Underworld themes that play in this port, made in DefleMask Tracker. The FM sound of this port is his.
+  Underworld themes that play in this port, made in DefleMask.
+
+  All the other songs are extracted and converted from your NES rom, (but tbh they don't sound as good as what Inglebard did)
+
+  **Cyberdeous** They (they're a duo) graciously made their own version of underworld, though it is not implemented yet!
 
 **The original game**
 
