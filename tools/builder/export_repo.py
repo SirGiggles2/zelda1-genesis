@@ -33,6 +33,7 @@ REPO_EXTRA = (
     "tools/builder/make_package.py", "tools/builder/package_check.py",
     "tools/builder/package_closure.py", "tools/builder/export_repo.py",
     "tools/builder/test_converter_core.py", "tools/builder/rom_bytes_scan.py",
+    "tools/builder/local_music.py",
     "tools/emu/gpgx.py", "tools/emu/build_gpgx.sh", "tools/emu/preset_run.py",
     "tools/emu/nes_preset_run.py", "tools/emu/scenario.py",
     "tools/lockstep/presets.py", "tools/lockstep/gate.py",

@@ -53,6 +53,11 @@ CFLAGS = [
     "-fomit-frame-pointer",
     "-ffixed-a4",
 ]
+# build.py --music: your own VGMs (tools/builder/local_music.py writes
+# build/local_music/local_music.c). Off by default; local builds only.
+LOCAL_MUSIC = os.environ.get("ZELDA_LOCAL_MUSIC") == "1"
+if LOCAL_MUSIC:
+    CFLAGS += ["-DZELDA_LOCAL_MUSIC", f"-I{ROOT / 'build' / 'local_music'}"]
 
 # T-118: link-time optimization for C translation units. The gameplay
 # frame makes ~270 small cross-file calls (drained NES routines call each
@@ -701,6 +706,12 @@ def main() -> int:
     # T-141: C units compile in parallel; unchanged ones are reused
     # (compile_c / up_to_date). Link order stays the source-list order.
     c_units = list(TITLE_C_SOURCES) + list(ROOMROM_C_SOURCES)
+    if LOCAL_MUSIC:
+        if not (ROOT / "build" / "local_music" / "local_music.c").is_file():
+            print("ERROR: ZELDA_LOCAL_MUSIC=1 but build/local_music/local_music.c is missing "
+                  "(run tools/builder/local_music.py <folder>)")
+            return 1
+        c_units.append(("build/local_music/local_music.c", "local_music.o"))
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as ex:
         objects.extend(ex.map(lambda so: compile_c(*so), c_units))
 

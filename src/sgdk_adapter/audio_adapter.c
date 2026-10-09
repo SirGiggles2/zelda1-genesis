@@ -60,8 +60,30 @@ static volatile u8 * const music_song_req_ptr = &audio_music_state[0x01];
 #define SONG_OW_BITMAP  0x01u
 #define SONG_UW_BITMAP  0x40u
 
+#ifdef ZELDA_LOCAL_MUSIC
+/* Your own VGMs (tools/builder/local_music.py, build.py --music): a song
+ * request with a file here plays it on the XGM driver. Local builds only. */
+#include "local_music.h"
+static const u8 *local_blob(unsigned char song)
+{
+    for (u8 i = 0; i < local_music_count; i++)
+        if (local_music[i].song == song) return local_music[i].xgm;
+    return 0;
+}
+#endif
+
 static const u8 *xgm_blob_for_song(unsigned char song)
 {
+#ifdef ZELDA_LOCAL_MUSIC
+    {
+        const u8 *b;
+        /* Level 9 has its own song ($20, LevelSongIds) where the dungeon
+         * dispatcher asks for $40. */
+        if (song == SONG_UW_BITMAP && nes_ram[0x0010u] == 9u && (b = local_blob(0x20u)))
+            return b;
+        if ((b = local_blob(song))) return b;
+    }
+#endif
     if (song == SONG_OW_BITMAP) return ow_theme_xgm;
     if (song == SONG_UW_BITMAP) return uw_theme_xgm;
     return 0;
@@ -150,9 +172,14 @@ void audio_music_play(unsigned char song)
         *music_song_req_ptr = 0;
 
         if (!*xgm_owns_chip_ptr || s_current_xgm_song != song) {
+#ifndef ZELDA_LOCAL_MUSIC
             if (*xgm_owns_chip_ptr) {
                 XGM_stopPlay();
             }
+#endif
+            /* Local music switches tracks often (jingles): XGM_startPlay
+             * replaces the playing track itself; a stop right before it
+             * made the next track silent (first switch after the OW). */
             *xgm_owns_chip_ptr = 1;       /* gate legacy music_tick BEFORE Z80 starts */
             XGM_startPlay(xgm_song);
             s_current_xgm_song = song;
@@ -192,6 +219,24 @@ void audio_sfx_play(unsigned char sfx)
 
 void audio_tick_vblank(void)
 {
+#ifdef ZELDA_LOCAL_MUSIC
+    /* Song requests that have a local VGM: the game's SongRequest mailbox
+     * ($0600) and the legacy driver's own request byte (music_play). */
+    if (audio_native_ram_base) {
+        unsigned char req = audio_native_ram_base[0x0600u];
+        if (req && local_blob(req)) {
+            audio_native_ram_base[0x0600u] = 0u;
+            audio_music_play(req);
+        }
+    }
+    {
+        unsigned char req = *music_song_req_ptr;
+        if (req && local_blob(req)) {
+            *music_song_req_ptr = 0u;
+            audio_music_play(req);
+        }
+    }
+#endif
     /* music_tick itself gates on xgm_owns_chip (set above). The check
      * here is redundant but cheap and makes intent explicit at the call
      * site; the asm gate is the source of truth and covers genesis_shell

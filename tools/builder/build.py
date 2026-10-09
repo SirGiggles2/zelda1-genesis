@@ -319,13 +319,22 @@ def run_extractors(rom_path: Path, redux_path: Path,
     return 0
 
 
-def build_rom(step: tuple[int, int] | None = None) -> int:
+def build_rom(step: tuple[int, int] | None = None, music: Path | None = None) -> int:
     """Compile builds/Debug.md (tools/debug/build_debug.py, which Debug.bat
-    wraps; called directly so paths with spaces need no shell quoting)."""
+    wraps; called directly so paths with spaces need no shell quoting).
+    music: a folder of the user's own VGMs (tools/builder/local_music.py)."""
+    env = dict(os.environ)
+    env.pop("ZELDA_LOCAL_MUSIC", None)
+    if music is not None:
+        r = subprocess.run([sys.executable, str(ROOT / "tools" / "builder" / "local_music.py"),
+                            str(music)], cwd=ROOT, check=False)
+        if r.returncode:
+            return 1
+        env["ZELDA_LOCAL_MUSIC"] = "1"
     if step:
         progress(*step, "build Genesis ROM")
     r = subprocess.run([sys.executable, str(ROOT / "tools" / "debug" / "build_debug.py")],
-                       cwd=ROOT, check=False)
+                       cwd=ROOT, env=env, check=False)
     if r.returncode != 0:
         print(f"ERROR: Genesis build failed (exit {r.returncode})", file=sys.stderr)
         return 3
@@ -362,6 +371,10 @@ def main() -> int:
                     help="an already patched Zelda Redux ROM (instead of --redux-patch)")
     ap.add_argument("--check-toolchain", action="store_true",
                     help="verify gcc/objcopy availability")
+    ap.add_argument("--music", type=Path,
+                    help="folder of your own .vgm files (title, item, level9, ganon, triforce, "
+                         "zelda, ending, overworld, underworld) to use instead of the port's "
+                         "music; local builds only")
     ap.add_argument("--output", type=Path,
                     help="where to write the Genesis ROM (default: builds/Debug.md only)")
     args = ap.parse_args()
@@ -405,7 +418,10 @@ def main() -> int:
     if not args.skip_extract:
         if (rc := run_extractors(args.rom, args.redux, total_extra=1)) != 0:
             return rc
-    if (rc := build_rom((n, n))) != 0:
+    if args.music is not None and not args.music.is_dir():
+        print(f"ERROR: music folder not found: {args.music}", file=sys.stderr)
+        return 1
+    if (rc := build_rom((n, n), args.music)) != 0:
         return rc
     if args.output:
         return deliver(args.output, [args.rom, args.redux_patch, args.redux])

@@ -59,8 +59,11 @@ class Genesis:
         self.frame = None            # (bytes, width, height, pitch)
         self.pixfmt = 0                          # RETRO_PIXEL_FORMAT_0RGB1555 until the core sets it
         self._sysdir = C.c_char_p(str(ROOT / "build" / "emu").encode())
+        # Audio: set .audio = bytearray() to collect interleaved s16 stereo
+        # samples (None = discard).
+        self.audio: bytearray | None = None
         self._cbs = (ENV_CB(self._env), VIDEO_CB(self._video), AUDIO_CB(lambda l, r: None),
-                     AUDIO_BATCH_CB(lambda d, n: n), POLL_CB(lambda: None),
+                     AUDIO_BATCH_CB(self._audio_batch), POLL_CB(lambda: None),
                      STATE_CB(self._input))
         L = self.lib
         L.retro_set_environment(self._cbs[0])
@@ -84,6 +87,11 @@ class Genesis:
         self._syms = self._local_symbols(core)
 
     # ---- libretro callbacks ----
+    def _audio_batch(self, data, frames):
+        if self.audio is not None:
+            self.audio += C.string_at(data, frames * 4)
+        return frames
+
     def _env(self, cmd, data):
         cmd &= 0xFFFF
         if cmd == ENV_SET_PIXEL_FORMAT:
