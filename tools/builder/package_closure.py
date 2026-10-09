@@ -40,7 +40,7 @@ def read_paths(trace: Path, tree: Path) -> set[str]:
     """Package-relative paths opened for reading or executed."""
     out = set()
     tree = tree.resolve()
-    for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in trace.open(encoding="utf-8", errors="replace"):
         m = CALL.search(line)
         if not m or "ENOENT" in line or "ENOTDIR" in line:
             continue
@@ -62,8 +62,37 @@ def read_paths(trace: Path, tree: Path) -> set[str]:
     return out
 
 
+def compiler_inputs(tree: Path) -> set[str]:
+    """GCC's actual source/header reads, including Wine's server-side opens.
+
+    Wine can delegate opens to an already-running server outside strace's
+    process tree. Successful objects' -MMD files retain those dependencies.
+    A fresh conversion's tree, not a developer checkout, supplies these.
+    """
+    tree = tree.resolve()
+    found = set()
+    for dep in (tree / "build/debug_project/out").glob("*.d"):
+        if not dep.with_suffix(".o").is_file():
+            continue
+        text = dep.read_text(encoding="utf-8").replace("\\\n", " ")
+        tokens = [s.replace("\\ ", " ") for s in re.findall(r"(?:\\ |\S)+", text)]
+        split = next((i for i, s in enumerate(tokens) if s.endswith(":")), None)
+        if split is None:
+            raise ValueError(f"malformed compiler dependency file: {dep.name}")
+        for s in tokens[split + 1:]:
+            s = re.sub(r"(?i)^z:(?=/)", "", s)
+            path = Path(s)
+            if not path.is_absolute():
+                path = tree / path
+            try:
+                found.add(Path(os.path.normpath(path)).relative_to(tree).as_posix())
+            except ValueError:
+                pass
+    return found
+
+
 def closure(traces: list[Path], tree: Path, candidates: list[str]) -> list[str]:
-    opened = set().union(*(read_paths(t, tree) for t in traces))
+    opened = compiler_inputs(tree) | set().union(*(read_paths(t, tree) for t in traces))
     keep = [c for c in candidates
             if c in opened and not c.startswith(make_package.THIRD_PARTY)
             and c not in make_package.ALWAYS]

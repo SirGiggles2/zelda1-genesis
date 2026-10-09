@@ -591,7 +591,8 @@ def depfile_inputs(dep: Path) -> list[Path] | None:
     toks = [t.replace("\\ ", " ") for t in re.findall(r"(?:\\ |\S)+", text)]
     for i, t in enumerate(toks):
         if t.endswith(":"):
-            return [Path(x) for x in toks[i + 1:]]
+            return [Path(re.sub(r"(?i)^z:(?=/)", "", x) if WINE else x)
+                    for x in toks[i + 1:]]
     return None
 
 
@@ -643,7 +644,7 @@ def compile_asm(src: Path, obj_name: str, label: str, mri: bool = False) -> Path
         + ["-x", "assembler-with-cpp", asm_flags]
         + CFLAGS
         + include_args()
-        + ["-c", src, "-o", obj_path],
+        + ["-c", src, "-o", obj_path, "-MMD", "-MF", obj_path.with_suffix(".d")],
         cwd=cwd,
     )
     return obj_path

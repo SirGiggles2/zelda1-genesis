@@ -37,6 +37,7 @@ REPO_EXTRA = (
     "tools/builder/test_nes_music.py",
     "tools/builder/test_nes_music_runtime.py",
     "tools/builder/test_uw_music_contract.py",
+    "tools/builder/test_package_closure.py",
     "tools/emu/gpgx.py", "tools/emu/build_gpgx.sh", "tools/emu/preset_run.py",
     "tools/emu/nes_preset_run.py", "tools/emu/scenario.py",
     "tools/lockstep/presets.py", "tools/lockstep/gate.py",
