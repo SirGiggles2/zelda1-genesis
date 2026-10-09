@@ -78,3 +78,5 @@ tools/file_select_test/
 *.zip
 # Your own music (tools/builder/local_music.py, build.py --music).
 build/local_music/
+build/nes_music/
+build/nes_music_test/

@@ -56,6 +56,9 @@ CFLAGS = [
 # build.py --music: your own VGMs (tools/builder/local_music.py writes
 # build/local_music/local_music.c). Off by default; local builds only.
 LOCAL_MUSIC = os.environ.get("ZELDA_LOCAL_MUSIC") == "1"
+NES_MUSIC = os.environ.get("ZELDA_NES_MUSIC") == "1"
+if NES_MUSIC:
+    CFLAGS += ["-DZELDA_NES_MUSIC", f"-I{ROOT / 'build' / 'nes_music'}"]
 if LOCAL_MUSIC:
     CFLAGS += ["-DZELDA_LOCAL_MUSIC", f"-I{ROOT / 'build' / 'local_music'}"]
 
@@ -708,6 +711,11 @@ def main() -> int:
     # T-141: C units compile in parallel; unchanged ones are reused
     # (compile_c / up_to_date). Link order stays the source-list order.
     c_units = list(TITLE_C_SOURCES) + list(ROOMROM_C_SOURCES)
+    if NES_MUSIC:
+        if not (ROOT / "build/nes_music/nes_music.c").is_file():
+            print("ERROR: ROM music table missing; run build.py with your NES ROM")
+            return 1
+        c_units.append(("build/nes_music/nes_music.c", "nes_music.o"))
     if LOCAL_MUSIC:
         if not (ROOT / "build" / "local_music" / "local_music.c").is_file():
             print("ERROR: ZELDA_LOCAL_MUSIC=1 but build/local_music/local_music.c is missing "

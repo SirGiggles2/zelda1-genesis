@@ -46,6 +46,8 @@ volatile unsigned char audio_dmc_state[0x10] __attribute__((aligned(4)));
 
 static u8 xgm_initialized = 0;
 static u8 s_current_xgm_song = 0;
+static u8 s_resume_xgm_song = 0;
+static u16 s_nes_song_frames = 0;
 static u8 sfx_next_channel = 0;  /* round-robin index 0..2 → CH2..CH4 */
 static u8 s_pcm_ids[4];          /* latest requested sample on each PCM channel */
 
@@ -75,16 +77,36 @@ static const u8 *local_blob(unsigned char song)
 }
 #endif
 
+#ifdef ZELDA_NES_MUSIC
+#include "nes_music.h"
+static const local_song_t *nes_song(unsigned char song)
+{
+    for (u8 i = 0; i < nes_music_count; i++)
+        if (nes_music[i].song == song) return &nes_music[i];
+    return 0;
+}
+#endif
+
 static const u8 *xgm_blob_for_song(unsigned char song)
 {
+    unsigned char resolved = song;
+    /* A level-9 request has its own generated tune; a user can override
+     * that tune specifically or override the requested dungeon song. */
+    if (song == SONG_UW_BITMAP && nes_ram[0x0010u] == 9u) resolved = 0x20u;
 #ifdef ZELDA_LOCAL_MUSIC
     {
         const u8 *b;
         /* Level 9 has its own song ($20, LevelSongIds) where the dungeon
          * dispatcher asks for $40. */
-        if (song == SONG_UW_BITMAP && nes_ram[0x0010u] == 9u && (b = local_blob(0x20u)))
+        if ((b = local_blob(resolved)))
             return b;
         if ((b = local_blob(song))) return b;
+    }
+#endif
+#ifdef ZELDA_NES_MUSIC
+    {
+        const local_song_t *entry = nes_song(resolved);
+        if (entry) return entry->xgm;
     }
 #endif
     if (song == SONG_OW_BITMAP) return ow_theme_xgm;
@@ -161,6 +183,9 @@ void audio_music_play(unsigned char song)
         if (*xgm_owns_chip_ptr) XGM_stopPlay();
         *xgm_owns_chip_ptr = 0u;
         s_current_xgm_song = 0u;
+        s_resume_xgm_song = 0u;
+        s_nes_song_frames = 0u;
+        if (audio_native_ram_base) audio_native_ram_base[0x0609u] = 0u;
         *music_song_req_ptr = 0u;
         music_silence();
         return;
@@ -178,14 +203,24 @@ void audio_music_play(unsigned char song)
         *music_song_req_ptr = 0;
 
         if (!*xgm_owns_chip_ptr || s_current_xgm_song != song) {
-#ifndef ZELDA_LOCAL_MUSIC
-            if (*xgm_owns_chip_ptr) {
-                XGM_stopPlay();
-            }
-#endif
-            /* Local music switches tracks often (jingles): XGM_startPlay
+            /* XGM_startPlay
              * replaces the playing track itself; a stop right before it
              * made the next track silent (first switch after the OW). */
+            if (song == 0x08u || song == 0x04u) {
+                if (s_current_xgm_song == SONG_OW_BITMAP ||
+                    s_current_xgm_song == SONG_UW_BITMAP || s_current_xgm_song == 0x20u)
+                    s_resume_xgm_song = s_current_xgm_song;
+            } else {
+                s_resume_xgm_song = 0u;
+            }
+            s_nes_song_frames = 0u;
+#ifdef ZELDA_NES_MUSIC
+            {
+                const local_song_t *entry = nes_song(song);
+                if (entry && !entry->looping) s_nes_song_frames = entry->frames;
+            }
+#endif
+            if (audio_native_ram_base) audio_native_ram_base[0x0609u] = song;
             *xgm_owns_chip_ptr = 1;       /* gate legacy music_tick BEFORE Z80 starts */
             XGM_startPlay(xgm_song);
             s_current_xgm_song = song;
@@ -199,6 +234,8 @@ void audio_music_play(unsigned char song)
         *xgm_owns_chip_ptr = 0;
         s_current_xgm_song = 0;
     }
+    s_resume_xgm_song = 0u;
+    s_nes_song_frames = 0u;
     music_play(song);
 }
 
@@ -225,24 +262,44 @@ void audio_sfx_play(unsigned char sfx)
 
 void audio_tick_vblank(void)
 {
-#ifdef ZELDA_LOCAL_MUSIC
+#if defined(ZELDA_LOCAL_MUSIC) || defined(ZELDA_NES_MUSIC)
     /* Song requests that have a local VGM: the game's SongRequest mailbox
      * ($0600) and the legacy driver's own request byte (music_play). */
     if (audio_native_ram_base) {
         unsigned char req = audio_native_ram_base[0x0600u];
-        if (req && local_blob(req)) {
+        if (req && xgm_blob_for_song(req)) {
             audio_native_ram_base[0x0600u] = 0u;
+            /* Restart event tunes, preserving the area's existing XGM
+             * stream when room entry requests its already-playing song. */
+            if (req == s_current_xgm_song && req != SONG_OW_BITMAP &&
+                req != SONG_UW_BITMAP && req != 0x20u) s_current_xgm_song = 0u;
             audio_music_play(req);
         }
     }
     {
         unsigned char req = *music_song_req_ptr;
-        if (req && local_blob(req)) {
+        if (req && xgm_blob_for_song(req)) {
             *music_song_req_ptr = 0u;
+            if (req == s_current_xgm_song && req != SONG_OW_BITMAP &&
+                req != SONG_UW_BITMAP && req != 0x20u) s_current_xgm_song = 0u;
             audio_music_play(req);
         }
     }
 #endif
+    /* NES one-shot duration excludes the VGM release tail. Publish the
+     * source Song clear at that boundary, and resume area music after a
+     * pickup only while normal play still owns the scene. Mode changes
+     * and explicit silence requests cancel this continuation. */
+    if (s_nes_song_frames && --s_nes_song_frames == 0u) {
+        if (audio_native_ram_base) audio_native_ram_base[0x0609u] = 0u;
+        *music_song_ptr = 0u;
+        if (s_resume_xgm_song && audio_native_ram_base &&
+            audio_native_ram_base[0x0012u] == 0x05u) {
+            u8 resume = s_resume_xgm_song;
+            s_resume_xgm_song = 0u;
+            audio_music_play(resume);
+        }
+    }
     /* music_tick itself gates on xgm_owns_chip (set above). The check
      * here is redundant but cheap and makes intent explicit at the call
      * site; the asm gate is the source of truth and covers genesis_shell

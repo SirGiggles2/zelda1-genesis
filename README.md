@@ -76,7 +76,9 @@ runs under Wine; install Wine and make sure `wine` is on your PATH.
 
 The converter (`tools/builder/build.py`) checks both inputs, applies the Redux
 patch to a copy of your ROM, and pulls everything the port needs out of the two
-ROMs: graphics, rooms, music, text and the game's own tables. Then it compiles
+ROMs: graphics, rooms, music, text and the game's own tables. The title, item,
+level 9, Ganon, Triforce, Zelda rescue and ending songs are converted from your
+NES ROM to Genesis FM/PSG music on your computer. Then it compiles
 the Genesis ROM with SGDK. In our tests the same inputs have always produced
 exactly the same ROM, byte for byte, so you can compare your build with
 anyone else's.
@@ -95,7 +97,8 @@ This port stands on a lot of other people's work. Thank you, all of you.
 - **Inglebard** — the Genesis/Mega Drive covers of the Overworld and
   Underworld themes that play in this port, made in DefleMask.
 
-  All the other songs will be extracted and converted from your NES rom, (but tbh they don't sound as good as what Inglebard did). I got it working, but I haven't put it on the github yet.
+  All the other songs are extracted and converted from your NES ROM (but tbh
+  they don't sound as good as what Inglebard did).
 
   **Cyberdeous** They (they're a duo) graciously made their own version of underworld, "Dungeon Jungle". Pick it in
   Options > UW MUSIC (Inglebard's stays the default).

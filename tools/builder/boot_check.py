@@ -47,7 +47,13 @@ def main() -> int:
     p = presets.build(spec)
     nes = NesSession(a.rom)
     seed = drive(nes, p, {})
-    gen = Session(a.genesis)
+    try:
+        gen = Session(a.genesis)
+    except OSError as exc:
+        # A Linux core may coexist with Windows builds in a shared checkout.
+        # An incompatible library is unavailable, not a gameplay failure.
+        print(f"ERROR: emulator core unavailable on this host: {exc}", file=sys.stderr)
+        return 2
     drive(gen, p, {}, seed)
 
     rows = {name: (nes.nes8(addr), gen.nes8(addr)) for name, addr in CELLS}

@@ -57,6 +57,8 @@ class NesMemory:
 
     def __setitem__(self, addr, value):
         n = self.nes
+        if n.apu_write_log is not None and 0x4000 <= addr <= 0x4017:
+            n.apu_write_log.append((n.frame, addr, value & 0xFF))
         if addr < 0x2000:
             n.ram[addr & 0x7FF] = value
         elif addr >= 0x8000:
@@ -79,7 +81,9 @@ class NesMemory:
 
 
 class Nes:
-    def __init__(self, ines: bytes):
+    def __init__(self, ines: bytes, *, log_apu: bool = False):
+        self.apu_write_log = [] if log_apu else None
+        self.frame = 0
         if ines[:4] != b"NES\x1a":
             raise ValueError("not an iNES image")
         if (ines[6] >> 4) | (ines[7] & 0xF0) != 1 or ines[5] != 0:

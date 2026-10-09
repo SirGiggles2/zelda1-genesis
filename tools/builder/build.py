@@ -265,7 +265,9 @@ def plan_steps(rom_path: Path, redux_path: Path | None) -> list[tuple[str, list[
     # from the ROM into reference/aldonunez/ (the package ships only holes).
     steps: list[tuple[str, list[str]]] = [
         ("disasm_template.py", [sys.executable, str(ROOT / "tools" / "builder" / "disasm_template.py"),
-                                "restore", "--rom", str(rom_path)])]
+                                "restore", "--rom", str(rom_path)]),
+        ("music from your ROM", [sys.executable, str(ROOT / "tools/builder/nes_music.py"),
+                                 "--rom", str(rom_path)])]
     for name, convention, extra in EXTRACTORS:
         ext = str(ROOT / "tools" / name)
         if convention == "flag":
@@ -324,6 +326,7 @@ def build_rom(step: tuple[int, int] | None = None, music: Path | None = None) ->
     wraps; called directly so paths with spaces need no shell quoting).
     music: a folder of the user's own VGMs (tools/builder/local_music.py)."""
     env = dict(os.environ)
+    env["ZELDA_NES_MUSIC"] = "1"
     env.pop("ZELDA_LOCAL_MUSIC", None)
     if music is not None:
         r = subprocess.run([sys.executable, str(ROOT / "tools" / "builder" / "local_music.py"),
@@ -418,6 +421,11 @@ def main() -> int:
     if not args.skip_extract:
         if (rc := run_extractors(args.rom, args.redux, total_extra=1)) != 0:
             return rc
+    else:
+        # A developer skip still uses this user's ROM, never a stale song table.
+        if subprocess.run([sys.executable, str(ROOT / "tools/builder/nes_music.py"),
+                           "--rom", str(args.rom)], cwd=ROOT).returncode:
+            return 1
     if args.music is not None and not args.music.is_dir():
         print(f"ERROR: music folder not found: {args.music}", file=sys.stderr)
         return 1
