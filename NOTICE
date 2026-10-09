@@ -1,0 +1,27 @@
+zelda1-genesis - notices
+
+The Legend of Zelda is (c) Nintendo. This project is not affiliated with or
+endorsed by Nintendo. It contains no Nintendo ROM, graphics, music, level
+data or program bytes: the converter derives them from a ROM you supply, on
+your own computer. The game logic is reimplemented in C; like other
+reimplementations it writes out some small lookup tables of the original
+(item, enemy, palette and sound tables, about 2.5 KB in total as measured by
+tools/builder/rom_bytes_scan.py).
+
+Zelda Redux (ShadowOne333) is not included. You download its v3.3.3 patch
+yourself; the converter applies it locally.
+https://github.com/ShadowOne333/The-Legend-of-Zelda-Redux
+
+Third-party components
+
+- SGDK by Stephane Dallongeville, MIT License (git submodule sgdk/, which
+  bundles the m68k-elf GCC toolchain and its licenses).
+  https://github.com/Stephane-D/SGDK
+- Zelda 1 disassembly by aldonunez: labels and comments (with this
+  project's annotations) in reference/aldonunez_tpl/ and the RAM symbol
+  files in reference/aldonunez/*.inc. Byte values are not included; the
+  build restores them from your ROM. Upstream states no license.
+  https://github.com/aldonunez/zelda1-disassembly
+- Overworld and Underworld music: Genesis/Mega Drive covers by
+  Inglebard, made in DefleMask Tracker, converted
+  to XGM in data/audio_music/. The compositions are Koji Kondo's (Nintendo).

@@ -1,0 +1,271 @@
+{
+  "level": 3,
+  "quest": 2,
+  "start_room_id": "0x79",
+  "boss_room_id": "0x2B",
+  "triforce_room_id": "0x1B",
+  "source_blocks": [
+    "LevelBlockUW1Q2"
+  ],
+  "rooms": [
+    "0x0A",
+    "0x19",
+    "0x1A",
+    "0x29",
+    "0x2A",
+    "0x39",
+    "0x49",
+    "0x4A",
+    "0x4B",
+    "0x59",
+    "0x5A",
+    "0x5B",
+    "0x69",
+    "0x6B",
+    "0x79",
+    "0x7B"
+  ],
+  "passage_rooms": [
+    "0x09",
+    "0x0B"
+  ],
+  "cellar_targets": [
+    "0x09",
+    "0x0B"
+  ],
+  "room_tags": {
+    "0x79": [
+      "start"
+    ],
+    "0x2B": [
+      "boss"
+    ],
+    "0x1B": [
+      "triforce"
+    ],
+    "0x09": [
+      "passage"
+    ],
+    "0x0B": [
+      "passage"
+    ]
+  },
+  "edges": [
+    {
+      "from": "0x79",
+      "to": "0x69",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x69",
+      "to": "0x59",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x69",
+      "to": "0x79",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x59",
+      "to": "0x49",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x59",
+      "to": "0x69",
+      "dir": "S",
+      "door_type": 7
+    },
+    {
+      "from": "0x59",
+      "to": "0x5A",
+      "dir": "E",
+      "door_type": 5
+    },
+    {
+      "from": "0x49",
+      "to": "0x39",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x49",
+      "to": "0x59",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x49",
+      "to": "0x4A",
+      "dir": "E",
+      "door_type": 5
+    },
+    {
+      "from": "0x5A",
+      "to": "0x4A",
+      "dir": "N",
+      "door_type": 4
+    },
+    {
+      "from": "0x5A",
+      "to": "0x59",
+      "dir": "W",
+      "door_type": 5
+    },
+    {
+      "from": "0x5A",
+      "to": "0x5B",
+      "dir": "E",
+      "door_type": 4
+    },
+    {
+      "from": "0x39",
+      "to": "0x29",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x39",
+      "to": "0x49",
+      "dir": "S",
+      "door_type": 7
+    },
+    {
+      "from": "0x4A",
+      "to": "0x5A",
+      "dir": "S",
+      "door_type": 4
+    },
+    {
+      "from": "0x4A",
+      "to": "0x49",
+      "dir": "W",
+      "door_type": 5
+    },
+    {
+      "from": "0x4A",
+      "to": "0x4B",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x5B",
+      "to": "0x4B",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x5B",
+      "to": "0x6B",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x5B",
+      "to": "0x5A",
+      "dir": "W",
+      "door_type": 4
+    },
+    {
+      "from": "0x29",
+      "to": "0x19",
+      "dir": "N",
+      "door_type": 7
+    },
+    {
+      "from": "0x29",
+      "to": "0x39",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x29",
+      "to": "0x2A",
+      "dir": "E",
+      "door_type": 4
+    },
+    {
+      "from": "0x4B",
+      "to": "0x5B",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x4B",
+      "to": "0x4A",
+      "dir": "W",
+      "door_type": 0
+    },
+    {
+      "from": "0x6B",
+      "to": "0x5B",
+      "dir": "N",
+      "door_type": 7
+    },
+    {
+      "from": "0x6B",
+      "to": "0x7B",
+      "dir": "S",
+      "door_type": 7
+    },
+    {
+      "from": "0x19",
+      "to": "0x29",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x19",
+      "to": "0x1A",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x2A",
+      "to": "0x1A",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x2A",
+      "to": "0x29",
+      "dir": "W",
+      "door_type": 4
+    },
+    {
+      "from": "0x7B",
+      "to": "0x6B",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x1A",
+      "to": "0x0A",
+      "dir": "N",
+      "door_type": 5
+    },
+    {
+      "from": "0x1A",
+      "to": "0x2A",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x1A",
+      "to": "0x19",
+      "dir": "W",
+      "door_type": 0
+    },
+    {
+      "from": "0x0A",
+      "to": "0x1A",
+      "dir": "S",
+      "door_type": 5
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+[
+  {
+    "name": "overworld_column_data.bin",
+    "rom": "redux",
+    "length": 1984,
+    "sha256": "0df0fc9a47a9f94f9712aa9df208b6ff9fc717f5c6f843a5066615cd9e4ee97d"
+  },
+  {
+    "name": "column_heap_00.bin",
+    "rom": "redux",
+    "length": 105,
+    "sha256": "64d56f79eec3118c568a48e540982a7dc1a0a1823011b83fda4aa2773c945e23"
+  },
+  {
+    "name": "column_heap_01.bin",
+    "rom": "redux",
+    "length": 93,
+    "sha256": "9b05e6d996652f7c82026df0b32ce3dd62895ba4ee25bb66f05e19eb0474e352"
+  },
+  {
+    "name": "column_heap_02.bin",
+    "rom": "redux",
+    "length": 105,
+    "sha256": "70ba4d7834b8a37007392ed2cf607e01e06995a1c0a9d9716598483c81ed8cdd"
+  },
+  {
+    "name": "column_heap_03.bin",
+    "rom": "redux",
+    "length": 114,
+    "sha256": "2698ae94d4a5af1afba71f8fe64833bc1c935a94b734e4bcdcd013138d8799f2"
+  },
+  {
+    "name": "column_heap_04.bin",
+    "rom": "redux",
+    "length": 90,
+    "sha256": "ce250a9b5e139e09aac56873fb1e52709b99cd52955251c17ff0e06794557269"
+  },
+  {
+    "name": "column_heap_05.bin",
+    "rom": "redux",
+    "length": 109,
+    "sha256": "3b24e6121c214c31621465c3d9f86e9bfded5838e413ff7914ed725fb48eba96"
+  },
+  {
+    "name": "column_heap_06.bin",
+    "rom": "redux",
+    "length": 107,
+    "sha256": "de2e77b5ab08b6337f95c099e5260b62b4d6571f50157b03b4b7b4038a055280"
+  },
+  {
+    "name": "column_heap_07.bin",
+    "rom": "redux",
+    "length": 89,
+    "sha256": "869c3594177e68adbbf1e442bc852804a26d0c28bef24675423e145d5bf5cddb"
+  },
+  {
+    "name": "column_heap_08.bin",
+    "rom": "redux",
+    "length": 62,
+    "sha256": "618c487922f768b1e104f67685b931c972d2d59a4bbfda0938fe9ba142053898"
+  },
+  {
+    "name": "column_heap_09.bin",
+    "rom": "redux",
+    "length": 65,
+    "sha256": "7c47b163c8bd2a09a4221fef0fde058937c664c5f69b9d702efb3b9dc44eeeb3"
+  },
+  {
+    "name": "column_heap_10.bin",
+    "rom": "redux",
+    "length": 69,
+    "sha256": "145d7571c98b7e4d5161866aed75e2a85c2e502c0d119a1a9b38e2b71878ce86"
+  },
+  {
+    "name": "column_heap_11.bin",
+    "rom": "redux",
+    "length": 61,
+    "sha256": "0537db9ed0040a7edc927d40650bcaeaa2c9ee9cb4235051811d0f131a059604"
+  },
+  {
+    "name": "column_heap_12.bin",
+    "rom": "redux",
+    "length": 54,
+    "sha256": "66d8ddc3943a3641b654969b48093dd6e02a5c17334da15908b8555ad02f08f0"
+  },
+  {
+    "name": "column_heap_13.bin",
+    "rom": "redux",
+    "length": 66,
+    "sha256": "e7a29940216a0cd1c488f883246c737b4f9739a95f1bfa6e7469f0484d1eed5f"
+  },
+  {
+    "name": "column_heap_14.bin",
+    "rom": "redux",
+    "length": 53,
+    "sha256": "c7cd21f5059c8c913dcdb5cced9bc9cddc81992849c403d4e923f906823ee9f2"
+  },
+  {
+    "name": "column_heap_15.bin",
+    "rom": "redux",
+    "parts": [
+      {
+        "length": 113,
+        "sha256": "1f6d5668afeef6b008f4b169db5cd283fc7860ef7113c516102e106094c8bfd9"
+      },
+      {
+        "length": 56,
+        "sha256": "efad4754969f3196a87f9ba656b9ef203bf99aa9cbb470cc27848ee1f59308b5"
+      }
+    ]
+  },
+  {
+    "name": "data_02b.bin",
+    "rom": "redux",
+    "length": 2080,
+    "sha256": "71fa08952aedbaa3bf69c251241d6e523876c788fb8a14c9c2f0722e3ca3ff83"
+  },
+  {
+    "name": "OverworldAssets.bin",
+    "rom": "redux",
+    "length": 192,
+    "sha256": "079bf1ea10040f790e20a2dde3b86d7890ff949a11f03bdadbd58b6bf0813e35"
+  },
+  {
+    "name": "automap_tiles.bin",
+    "rom": "redux",
+    "length": 512,
+    "sha256": "98259296d59cac0df58a25f6052b0d54503f4bf2edc0040428448f313bd23434"
+  }
+]

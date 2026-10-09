@@ -1,0 +1,15 @@
+# RoomRom Z1 ROM input pin file
+#
+# Atlas pipeline (north-star spec 2026-05-01-roomrom-z1-full-atlas-design.md
+# Phase 0) requires deterministic ROM inputs. Tools/extract_z1_prg_chr.py
+# refuses to run if the input ROM SHA-256 does not match this file.
+#
+# Format: <variant_id> <sha256> <byte_count> <rel_path_from_repo_root>
+# Comments (#) and blank lines ignored.
+#
+# Both ROMs are 131088 bytes = 16-byte iNES header + 8 PRG x 16KB = 131088.
+# CHR ROM = 0 banks (CHR RAM); pattern data lives in PRG ROM as INCBIN
+# blocks copied/transferred into CHR RAM at scene-load time.
+
+orig    8f72dc2e98572eb4ba7c3a902bca5f69c448fc4391837e5f8f0d4556280440ac    131088    Legend of Zelda, The (USA).nes
+redux   f3df57365d6f04e7a8947a2393b46c7e94dc971d99146f2d4c69e6047a23ed21    131088    Zelda Redux.nes

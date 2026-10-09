@@ -1,0 +1,12 @@
+{
+  "atlas": "4d07674622b20a84d941bc1a0a142fe00ef037350afa61ee50650f343a0fb980",
+  "bg_palette_blob": "a1a66fd5dd611617d66cb69e00f6fc67202e6f97c80f18afaac11377bd4873b0",
+  "bg_sparse": "8464fda5054d47e53fc50bd24d76bbede794dfe3ed0c4d67228df38ad082be83",
+  "expand_bg_chr": "28865e0161b7cb61bae7a660ca3659e7a71e167a7915d1446ed800ff9f73e987",
+  "item_tile_atlas_idx": "3e99cb500994a6358facfb62f6e82599f06d0be157349726bb3be663c0bee547",
+  "redux_roomrom": "f57cde130675ee209b54428fea24ced76d6b268f9a352488f171a1d69ab1484d",
+  "redux_uw_bg": "bd7eeced129d7bc29cf1e42f51fea60fc864baf078574e9c91bcd83bbcc7f8b7",
+  "sprite_catalog": "c37d8da0c1f394bb667253c85175ebbbb7175576ab6a834e216da97096266a7d",
+  "uw_blob": "72fbbc0bdeccb8ed35ceb4ff2714d32d39abd9e87be4228df60e74dc3da0323a",
+  "uw_collision": "ebc2bfd280a2302e25ff6fa8d1b5c401c87afb744e84cb4fc6fe0dd2f180fe38"
+}

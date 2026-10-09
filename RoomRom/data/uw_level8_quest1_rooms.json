@@ -1,0 +1,316 @@
+{
+  "level": 8,
+  "quest": 1,
+  "start_room_id": "0x7E",
+  "boss_room_id": "0x3C",
+  "triforce_room_id": "0x2C",
+  "source_blocks": [
+    "LevelBlockUW2Q1"
+  ],
+  "rooms": [
+    "0x0E",
+    "0x1D",
+    "0x1E",
+    "0x1F",
+    "0x2D",
+    "0x2E",
+    "0x3D",
+    "0x3E",
+    "0x3F",
+    "0x4D",
+    "0x4E",
+    "0x5C",
+    "0x5D",
+    "0x5E",
+    "0x5F",
+    "0x6E",
+    "0x7C",
+    "0x7D",
+    "0x7E",
+    "0x7F"
+  ],
+  "passage_rooms": [
+    "0x0F",
+    "0x2F",
+    "0x6F"
+  ],
+  "cellar_targets": [
+    "0x2F",
+    "0x0F",
+    "0x6F"
+  ],
+  "room_tags": {
+    "0x7E": [
+      "start"
+    ],
+    "0x3C": [
+      "boss"
+    ],
+    "0x2C": [
+      "triforce"
+    ],
+    "0x2F": [
+      "passage"
+    ],
+    "0x0F": [
+      "passage"
+    ],
+    "0x6F": [
+      "passage"
+    ]
+  },
+  "edges": [
+    {
+      "from": "0x7E",
+      "to": "0x6E",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x7E",
+      "to": "0x7D",
+      "dir": "W",
+      "door_type": 0
+    },
+    {
+      "from": "0x7E",
+      "to": "0x7F",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x6E",
+      "to": "0x5E",
+      "dir": "N",
+      "door_type": 4
+    },
+    {
+      "from": "0x6E",
+      "to": "0x7E",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x7D",
+      "to": "0x7C",
+      "dir": "W",
+      "door_type": 7
+    },
+    {
+      "from": "0x7D",
+      "to": "0x7E",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x7F",
+      "to": "0x7E",
+      "dir": "W",
+      "door_type": 0
+    },
+    {
+      "from": "0x5E",
+      "to": "0x4E",
+      "dir": "N",
+      "door_type": 7
+    },
+    {
+      "from": "0x5E",
+      "to": "0x6E",
+      "dir": "S",
+      "door_type": 4
+    },
+    {
+      "from": "0x5E",
+      "to": "0x5D",
+      "dir": "W",
+      "door_type": 7
+    },
+    {
+      "from": "0x5E",
+      "to": "0x5F",
+      "dir": "E",
+      "door_type": 5
+    },
+    {
+      "from": "0x7C",
+      "to": "0x7D",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x4E",
+      "to": "0x3E",
+      "dir": "N",
+      "door_type": 5
+    },
+    {
+      "from": "0x4E",
+      "to": "0x5E",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x4E",
+      "to": "0x4D",
+      "dir": "W",
+      "door_type": 5
+    },
+    {
+      "from": "0x5D",
+      "to": "0x4D",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x5D",
+      "to": "0x5C",
+      "dir": "W",
+      "door_type": 0
+    },
+    {
+      "from": "0x5D",
+      "to": "0x5E",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x5F",
+      "to": "0x5E",
+      "dir": "W",
+      "door_type": 5
+    },
+    {
+      "from": "0x3E",
+      "to": "0x2E",
+      "dir": "N",
+      "door_type": 4
+    },
+    {
+      "from": "0x3E",
+      "to": "0x4E",
+      "dir": "S",
+      "door_type": 5
+    },
+    {
+      "from": "0x3E",
+      "to": "0x3F",
+      "dir": "E",
+      "door_type": 7
+    },
+    {
+      "from": "0x4D",
+      "to": "0x3D",
+      "dir": "N",
+      "door_type": 7
+    },
+    {
+      "from": "0x4D",
+      "to": "0x5D",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x4D",
+      "to": "0x4E",
+      "dir": "E",
+      "door_type": 5
+    },
+    {
+      "from": "0x5C",
+      "to": "0x5D",
+      "dir": "E",
+      "door_type": 0
+    },
+    {
+      "from": "0x2E",
+      "to": "0x1E",
+      "dir": "N",
+      "door_type": 5
+    },
+    {
+      "from": "0x2E",
+      "to": "0x3E",
+      "dir": "S",
+      "door_type": 4
+    },
+    {
+      "from": "0x2E",
+      "to": "0x2D",
+      "dir": "W",
+      "door_type": 4
+    },
+    {
+      "from": "0x3F",
+      "to": "0x3E",
+      "dir": "W",
+      "door_type": 7
+    },
+    {
+      "from": "0x3D",
+      "to": "0x4D",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x1E",
+      "to": "0x0E",
+      "dir": "N",
+      "door_type": 7
+    },
+    {
+      "from": "0x1E",
+      "to": "0x2E",
+      "dir": "S",
+      "door_type": 5
+    },
+    {
+      "from": "0x1E",
+      "to": "0x1D",
+      "dir": "W",
+      "door_type": 4
+    },
+    {
+      "from": "0x1E",
+      "to": "0x1F",
+      "dir": "E",
+      "door_type": 7
+    },
+    {
+      "from": "0x2D",
+      "to": "0x1D",
+      "dir": "N",
+      "door_type": 0
+    },
+    {
+      "from": "0x2D",
+      "to": "0x2E",
+      "dir": "E",
+      "door_type": 4
+    },
+    {
+      "from": "0x0E",
+      "to": "0x1E",
+      "dir": "S",
+      "door_type": 7
+    },
+    {
+      "from": "0x1D",
+      "to": "0x2D",
+      "dir": "S",
+      "door_type": 0
+    },
+    {
+      "from": "0x1D",
+      "to": "0x1E",
+      "dir": "E",
+      "door_type": 4
+    },
+    {
+      "from": "0x1F",
+      "to": "0x1E",
+      "dir": "W",
+      "door_type": 0
+    }
+  ]
+}

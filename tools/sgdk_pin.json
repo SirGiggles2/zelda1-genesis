@@ -1,0 +1,21 @@
+{
+  "_comment": "SGDK pin record. Single source of truth for the pinned SGDK submodule SHA. Verified by tools/check_sgdk_pin.py and gated in build.bat. See docs/sgdk_audit.md for the why.",
+  "submodule_path": "sgdk",
+  "pinned_sha": "ef9292c03fe33a2f8af3a2589ab856a53dcef35c",
+  "pinned_sha_short": "ef9292c0",
+  "pinned_tag": "v2.11",
+  "pinned_date": "2025-04-03",
+  "pinned_subject": "Fixed incorrect naming of some methods + updated to SGDK 2.11",
+  "audit_doc": "docs/sgdk_audit.md",
+  "policy": {
+    "rolling": false,
+    "fork": false,
+    "bump_requires": [
+      "--accept-sgdk-bump flag passed to build.bat",
+      "docs/sgdk_audit.md updated with new SHA + reason + tested matrix",
+      "parity oracle baselines regenerated in same commit",
+      "Final.md checksum regenerated in same commit"
+    ]
+  },
+  "content_sha256": "a5dcdb8a7e62a7ddf06d0b0a6323db9a0630385ae3fc831ef5d97d1080418a6c"
+}

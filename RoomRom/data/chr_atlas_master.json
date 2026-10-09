@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "spec_path": "docs/superpowers/specs/2026-05-07-whole-chr-rollout-design.md",
+  "decision_path": "docs/superpowers/decisions/2026-05-07-chr-budget-lock.md",
+  "notes": [
+    "POST 2026-05-18 VRAM cleanup pass (Phases A-F shipped):",
+    "  - BG_4x stays (architectural constraint: 4 PALs vs 4 BG + 3 SPR sub-pals; per-tile selective dedup planned as Phase J)",
+    "  - SPR_1x stays (sub-pal 0 only; future sprites needing sub-pal 1+ use OAM pal field to PAL2/PAL3 via subpal_routing.h)",
+    "  - ITEM_1x (was 3x); sub-pal selection via Genesis OAM pal field instead of pixel-bias replication",
+    "  - UWSP enemy bank 1x (was 4x); same OAM pal routing approach",
+    "  - SCENE_OBJ transient slot at SPR_BASE+44, sized 136 tiles for OWSP/BOSS max (114 tiles); Phase M can shrink to 114",
+    "CRAM layout post-cleanup (see src/game/world/bg_palette.h ARCH NOTE):",
+    "  PAL0 = NES BG palram (16 colors packed, sub-pals 0..3 pixel-biased)",
+    "  PAL1[0..3] = NES SPR sub-pal 0; PAL2[0..3] = sub-pal 1; PAL3[0..3] = sub-pal 2"
+  ],
+  "banks": {
+    "bg_4x": {
+      "residence": "static",
+      "subpal_count": 4,
+      "vram_tile_base_macro": "ROOMROM_BG_TILE_BASE",
+      "vram_tile_count": 1024,
+      "source_files": [
+        "data/chr/overworld_bg.c",
+        "data/chr/underworld_bg.c"
+      ],
+      "cleanup_note": "Phase J will collapse via selective per-(tile_id, sub_pal) dedup; ~798 tiles recoverable"
+    },
+    "spr_1x": {
+      "residence": "static",
+      "subpal_count": 1,
+      "vram_tile_base_macro": "ROOMROM_SPR_TILE_BASE",
+      "vram_tile_count": 287,
+      "source_files": ["data/chr/common.c"],
+      "cleanup_note": "Reduced from 312 to 287 during 8x16 fixes; SCENE_OBJ slot lives within this bank at +44"
+    },
+    "item_1x": {
+      "residence": "static",
+      "subpal_count": 1,
+      "vram_tile_base_macro": "ROOMROM_ITEM_TILE_BASE",
+      "vram_tile_count_per_pal_macro": "ROOMROM_ATLAS_ITEMS_X4_TILE_COUNT",
+      "source_manifest": "RoomRom/data/item_chr_manifest.json",
+      "source_files": ["RoomRom/src/atlas/items_chr_x4.c"],
+      "cleanup_note": "Phase B collapsed 3x -> 1x (2026-05-18); sub-pal via OAM pal field"
+    },
+    "scene_obj_transient": {
+      "residence": "transient",
+      "subpal_count_per_context": {
+        "enemy": 4,
+        "boss": 2,
+        "npc": 2,
+        "fx": 4
+      },
+      "vram_tile_base_macro": "ROOMROM_SCENE_OBJ_TILE_BASE",
+      "vram_tile_count": "TBD_PR2",
+      "swap_state_machine": "RoomRom/src/atlas/level_chr_swap.{c,h} (TBD PR-4)",
+      "dma_split": "2-vblank: REQUESTED -> BLANK -> DMA_SCENE_A -> DMA_SCENE_B -> READY",
+      "swap_triggers": [
+        "roomrom_uw_room_render_set_level (UW level change)",
+        "roomrom_main_apply_warp_outcome (scene transition)",
+        "cave_dispatch entry (cave/grotto)"
+      ],
+      "preconditions": [
+        "palette_tick_quiescent() == true (avoid SGDK DMA queue overflow)",
+        "scene transition fade active (covers visible blank)"
+      ]
+    }
+  },
+  "level_table_placeholder": [
+    {"level": 1, "enemy_variant": "UWSP127", "boss_variant": "Boss1257"},
+    {"level": 2, "enemy_variant": "UWSP127", "boss_variant": "Boss1257"},
+    {"level": 3, "enemy_variant": "UWSP358", "boss_variant": "Boss3468"},
+    {"level": 4, "enemy_variant": "UWSP469", "boss_variant": "Boss3468"},
+    {"level": 5, "enemy_variant": "UWSP358", "boss_variant": "Boss1257"},
+    {"level": 6, "enemy_variant": "UWSP469", "boss_variant": "Boss3468"},
+    {"level": 7, "enemy_variant": "UWSP127", "boss_variant": "Boss1257"},
+    {"level": 8, "enemy_variant": "UWSP358", "boss_variant": "Boss3468"},
+    {"level": 9, "enemy_variant": "UWSP469", "boss_variant": "Boss9"}
+  ],
+  "deferred_to_subsequent_prs": [
+    "PR-1.5: gen_atlas.py data-driven refactor (byte-equal items_chr_x4 regression gate)",
+    "PR-2: SCENE_OBJ size budget + LINK_STATIC split decision",
+    "PR-3: ITEM_4x extension (triforce + FX content)",
+    "PR-4: SCENE_OBJ transient state machine + enemy + NPC content",
+    "PR-5: per-level boss content + per-boss OAM map JSON"
+  ]
+}
