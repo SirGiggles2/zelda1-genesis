@@ -16,6 +16,9 @@
 #include "platform_abi.h"   /* nes_ram (A4-pinned) for probe sentinels */
 #include "../../data/audio_music/ow_theme_xgm.h"
 #include "../../data/audio_music/uw_theme_xgm.h"
+#include "../../data/audio_music/uw_theme_cyberdeous_xgm.h"
+#include "../game/options/options_consumer.h"
+#include "../game/options/options_state.h"
 #include <z80_ctrl.h>
 #include <snd/sound.h>
 #include <snd/xgm.h>
@@ -85,7 +88,10 @@ static const u8 *xgm_blob_for_song(unsigned char song)
     }
 #endif
     if (song == SONG_OW_BITMAP) return ow_theme_xgm;
-    if (song == SONG_UW_BITMAP) return uw_theme_xgm;
+    if (song == SONG_UW_BITMAP)
+        /* Options > UW MUSIC: Inglebard (default) or Cyberdeous. */
+        return (options_consumer_get_uw_music() == OPTIONS_UWMUSIC_CYBERDEOUS)
+               ? uw_theme_cyberdeous_xgm : uw_theme_xgm;
     return 0;
 }
 

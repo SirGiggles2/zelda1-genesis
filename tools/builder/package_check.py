@@ -143,6 +143,8 @@ ALLOWLIST = (
     "data/audio_music/ow_theme_xgm.h",
     "data/audio_music/uw_theme_xgm.c",
     "data/audio_music/uw_theme_xgm.h",
+    "data/audio_music/uw_theme_cyberdeous_xgm.c",
+    "data/audio_music/uw_theme_cyberdeous_xgm.h",
 )
 
 

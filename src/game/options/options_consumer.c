@@ -114,6 +114,11 @@ unsigned char options_consumer_get_room_scroll(void)
     return options_get((unsigned int)OPTION_ID_ROOM_SCROLL);
 }
 
+unsigned char options_consumer_get_uw_music(void)
+{
+    return options_get((unsigned int)OPTION_ID_UW_MUSIC);
+}
+
 /* --- Numeric ------------------------------------------------------- */
 
 unsigned char options_consumer_get_start_hearts(void)

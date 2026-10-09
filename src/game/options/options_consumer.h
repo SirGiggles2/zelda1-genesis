@@ -55,6 +55,9 @@ unsigned char options_consumer_get_lost_woods(void);
 unsigned char options_consumer_get_dark_room_light(void);
 unsigned char options_consumer_get_room_scroll(void);
 
+/* OPTIONS_UWMUSIC_*: which underworld theme plays (audio_adapter.c). */
+unsigned char options_consumer_get_uw_music(void);
+
 /* Numeric — clamped before return so callers don't need to re-clamp. */
 unsigned char options_consumer_get_start_hearts(void);
 

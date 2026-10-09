@@ -36,9 +36,12 @@
 #define FIRST_ROW    5u    /* first option row */
 #define LABEL_COL    5u
 #define VALUE_COL   18u
-#define ROW_STRIDE   1u    /* rows are contiguous (15 rows fit in 24 row band) */
+#define ROW_STRIDE   1u    /* rows are contiguous (17 rows + footer end at row 23) */
 
-#define SAT_ENTRY_OPTIONS_CURSOR  4u
+/* Entry 0: hide_fs_nav_sprites zeroes entries 0..3, so a cursor in entry 4
+ * was never reached by the link chain (invisible). Leaving the submenu
+ * redraws the FS_NAV sprites over entry 0. */
+#define SAT_ENTRY_OPTIONS_CURSOR  0u
 
 /* Glyph helpers (NES-letter encoding: 'A'=0x0A .. 'Z'=0x23). */
 static unsigned char letter_tile(char c)
@@ -95,7 +98,8 @@ static const char *const ROW_LABELS[FS_OPTIONS_SAVE_ROW + 1u] = {
     "LOSTWOODS",       /* 12 LOST_WOODS          enum   */
     "DARK ROOM",       /* 13 DARK_ROOM_LIGHT     enum   */
     "ROOM SCROLL",     /* 14 ROOM_SCROLL         enum   */
-    "SAVE"             /* 15 SAVE row                    */
+    "UW MUSIC",        /* 15 UW_MUSIC            enum   */
+    "SAVE"             /* 16 SAVE row                    */
 };
 
 static const char *bool_value_str(unsigned char v) { return (v != 0u) ? "ON" : "OFF"; }
@@ -145,6 +149,12 @@ static const char *scroll_value_str(unsigned char v)
     return (v == OPTIONS_SCROLL_CLASSIC) ? "CLASSIC" : "SMOOTH";
 }
 
+/* Underworld theme by its arranger (README credits). */
+static const char *uwmusic_value_str(unsigned char v)
+{
+    return (v == OPTIONS_UWMUSIC_CYBERDEOUS) ? "CYBERDEOUS" : "INGLEBARD";
+}
+
 /* Format START HEARTS numeric as decimal "NN". */
 static void format_decimal_2(unsigned char value, char out[3])
 {
@@ -179,6 +189,7 @@ static const char *value_string_for_row(uint8_t row, char numbuf[3])
     case OPTION_ID_LOST_WOODS:        return lwoods_value_str(v);
     case OPTION_ID_DARK_ROOM_LIGHT:   return dark_value_str(v);
     case OPTION_ID_ROOM_SCROLL:       return scroll_value_str(v);
+    case OPTION_ID_UW_MUSIC:          return uwmusic_value_str(v);
     default: return "";
     }
 }

@@ -25,3 +25,6 @@ Third-party components
 - Overworld and Underworld music: Genesis/Mega Drive covers by
   Inglebard, made in DefleMask Tracker, converted
   to XGM in data/audio_music/. The compositions are Koji Kondo's (Nintendo).
+- Alternate Underworld music ("Zelda - Dungeon Jungle", Options > UW MUSIC):
+  Genesis/Mega Drive cover by Cyberdeous, made in DefleMask Tracker,
+  converted to XGM in data/audio_music/uw_theme_cyberdeous_xgm.c.

@@ -56,6 +56,7 @@ static void load_defaults_into(OptionsState *s)
     s->lost_woods   = OPTIONS_LWOODS_VANILLA;
     s->dark_room    = OPTIONS_DARK_VANILLA;
     s->room_scroll = OPTIONS_SCROLL_SMOOTH;
+    s->uw_music = OPTIONS_UWMUSIC_INGLEBARD;
 
     for (i = 0u; i < sizeof(s->reserved); ++i) {
         s->reserved[i] = 0u;
@@ -139,6 +140,7 @@ unsigned char options_get(unsigned int id)
     case OPTION_ID_LOST_WOODS:         return g_options.lost_woods;
     case OPTION_ID_DARK_ROOM_LIGHT:    return g_options.dark_room;
     case OPTION_ID_ROOM_SCROLL:        return g_options.room_scroll;
+    case OPTION_ID_UW_MUSIC:           return g_options.uw_music;
     default:                           return 0u;
     }
 }
@@ -185,6 +187,9 @@ void options_set(unsigned int id, unsigned char value)
     case OPTION_ID_ROOM_SCROLL:
         if (value < OPTIONS_SCROLL_COUNT) g_options.room_scroll = value;
         break;
+    case OPTION_ID_UW_MUSIC:
+        if (value < OPTIONS_UWMUSIC_COUNT) g_options.uw_music = value;
+        break;
     default:
         return;
     }
@@ -213,6 +218,7 @@ unsigned char options_runtime_validate(void)
     if (g_options.lost_woods   >= OPTIONS_LWOODS_COUNT)   return 0u;
     if (g_options.dark_room    >= OPTIONS_DARK_COUNT)     return 0u;
     if (g_options.room_scroll  >= OPTIONS_SCROLL_COUNT)   return 0u;
+    if (g_options.uw_music     >= OPTIONS_UWMUSIC_COUNT)  return 0u;
     if (g_options.start_hearts <  OPTIONS_START_HEARTS_MIN) return 0u;
     if (g_options.start_hearts >  OPTIONS_START_HEARTS_MAX) return 0u;
 
@@ -268,6 +274,7 @@ unsigned char options_runtime_apply(const unsigned char *buf,
     if (tmp[9]  >= OPTIONS_LWOODS_COUNT)   return 0u;
     if (tmp[10] >= OPTIONS_DARK_COUNT)     return 0u;
     if (tmp[11] >= OPTIONS_SCROLL_COUNT)   return 0u;
+    if (tmp[12] >= OPTIONS_UWMUSIC_COUNT)  return 0u;
 
     /* Commit. */
     {

@@ -127,6 +127,8 @@ TITLE_C_SOURCES = [
     # XGM_startPlay(*_theme_xgm).
     ("data/audio_music/ow_theme_xgm.c",     "ow_theme_xgm.o"),
     ("data/audio_music/uw_theme_xgm.c",     "uw_theme_xgm.o"),
+    # Alternate underworld theme (Cyberdeous), picked in Options > UW MUSIC.
+    ("data/audio_music/uw_theme_cyberdeous_xgm.c", "uw_theme_cyberdeous_xgm.o"),
     ("src/frontend/intro/intro_phase.c", "intro_phase.o"),
     ("src/frontend/intro/intro_title.c", "intro_title.o"),
     ("src/frontend/intro/intro_story.c", "intro_story.o"),

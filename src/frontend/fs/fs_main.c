@@ -9,6 +9,7 @@
 #include "fs_options.h"
 #include "render_abi.h"
 #include "save_game.h"   /* T-099 register / erase / copy */
+#include "../../game/options/options_persistence.h"
 
 /* Music driver hooks — proof ROM links music_stub.c (no-op);
  * main ROM links the real audio driver. */
@@ -119,6 +120,11 @@ static void fs_init(void) {
     render_vram_write_words(&fs_palettes[2][0], 4u);  /* pal 2: Link sprite */
     render_cram_open_write_byte(96u);
     render_vram_write_words(&fs_palettes[3][0], 4u);  /* pal 3: heart cursor */
+
+    /* 4a. The OPTIONS submenu shows and edits the saved options: load them
+     *     (or defaults) here. Before, they were first loaded at gameplay
+     *     start, so the menu showed an all-zero state (START HP blank). */
+    options_persistence_load_or_default();
 
     /* 5. Phase + input init (v2). */
     fs_input_init();

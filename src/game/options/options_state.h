@@ -21,7 +21,9 @@
  *   off 8      start_hearts u8      3..16              numeric
  *   off 9      lost_woods   u8      OPTIONS_LWOODS_*   radio
  *   off 10     dark_room    u8      OPTIONS_DARK_*     radio
- *   off 11..29 reserved     18 bytes — future v2+ growth
+ *   off 11     room_scroll  u8      OPTIONS_SCROLL_*   radio   (v2)
+ *   off 12     uw_music     u8      OPTIONS_UWMUSIC_*  radio   (v3)
+ *   off 13..29 reserved     17 bytes — future growth
  *   off 30..31 checksum     be u16  add-all-bytes-mod-65536
  *
  * Bitfield assignments inside `bool_bits` (set = enabled):
@@ -49,7 +51,8 @@ extern "C" {
 #define OPTIONS_VERSION_NONE    0x00u  /* uninitialized — triggers migrate */
 #define OPTIONS_VERSION_V1      0x01u  /* initial schema */
 #define OPTIONS_VERSION_V2      0x02u  /* room_scroll option */
-#define OPTIONS_VERSION_CURRENT OPTIONS_VERSION_V2
+#define OPTIONS_VERSION_V3      0x03u  /* uw_music option */
+#define OPTIONS_VERSION_CURRENT OPTIONS_VERSION_V3
 
 #define OPTIONS_STATE_SIZE      32u
 
@@ -71,7 +74,8 @@ typedef enum {
     OPTION_ID_LOST_WOODS         = 12,  /* enum */
     OPTION_ID_DARK_ROOM_LIGHT    = 13,  /* enum */
     OPTION_ID_ROOM_SCROLL        = 14,  /* enum */
-    OPTION_ID_COUNT              = 15
+    OPTION_ID_UW_MUSIC           = 15,  /* enum */
+    OPTION_ID_COUNT              = 16
 } OptionId;
 
 /* Bitfield bit indices inside `bool_bits` u16. */
@@ -121,6 +125,12 @@ typedef enum {
 #define OPTIONS_SCROLL_CLASSIC     1u
 #define OPTIONS_SCROLL_COUNT       2u
 
+/* uw_music enum: which underworld (dungeon) theme plays. Older saves
+ * (v1/v2) have 0 here, the default. */
+#define OPTIONS_UWMUSIC_INGLEBARD  0u  /* default */
+#define OPTIONS_UWMUSIC_CYBERDEOUS 1u
+#define OPTIONS_UWMUSIC_COUNT      2u
+
 /* start_hearts numeric — clamp range. */
 #define OPTIONS_START_HEARTS_MIN   3u
 #define OPTIONS_START_HEARTS_MAX   16u
@@ -139,7 +149,8 @@ typedef struct OptionsState {
     unsigned char lost_woods;     /* off 9    */
     unsigned char dark_room;      /* off 10   */
     unsigned char room_scroll;    /* off 11   */
-    unsigned char reserved[18];   /* off 12..29 */
+    unsigned char uw_music;       /* off 12   */
+    unsigned char reserved[17];   /* off 13..29 */
     unsigned char checksum[2];    /* off 30..31 (be u16) */
 } OptionsState;
 
