@@ -1086,11 +1086,12 @@ void inventory_subscreen_tick(unsigned char joy_state)
         /* Menu slides back UP off the top: VSRAM 1 -> 174. */
         s_vscroll += SCROLL_VSCROLL_STEP;
         if (s_vscroll >= SCROLL_VSCROLL_TOP) {
-            /* Reset scroll to 0 before main.c's load_room repaints the room.
-             * The plane is already V64 (gameplay default) — do NOT toggle to
-             * V32 here (that left gameplay in the wrong plane mode). */
-            set_subscreen_vscroll(0);
-            render_set_window_on_top(7u);
+            /* T-245: NES UpdateMenuScrollUp switches nametable and scroll
+             * together in NMI. Keep the outgoing strip at its final position
+             * until pause_restore_room queues the existing atomic VBlank
+             * handoff. Resetting VSRAM/Window here exposes the inventory at
+             * scroll zero for two frames before the room slot returns. */
+            set_subscreen_vscroll(s_vscroll);
             s_scroll_state = SCROLL_IDLE;
             s_active = 0u;
             /* Clear ALL 80 SAT slots so no stale item/cursor sprite ghosts
