@@ -697,7 +697,7 @@ static void startup_triangle_upload(const unsigned long *patterns,
     dma_stats_record((unsigned long)count * 32u + 1792u);
 }
 
-static void mask_scene_snapshot(short horizontal, short vertical)
+static void mask_scene_copy(short horizontal, short vertical)
 {
     unsigned short row;
     const unsigned short col = (unsigned short)((-horizontal) >> 3) & 63u;
@@ -722,6 +722,10 @@ static void mask_scene_snapshot(short horizontal, short vertical)
             DMA_waitCompletion();
         }
     }
+}
+
+static void mask_scene_activate(void)
+{
     PAL_setColor(63u, 0u);
     VDP_setHorizontalScroll(BG_B, s_mask_col ? -256 : 0);
     VDP_setVerticalScroll(BG_B, 0);
@@ -732,7 +736,8 @@ void render_startup_triangle_begin(short horizontal, short vertical,
                                    const unsigned long *patterns, const unsigned short *map)
 {
     s_mask_stride = 32u;
-    mask_scene_snapshot(horizontal,vertical);
+    mask_scene_copy(horizontal,vertical);
+    mask_scene_activate();
     startup_triangle_upload(patterns, map, 1u);
     s_tri_pending = 0u;
 }
@@ -779,8 +784,10 @@ void render_circle_begin(short horizontal, short vertical, const unsigned long *
                          const unsigned short *map, unsigned short count)
 {
     render_circle_frame(patterns,map,count);
-    s_tri_h = horizontal;
-    s_tri_v = vertical;
+    /* Copy into the invisible half while the original scene is still
+     * displayed (or behind the closed iris). VRAM copy plus mask/SAT DMA
+     * exceeded one VBlank when all were done during the layer switch. */
+    mask_scene_copy(horizontal,vertical);
     s_tri_pending = 3u;
 }
 
@@ -794,9 +801,9 @@ static void startup_triangle_flush(void)
 {
     unsigned short row;
     if (s_tri_pending == 3u) {
-        mask_scene_snapshot(s_tri_h,s_tri_v);
         circle_sprites(1u);
         startup_triangle_upload(s_tri_patterns,s_tri_map,s_tri_count);
+        mask_scene_activate();
         s_circle_black_hold = 0u;
         VDP_setEnable(TRUE);
     }
