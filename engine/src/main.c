@@ -1,4 +1,5 @@
 #include "../../src/game/room/room_dispatch.h"
+#include "../../src/game/world/startup_triangle.h"
 #include "../../src/game/items/weapon_dispatch.h"  /* weapon_wield_flute */
 #include <genesis.h>
 #include "engine_runtime.h"
@@ -2795,11 +2796,11 @@ static void curtain_hide(void)
         if (first > 32u) first = 32u;
         render_vram_read_run((u16)(0xC000u + ((pr * 64u + pc) << 1)),
                              &s_curtain[row][0], first);
-        render_plane_fill_row(0u, pc, pr, first, 0u);
+        if (!startup_triangle_preserve_scene()) render_plane_fill_row(0u, pc, pr, first, 0u);
         if (first < 32u) {
             render_vram_read_run((u16)(0xC000u + ((pr * 64u) << 1)),
                                  &s_curtain[row][first], (u16)(32u - first));
-            render_plane_fill_row(0u, 0u, pr, (u16)(32u - first), 0u);
+            if (!startup_triangle_preserve_scene()) render_plane_fill_row(0u, 0u, pr, (u16)(32u - first), 0u);
         }
     }
 }
@@ -3215,6 +3216,7 @@ static void mode3_init_tick(void)
     enemy_render_reset_oam();
     enemy_render_native_sweep();
     VDP_updateSprites(80u, DMA_QUEUE);
+    startup_triangle_prepare(s_active_scroll_x, s_active_scroll_y);
     render_display_enable(1u);
     nes_ram[0x0013u] = 0u;                       /* BeginUpdateMode */
     nes_ram[0x0011u] = (u8)(nes_ram[0x0011u] + 1u);
@@ -3913,6 +3915,20 @@ stepped_out:
     }
     /* Mode 3 UpdateWorldCurtainEffect: columns $10-k and $11+k (1-based)
      * when Link's ObjTimer has run out, then a 5-frame delay. */
+    if (startup_triangle_active()) {
+        level_entry_draw_link();
+        g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK].attribut &= 0x7FFFu;
+        g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK_R].attribut &= 0x7FFFu;
+        VDP_updateSprites(ROOMROM_SPRITE_SLOT_ENEMY_FIRST, DMA_QUEUE);
+        if (!startup_triangle_tick()) return;
+        /* Restore cached Link priority with the mask's final VBlank. */
+        g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK].attribut |= 0x8000u;
+        g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK_R].attribut |= 0x8000u;
+        VDP_updateSprites(ROOMROM_SPRITE_SLOT_ENEMY_FIRST, DMA_QUEUE);
+        s_lvl_step = 16u;
+        nes_ram[0x007Cu] = 0u;
+        nes_ram[0x007Du] = 0x21u;
+    } else {
     if (s_lvl_timer != 0u) {
         s_lvl_timer = (unsigned char)(s_lvl_timer - 1u);
         return;
@@ -3929,6 +3945,7 @@ stepped_out:
     nes_ram[0x007Cu] = (u8)(0x10u - s_lvl_step);
     nes_ram[0x007Du] = (u8)(0x11u + s_lvl_step);
     if (s_lvl_step < 16u) return;
+    }
     if (s_lvl_exiting) {
         /* Mode 4 in the OW: InitMode_EnterRoom method 1, StepOutside. */
         s_lvl_exiting = 0u;

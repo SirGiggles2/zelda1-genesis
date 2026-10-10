@@ -385,6 +385,14 @@ void render_dma_stats_get(render_dma_stats_t *out);
 void render_dma_stats_reset(void);   /* zero peak + total + current */
 void render_dma_stats_frame_end(void); /* roll current into peak, reset current */
 
+/* T-284: ROM-resident H32 masks, Window above a frozen BG_B snapshot.
+ * The adapter reserves pattern slots 1440..1535 only during file startup. */
+void render_startup_triangle_begin(short horizontal, short vertical,
+                                   const unsigned long *patterns, const unsigned short *map);
+void render_startup_triangle_frame(const unsigned long *patterns,
+                                   const unsigned short *map, unsigned short count);
+void render_startup_triangle_finish(void);
+
 #endif /* RENDER_ABI_H */
 
 /* Restore both gameplay planes and the fixed HUD together at VBlank. */

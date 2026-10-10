@@ -424,6 +424,7 @@ static unsigned char s_ps_pending;
 static unsigned char s_menu_restore_pending;
 static unsigned short s_menu_restore_rows;
 static unsigned short s_ps_col, s_ps_room_col, s_ps_room_row;
+static void startup_triangle_flush(void);
 
 void render_plane_defer_flush(void)
 {
@@ -436,6 +437,7 @@ void render_plane_defer_flush(void)
     }
     for (i = 0u; i < s_pd_count; ++i) plane_word_now(s_pd_addr[i], s_pd_word[i]);
     s_pd_count = 0u;
+    startup_triangle_flush();
 }
 
 void render_plane_defer(unsigned char on)
@@ -672,6 +674,83 @@ static void pause_scene_flush(void)
     VDP_DATA_WORD = 174u;
     s_ps_pending = 0u;
     SYS_enableInts();
+}
+
+/* T-284: no frame buffers in RAM. Mask patterns/maps DMA directly from ROM.
+ * BG_A/B share C000; snapshot at columns 32..63 leaves the room untouched.
+ * Window replaces BG_A over all 28 rows, and its transparent hole shows BG_B.
+ * Highest existing dynamic pattern is 1439; tables begin at tile 1536. */
+static const unsigned long *s_tri_patterns;
+static const unsigned short *s_tri_map;
+static unsigned short s_tri_count, s_tri_color;
+static short s_tri_h, s_tri_v;
+static unsigned char s_tri_pending;
+
+static void startup_triangle_upload(const unsigned long *patterns,
+                                    const unsigned short *map, unsigned short count)
+{
+    VDP_loadTileData(patterns, 1440u, count, DMA);
+    VDP_setTileMapDataRect(WINDOW, map, 0u, 0u, 32u, 28u, 32u, DMA);
+    dma_stats_record((unsigned long)count * 32u + 1792u);
+}
+
+void render_startup_triangle_begin(short horizontal, short vertical,
+                                   const unsigned long *patterns, const unsigned short *map)
+{
+    unsigned short row;
+    const unsigned short col = (unsigned short)((-horizontal) >> 3) & 63u;
+    const unsigned short room_row = (unsigned short)(7 + (vertical >> 3)) & 63u;
+    const unsigned short first = col > 32u ? (unsigned short)(64u - col) : 32u;
+    s_tri_h = horizontal;
+    s_tri_v = vertical;
+    s_tri_color = PAL_getColor(63u);
+    for (row = 0u; row < 28u; ++row) {
+        const unsigned short dst = (unsigned short)(PLANE_A_BASE + row * 128u + 64u);
+        const unsigned short src = row < 7u
+            ? (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u)
+            : (unsigned short)(PLANE_A_BASE + ((room_row + row - 7u) & 63u) * 128u + col * 2u);
+        DMA_doVRamCopy(src, dst, row < 7u ? 64u : (unsigned short)(first * 2u), 1);
+        DMA_waitCompletion();
+        if (row >= 7u && first < 32u) {
+            DMA_doVRamCopy((unsigned short)(src - col * 2u), (unsigned short)(dst + first * 2u),
+                           (unsigned short)((32u - first) * 2u), 1);
+            DMA_waitCompletion();
+        }
+    }
+    PAL_setColor(63u, 0u);
+    VDP_setHorizontalScroll(BG_B, -256);
+    VDP_setVerticalScroll(BG_B, 0);
+    VDP_setWindowOnTop(28u);
+    startup_triangle_upload(patterns, map, 1u);
+    s_tri_pending = 0u;
+}
+
+void render_startup_triangle_frame(const unsigned long *patterns,
+                                   const unsigned short *map, unsigned short count)
+{
+    s_tri_patterns = patterns;
+    s_tri_map = map;
+    s_tri_count = count;
+    s_tri_pending = 1u;
+}
+
+void render_startup_triangle_finish(void) { s_tri_pending = 2u; }
+
+static void startup_triangle_flush(void)
+{
+    unsigned short row;
+    if (s_tri_pending == 1u) startup_triangle_upload(s_tri_patterns, s_tri_map, s_tri_count);
+    else if (s_tri_pending == 2u) {
+        for (row = 0u; row < 7u; ++row) {
+            DMA_doVRamCopy((unsigned short)(PLANE_A_BASE + row * 128u + 64u),
+                           (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u), 64u, 1);
+            DMA_waitCompletion();
+        }
+        PAL_setColor(63u, s_tri_color);
+        VDP_setWindowOnTop(7u);
+        render_scene_scroll_set(s_tri_h, s_tri_v);
+    }
+    s_tri_pending = 0u;
 }
 
 static unsigned char s_wm_pending;

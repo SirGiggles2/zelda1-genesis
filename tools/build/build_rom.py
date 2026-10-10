@@ -182,6 +182,7 @@ ROOMROM_C_SOURCES = [
     ("src/game/cave/cave_dispatch.c", "cave_dispatch.o"),
     ("src/game/cave/cave_entrance.c", "cave_entrance.o"),
     ("src/game/world/world_dispatch.c", "world_dispatch.o"),
+    ("src/game/world/startup_triangle.c", "world_startup_triangle.o"),
     ("src/game/world/object_dispatch.c", "object_dispatch.o"),
     ("src/game/world/sprite_dispatch.c", "sprite_dispatch.o"),
     ("src/game/world/progress_dispatch.c", "progress_dispatch.o"),
