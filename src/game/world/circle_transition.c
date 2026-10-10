@@ -23,6 +23,7 @@ void circle_transition_set_mode(unsigned char enhanced)
 }
 unsigned char circle_transition_enabled(void) { return s_circle_enabled; }
 unsigned char circle_transition_active(void) { return s_circle_phase == 1u || s_circle_phase == 3u; }
+unsigned char circle_transition_closing(void) { return s_circle_phase == 1u; }
 unsigned char circle_transition_waiting(void) { return s_circle_phase == 2u; }
 
 static const unsigned short *frame_map(unsigned char frame)
@@ -71,7 +72,8 @@ void circle_transition_open(short x, short y, short horizontal, short vertical)
 void circle_transition_tick(void)
 {
     unsigned char frame;
-    unsigned char total = s_circle_phase == 1u ? 56u : 48u;
+    /* Match the native sixteen-step stairs walk's sixty-four frame span. */
+    unsigned char total = 64u;
     if (++s_circle_tick >= total) {
         render_circle_finish(s_circle_phase == 1u);
         s_circle_phase = s_circle_phase == 1u ? 2u : 0u;

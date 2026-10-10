@@ -797,6 +797,16 @@ void render_circle_finish(unsigned char hold_black)
     s_tri_pending = hold_black ? 4u : 5u;
 }
 
+void render_circle_clip_sprites(void)
+{
+    unsigned short slot;
+    /* Animation republishes sprite attributes. Preserve the initial
+     * restore bitmap; only reapply clipping to the new pose. */
+    if (s_tri_pending==3u) return; /* Initial activation saves priorities. */
+    for (slot=0u;slot<80u;++slot) g_render_sat_cache[slot].attribut &= 0x7fffu;
+    VDP_updateSprites(80u,DMA_QUEUE);
+}
+
 static void startup_triangle_flush(void)
 {
     unsigned short row;

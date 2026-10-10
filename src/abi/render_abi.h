@@ -398,6 +398,8 @@ void render_circle_begin(short horizontal, short vertical, const unsigned long *
 void render_circle_frame(const unsigned long *patterns, const unsigned short *map,
                          unsigned short count);
 void render_circle_finish(unsigned char hold_black);
+/* Keep animated sprites beneath the active opaque Window mask. */
+void render_circle_clip_sprites(void);
 
 #endif /* RENDER_ABI_H */
 

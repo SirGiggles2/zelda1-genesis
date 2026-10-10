@@ -890,6 +890,9 @@ static void circle_open_here(void)
                             s_active_scroll_x,s_active_scroll_y);
 }
 
+static unsigned char s_circle_walk_out;
+static short s_circle_walk_target;
+
 /* Tier 1 cave-fade callbacks. cave_fade.c owns sequencing + cave_init/
  * cave_exit + plane fill; this side owns Link reposition + scene flip
  * + HUD underlay reset (which need engine-local statics). */
@@ -1037,10 +1040,6 @@ static void playfield_blank(void);
 static void cave_fade_load_blank_handler(unsigned char stage)
 {
     if (stage == 0u) {
-        /* The native stairs walk has finished. Close around the entrance
-         * before the shared loader replaces the scene. */
-        circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
-                                 s_active_scroll_x,s_active_scroll_y);
         /* Sprite changes reach VRAM at the next VBlank, one frame after
          * the plane writes below: hide Link a tick earlier so both show
          * on the same frame. NES enters mode $0B (cave) here and stays
@@ -3254,6 +3253,8 @@ static void mode3_init_tick(void)
 static unsigned char begin_level_exit(void)
 {
     if (!roomrom_world_transition_level_exit(&s_lvl_out)) return 0u;
+    s_circle_walk_out=circle_transition_enabled();
+    s_circle_walk_target=(short)(players[0].y+16);
     circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
                              s_active_scroll_x,s_active_scroll_y);
     room_save_kill_count_uw();                  /* InitMode6 SaveKillCount */
@@ -3378,6 +3379,8 @@ static void playfield_park_black(void)
 }
 static void begin_cave_exit(void)
 {
+    s_circle_walk_out=circle_transition_enabled();
+    s_circle_walk_target=(short)(players[0].y+16);
     circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
                              s_active_scroll_x,s_active_scroll_y);
     s_cave_load_blank = 1u;                 /* no Link redraw from here */
@@ -3440,6 +3443,13 @@ static void cave_exit_frame(u8 f)
         return;
     }
     if (f == CAVE_EXIT_REVEAL_FRAME) {
+        /* MD Remix stays fully black until StepOutside installs the
+         * actual entrance position. Never show the old cave-side pose. */
+        if (circle_transition_waiting()) {
+            s_scroll_hold=0u;
+            set_bg_scroll_vsync(s_active_scroll_x,s_active_scroll_y);
+            return;
+        }
         /* The OW room at once on the next frame (scroll at VBlank). Link's
          * sprite is still where DrawLinkBetweenRooms put it on frame 1 (the
          * cave spot, ObjX/ObjY held until InitMode4): it shows again with
@@ -3524,6 +3534,13 @@ void roomrom_main_begin_level_entry(const rr_warp_outcome_t *out)
     }
     s_lvl_phase = LVL_STAIRS;
     s_lvl_init = 1u;
+    s_circle_walk_out = 0u;
+    if (circle_transition_enabled()) {
+        if (tile==0x24u) mark_link_behind_bg();
+        render_plane_defer_flush();
+        circle_transition_close((short)(players[0].x+8),(short)(players[0].y+1),
+                                 s_active_scroll_x,s_active_scroll_y);
+    }
 }
 
 /* InitMode_EnterRoom method 1 (Z_05.asm:1570): X from LevelBlockAttrsA,
@@ -3802,6 +3819,12 @@ static void level_entry_tick(void)
             level_entry_draw_link();
             nes_ram[0x0011u] = 1u;
             VDP_updateSprites(ROOMROM_SPRITE_SLOT_ENEMY_FIRST, DMA_QUEUE);
+            if (circle_transition_waiting() && s_lvl_entrance_tile==0x24u) {
+                cave_fade_restore_arch();
+                mark_link_behind_bg();
+                s_step_out_restamp=0u;
+                render_plane_defer_flush();
+            }
             circle_open_here();
             return;                     /* InitMode4 has its own frame */
         }
@@ -3922,8 +3945,6 @@ stepped_out:
         if ((unsigned char)players[0].y != s_lvl_target_y) return;
         /* T-171: mode 2's first frame (k_level_enter_tl frame 0): the
          * stairs end here; InitMode2 runs from the next NMI. */
-        circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
-                                 s_active_scroll_x,s_active_scroll_y);
         nes_ram[0x0012u] = 0x02u;
         nes_ram[0x0013u] = 0u;
         nes_ram[0x0011u] = 0u;
@@ -3948,7 +3969,6 @@ stepped_out:
         s_lvl_step = 16u;
         nes_ram[0x007Cu] = 0u;
         nes_ram[0x007Du] = 0x21u;
-        if (!s_lvl_exiting) circle_open_here();
     } else if (startup_triangle_active()) {
         level_entry_draw_link();
         g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK].attribut &= 0x7FFFu;
@@ -4464,9 +4484,15 @@ static unsigned char play_update_objects(void)
              * EffectRequest is REPORTED, not byte-gated (like GameMode). */
             if (standing_tile == 0x24u)
                 nes_ram[0x0603u] |= 0x08u;   /* InitMode10 stairs effect */
+            s_circle_walk_out = 0u;
             cave_fade_set_callbacks(&k_cave_fade_callbacks);
             nes_ram[0x0012u] = 0x10u;         /* T-011: NES mode $10 stairs */
             end_prepare_mode();
+            if (circle_transition_enabled()) {
+                render_plane_defer_flush();
+                circle_transition_close((short)(players[0].x+8),(short)(players[0].y+1),
+                                         s_active_scroll_x,s_active_scroll_y);
+            }
             cave_fade_begin_enter(cid, standing_tile);
             inventory_rupee_tick(nes_ram[0x0015u]); /* @FinishUpdatePlay */
             return 1u;
@@ -4712,6 +4738,54 @@ static void nes_frame_timers_and_random(void)
 
 static u32 s_tick_vtimer = 0u;   /* T-125: vtimer at tick start */
 
+/* MD Remix presentation advances only the native doorway walk while masked.
+ * Room loading, gameplay and input retain their existing owners. */
+static void circle_walk_tick(void)
+{
+    cave_fade_phase_t cf=cave_fade_phase_current();
+    unsigned char grid=nes_ram[0x0394u];
+    s_frame_counter++;
+    nes_frame_nmi();
+    if (cf==CAVE_FADE_LINK_DESCEND || cf==CAVE_FADE_LINK_EMERGE) {
+        cave_fade_tick();
+        if (!s_cave_load_blank)
+            roomrom_sprites_set_link_pose(players[0].x,players[0].y,
+                                          players[0].face,s_link_frame);
+    } else if ((s_lvl_phase==LVL_STAIRS && !s_lvl_load_pending) ||
+               s_lvl_phase==LVL_STEP_OUT) {
+        level_entry_tick();
+    } else if (circle_transition_closing() && s_circle_walk_out) {
+        if (players[0].y<s_circle_walk_target) {
+            s_link_grid_offset=(signed char)grid;
+            s_link_pos_frac=nes_ram[0x03A8u];
+            link_nes_move_object_raw(LINK_DIR_DOWN);
+            nes_ram[0x0394u]=(u8)s_link_grid_offset;
+            nes_ram[0x03A8u]=s_link_pos_frac;
+            nes_ram[0x0070u]=(u8)players[0].x;
+            nes_ram[0x0084u]=(u8)players[0].y;
+            roomrom_combat_end_move_and_animate();
+        }
+        roomrom_sprites_set_link_pose(players[0].x,players[0].y,
+                                      players[0].face,s_link_frame);
+    } else if (!circle_transition_closing() && s_lvl_enter_only &&
+               nes_ram[0x0012u]==4u && grid!=0u && grid!=8u && grid!=0xf8u) {
+        if (ow_scroll_tick(&players[0].x,&players[0].y)==OW_SCROLL_WALK) {
+            link_dir_t d=link_dir_of_lowest_bit(nes_ram[0x0098u]);
+            s_link_grid_offset=(signed char)nes_ram[0x0394u];
+            s_link_pos_frac=nes_ram[0x03A8u];
+            link_nes_move_object_raw(d);
+            nes_ram[0x0394u]=(u8)s_link_grid_offset;
+            nes_ram[0x03A8u]=s_link_pos_frac;
+            nes_ram[0x0070u]=(u8)players[0].x;
+            nes_ram[0x0084u]=(u8)players[0].y;
+            roomrom_combat_end_move_and_animate();
+            roomrom_sprites_set_link_pose(players[0].x,
+                ow_scroll_display_link_y(players[0].y),players[0].face,s_link_frame);
+        }
+    }
+    render_circle_clip_sprites();
+}
+
 void roomrom_debug_tick(void)
 {
         /* DEBUG SENTINEL â€” capture players[0]+s_room_id at TOP-of-tick
@@ -4749,9 +4823,12 @@ void roomrom_debug_tick(void)
         state_dump_poll(STATE_DUMP_CTX_GAME);   /* A+B+C+Start: freeze + dump */
         if (s_arch_restore_ticks && --s_arch_restore_ticks == 0u)
             cave_fade_restore_arch();           /* after a step out */
+        if (circle_transition_waiting() &&
+            cave_fade_phase_current()==CAVE_FADE_LINK_EMERGE)
+            circle_open_here();
         if (circle_transition_active()) {
-            /* Freeze load clocks as well as actors/input during the iris.
-             * Their native load schedule starts again after full black. */
+            /* Hold load clocks and gameplay input during the iris;
+             * circle_walk_tick advances only the doorway animation. */
             const u32 elapsed = vtimer - s_tick_vtimer;
             s_tick_vtimer = vtimer;
             if (s_load_tl) s_load_vt0 += elapsed;
@@ -4759,6 +4836,7 @@ void roomrom_debug_tick(void)
             s_cave_exit_vt0 += elapsed;
             render_dma_stats_frame_end(); /* each iris tick is still a hardware frame */
             nes_pad_read_between_modes();
+            circle_walk_tick();
             circle_transition_tick();
             return;
         }
@@ -5050,6 +5128,8 @@ void roomrom_debug_tick(void)
                                                   players[0].face, s_link_frame);
                 VDP_updateSprites(80u, DMA_QUEUE);
                 transfer_buf_drain();            /* mode 7/4 fade palettes */
+                if (r==OW_SCROLL_ENTER && s_lvl_enter_only)
+                    circle_open_here();
             } else scroll_advance_fixed_point(&h_scroll, &v_scroll);
             set_bg_scroll_with_sprites(h_scroll, v_scroll);
             /* NES Z1 UW: Link is drawn behind door tiles during the
