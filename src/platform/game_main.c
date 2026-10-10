@@ -31,6 +31,7 @@ extern unsigned char g_fs_handoff_slot;
 #include "save_game.h"
 #include "../game/world/bg_palette.h"   /* refresh_link_color */
 #include "../game/world/startup_triangle.h"
+#include "../game/world/circle_transition.h"
 extern void room_patch_level_palette_link_color(void);   /* room_dispatch.c */
 
 /* The room (and its palette) loads in roomrom_debug_enter, before the
@@ -340,6 +341,7 @@ int debug_main_after_a4(bool hardReset)
                 (void) save_game_load_slot(g_fs_handoff_slot);
                 link_color_after_profile();
                 startup_triangle_arm(save_game_slot_mode(g_fs_handoff_slot) == SAVE_MODE_MD_REMIX);
+                circle_transition_set_mode(save_game_slot_mode(g_fs_handoff_slot) == SAVE_MODE_MD_REMIX);
 
                 /* T-241: restore the selected profile before the existing
                  * InitMode3/Unfurl path. NES Z_05 InitMode3_Sub8 loads

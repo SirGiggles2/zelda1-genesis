@@ -58,6 +58,7 @@ static inline void dma_stats_record(unsigned long bytes)
  * row = 64 bytes); engine runs 64x64 (64 tiles per row = 128 bytes).
  * CombinedDebug links one render ABI, so the stride has to follow the mode. */
 static unsigned short s_plane_row_stride_bytes = 64u;
+static unsigned char s_circle_black_hold;
 
 static void render_set_autoinc_word(void)
 {
@@ -68,6 +69,7 @@ static void render_set_autoinc_word(void)
 
 void render_display_enable(unsigned char on)
 {
+    if (on && s_circle_black_hold) return;
     /* Reg 1: $8134 = display OFF (VBlank IRQ, DMA, M5); $8174 = display ON. */
     VDP_CTRL_WORD = on ? (unsigned short)0x8174 : (unsigned short)0x8134;
 }
@@ -682,20 +684,20 @@ static void pause_scene_flush(void)
  * Highest existing dynamic pattern is 1439; tables begin at tile 1536. */
 static const unsigned long *s_tri_patterns;
 static const unsigned short *s_tri_map;
-static unsigned short s_tri_count, s_tri_color;
+static unsigned short s_tri_count, s_tri_color, s_mask_col;
 static short s_tri_h, s_tri_v;
-static unsigned char s_tri_pending;
+static unsigned char s_tri_pending, s_mask_stride = 32u;
+static unsigned short s_circle_priorities[5];
 
 static void startup_triangle_upload(const unsigned long *patterns,
                                     const unsigned short *map, unsigned short count)
 {
     VDP_loadTileData(patterns, 1440u, count, DMA);
-    VDP_setTileMapDataRect(WINDOW, map, 0u, 0u, 32u, 28u, 32u, DMA);
+    VDP_setTileMapDataRect(WINDOW, map, 0u, 0u, 32u, 28u, s_mask_stride, DMA);
     dma_stats_record((unsigned long)count * 32u + 1792u);
 }
 
-void render_startup_triangle_begin(short horizontal, short vertical,
-                                   const unsigned long *patterns, const unsigned short *map)
+static void mask_scene_snapshot(short horizontal, short vertical)
 {
     unsigned short row;
     const unsigned short col = (unsigned short)((-horizontal) >> 3) & 63u;
@@ -704,8 +706,11 @@ void render_startup_triangle_begin(short horizontal, short vertical,
     s_tri_h = horizontal;
     s_tri_v = vertical;
     s_tri_color = PAL_getColor(63u);
+    /* Entrances only fire at settled scroll origins (columns 0 or 32).
+     * Put the snapshot in the opposite half, including after OW scrolling. */
+    s_mask_col = (unsigned short)((col ^ 32u) & 32u);
     for (row = 0u; row < 28u; ++row) {
-        const unsigned short dst = (unsigned short)(PLANE_A_BASE + row * 128u + 64u);
+        const unsigned short dst = (unsigned short)(PLANE_A_BASE + row * 128u + s_mask_col * 2u);
         const unsigned short src = row < 7u
             ? (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u)
             : (unsigned short)(PLANE_A_BASE + ((room_row + row - 7u) & 63u) * 128u + col * 2u);
@@ -718,9 +723,16 @@ void render_startup_triangle_begin(short horizontal, short vertical,
         }
     }
     PAL_setColor(63u, 0u);
-    VDP_setHorizontalScroll(BG_B, -256);
+    VDP_setHorizontalScroll(BG_B, s_mask_col ? -256 : 0);
     VDP_setVerticalScroll(BG_B, 0);
     VDP_setWindowOnTop(28u);
+}
+
+void render_startup_triangle_begin(short horizontal, short vertical,
+                                   const unsigned long *patterns, const unsigned short *map)
+{
+    s_mask_stride = 32u;
+    mask_scene_snapshot(horizontal,vertical);
     startup_triangle_upload(patterns, map, 1u);
     s_tri_pending = 0u;
 }
@@ -731,24 +743,75 @@ void render_startup_triangle_frame(const unsigned long *patterns,
     s_tri_patterns = patterns;
     s_tri_map = map;
     s_tri_count = count;
+    s_mask_stride = 32u;
     s_tri_pending = 1u;
 }
 
 void render_startup_triangle_finish(void) { s_tri_pending = 2u; }
 
+static void circle_sprites(unsigned char clip)
+{
+    unsigned short slot;
+    if (clip) {
+        for (slot = 0u; slot < 5u; ++slot) s_circle_priorities[slot] = 0u;
+    }
+    for (slot = 0u; slot < 80u; ++slot) {
+        const unsigned short bit = (unsigned short)(1u << (slot & 15u));
+        if (clip) {
+            if (g_render_sat_cache[slot].attribut & 0x8000u) s_circle_priorities[slot >> 4] |= bit;
+            g_render_sat_cache[slot].attribut &= 0x7fffu;
+        } else if (s_circle_priorities[slot >> 4] & bit) g_render_sat_cache[slot].attribut |= 0x8000u;
+    }
+    VDP_updateSprites(80u,DMA);
+}
+
+void render_circle_frame(const unsigned long *patterns, const unsigned short *map,
+                         unsigned short count)
+{
+    s_tri_patterns = patterns;
+    s_tri_map = map;
+    s_tri_count = count;
+    s_mask_stride = 64u;
+    s_tri_pending = 1u;
+}
+
+void render_circle_begin(short horizontal, short vertical, const unsigned long *patterns,
+                         const unsigned short *map, unsigned short count)
+{
+    render_circle_frame(patterns,map,count);
+    s_tri_h = horizontal;
+    s_tri_v = vertical;
+    s_tri_pending = 3u;
+}
+
+void render_circle_finish(unsigned char hold_black)
+{
+    s_circle_black_hold = hold_black;
+    s_tri_pending = hold_black ? 4u : 5u;
+}
+
 static void startup_triangle_flush(void)
 {
     unsigned short row;
+    if (s_tri_pending == 3u) {
+        mask_scene_snapshot(s_tri_h,s_tri_v);
+        circle_sprites(1u);
+        startup_triangle_upload(s_tri_patterns,s_tri_map,s_tri_count);
+        s_circle_black_hold = 0u;
+        VDP_setEnable(TRUE);
+    }
     if (s_tri_pending == 1u) startup_triangle_upload(s_tri_patterns, s_tri_map, s_tri_count);
-    else if (s_tri_pending == 2u) {
+    else if (s_tri_pending == 2u || s_tri_pending == 4u || s_tri_pending == 5u) {
+        if (s_tri_pending == 4u) VDP_setEnable(FALSE);
         for (row = 0u; row < 7u; ++row) {
-            DMA_doVRamCopy((unsigned short)(PLANE_A_BASE + row * 128u + 64u),
+            DMA_doVRamCopy((unsigned short)(PLANE_A_BASE + row * 128u + s_mask_col * 2u),
                            (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u), 64u, 1);
             DMA_waitCompletion();
         }
         PAL_setColor(63u, s_tri_color);
         VDP_setWindowOnTop(7u);
         render_scene_scroll_set(s_tri_h, s_tri_v);
+        if (s_tri_pending != 2u) circle_sprites(0u);
     }
     s_tri_pending = 0u;
 }

@@ -367,6 +367,10 @@ src/game/world/startup_triangle.c
 src/game/world/startup_triangle.h
 src/game/world/startup_triangle_masks.inc
 tools/gen_startup_triangle.py
+src/game/world/circle_transition.c
+src/game/world/circle_transition.h
+src/game/world/circle_transition_masks.inc
+tools/gen_circle_transition.py
 src/state/save_game.h
 src/state/save_serializer.c
 src/state/save_serializer.h

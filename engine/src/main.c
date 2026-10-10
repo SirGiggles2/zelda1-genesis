@@ -1,5 +1,6 @@
 #include "../../src/game/room/room_dispatch.h"
 #include "../../src/game/world/startup_triangle.h"
+#include "../../src/game/world/circle_transition.h"
 #include "../../src/game/items/weapon_dispatch.h"  /* weapon_wield_flute */
 #include <genesis.h>
 #include "engine_runtime.h"
@@ -875,6 +876,20 @@ static u8 s_lvl_exit_dir = 0u;     /* door exit: ObjDir, 0 = not a door exit */
 static u8 s_lvl_exit_next = 0u;    /* door exit: CalculateNextRoom result */
 static u8 s_lvl_exit_steps = NES_LEVEL_EXIT_FC_STEPS;
 
+/* MD Remix presentation only: native entry/exit owners call this once the
+ * destination is fully loaded. The iris freezes that settled scene. */
+static void circle_open_here(void)
+{
+    if (!circle_transition_waiting()) return;
+    roomrom_hud_set_counts_hidden(0u);
+    roomrom_hud_draw(roomrom_uw_room_render_get_map(),s_room_id,s_scene == SCENE_UW);
+    roomrom_hud_b_item_update();
+    roomrom_sprites_set_link_pose(players[0].x,players[0].y,players[0].face,0u);
+    VDP_updateSprites(80u,DMA_QUEUE);
+    circle_transition_open((short)(players[0].x + 8),(short)(players[0].y + 1),
+                            s_active_scroll_x,s_active_scroll_y);
+}
+
 /* Tier 1 cave-fade callbacks. cave_fade.c owns sequencing + cave_init/
  * cave_exit + plane fill; this side owns Link reposition + scene flip
  * + HUD underlay reset (which need engine-local statics). */
@@ -998,6 +1013,7 @@ static void cave_fade_walk_done_handler(void)
 {
     nes_ram[0x0013u] = 0u;
     nes_ram[0x0011u] = 1u;   /* RunCrossRoomTasksAndBeginUpdateMode */
+    circle_open_here();
 }
 
 static void cave_fade_swap_exit_handler(void)
@@ -2796,11 +2812,13 @@ static void curtain_hide(void)
         if (first > 32u) first = 32u;
         render_vram_read_run((u16)(0xC000u + ((pr * 64u + pc) << 1)),
                              &s_curtain[row][0], first);
-        if (!startup_triangle_preserve_scene()) render_plane_fill_row(0u, pc, pr, first, 0u);
+        if (!startup_triangle_preserve_scene() && !circle_transition_waiting())
+            render_plane_fill_row(0u, pc, pr, first, 0u);
         if (first < 32u) {
             render_vram_read_run((u16)(0xC000u + ((pr * 64u) << 1)),
                                  &s_curtain[row][first], (u16)(32u - first));
-            if (!startup_triangle_preserve_scene()) render_plane_fill_row(0u, 0u, pr, (u16)(32u - first), 0u);
+            if (!startup_triangle_preserve_scene() && !circle_transition_waiting())
+                render_plane_fill_row(0u, 0u, pr, (u16)(32u - first), 0u);
         }
     }
 }
@@ -3232,6 +3250,8 @@ static void mode3_init_tick(void)
 static unsigned char begin_level_exit(void)
 {
     if (!roomrom_world_transition_level_exit(&s_lvl_out)) return 0u;
+    circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
+                             s_active_scroll_x,s_active_scroll_y);
     room_save_kill_count_uw();                  /* InitMode6 SaveKillCount */
     nes_ram[0x0604u] = 0x80u;                   /* Tune0Request: silence */
     /* T-140: the edge tick ends in mode 6 (CheckScreenEdge ->
@@ -3354,6 +3374,8 @@ static void playfield_park_black(void)
 }
 static void begin_cave_exit(void)
 {
+    circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
+                             s_active_scroll_x,s_active_scroll_y);
     s_cave_load_blank = 1u;                 /* no Link redraw from here */
     nes_ram[0x0012u] = 0x0Au;
     nes_ram[0x0013u] = 0u;
@@ -3475,6 +3497,8 @@ static void end_prepare_mode(void)
 void roomrom_main_begin_level_entry(const rr_warp_outcome_t *out)
 {
     unsigned char tile;
+    circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
+                             s_active_scroll_x,s_active_scroll_y);
     s_lvl_out = *out;
     /* Z_05.asm @LoadLevel: CaveSourceRoomId = the OW room of the entrance
      * (a Continue in the OW after the level starts there). */
@@ -3493,7 +3517,7 @@ void roomrom_main_begin_level_entry(const rr_warp_outcome_t *out)
     nes_ram[0x0012u] = 0x10u;
     end_prepare_mode();
     s_lvl_target_y = (unsigned char)players[0].y;
-    if (tile == 0x24u) {
+    if (tile == 0x24u && !circle_transition_enabled()) {
         s_lvl_target_y = (unsigned char)(players[0].y + 0x10);
     }
     s_lvl_phase = LVL_STAIRS;
@@ -3776,6 +3800,7 @@ static void level_entry_tick(void)
             level_entry_draw_link();
             nes_ram[0x0011u] = 1u;
             VDP_updateSprites(ROOMROM_SPRITE_SLOT_ENEMY_FIRST, DMA_QUEUE);
+            circle_open_here();
             return;                     /* InitMode4 has its own frame */
         }
         /* StepOutside: beside stairs (method 1-b) the first update ends
@@ -3915,7 +3940,12 @@ stepped_out:
     }
     /* Mode 3 UpdateWorldCurtainEffect: columns $10-k and $11+k (1-based)
      * when Link's ObjTimer has run out, then a 5-frame delay. */
-    if (startup_triangle_active()) {
+    if (circle_transition_waiting()) {
+        s_lvl_step = 16u;
+        nes_ram[0x007Cu] = 0u;
+        nes_ram[0x007Du] = 0x21u;
+        if (!s_lvl_exiting) circle_open_here();
+    } else if (startup_triangle_active()) {
         level_entry_draw_link();
         g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK].attribut &= 0x7FFFu;
         g_render_sat_cache[ROOMROM_SPRITE_SLOT_LINK_R].attribut &= 0x7FFFu;
@@ -4433,6 +4463,8 @@ static unsigned char play_update_objects(void)
             cave_fade_set_callbacks(&k_cave_fade_callbacks);
             nes_ram[0x0012u] = 0x10u;         /* T-011: NES mode $10 stairs */
             end_prepare_mode();
+            circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
+                                     s_active_scroll_x,s_active_scroll_y);
             cave_fade_begin_enter(cid, standing_tile);
             inventory_rupee_tick(nes_ram[0x0015u]); /* @FinishUpdatePlay */
             return 1u;
@@ -4715,6 +4747,19 @@ void roomrom_debug_tick(void)
         state_dump_poll(STATE_DUMP_CTX_GAME);   /* A+B+C+Start: freeze + dump */
         if (s_arch_restore_ticks && --s_arch_restore_ticks == 0u)
             cave_fade_restore_arch();           /* after a step out */
+        if (circle_transition_active()) {
+            /* Freeze load clocks as well as actors/input during the iris.
+             * Their native load schedule starts again after full black. */
+            const u32 elapsed = vtimer - s_tick_vtimer;
+            s_tick_vtimer = vtimer;
+            if (s_load_tl) s_load_vt0 += elapsed;
+            s_lvl_exit_vt0 += elapsed;
+            s_cave_exit_vt0 += elapsed;
+            render_dma_stats_frame_end(); /* each iris tick is still a hardware frame */
+            nes_pad_read_between_modes();
+            circle_transition_tick();
+            return;
+        }
         s_tick_vtimer = vtimer;
         /* Phase Q v2: roll per-frame DMA byte tally into peak tracker
          * and reset accumulator for next frame. Probes read peak via

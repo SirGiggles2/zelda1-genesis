@@ -392,6 +392,12 @@ void render_startup_triangle_begin(short horizontal, short vertical,
 void render_startup_triangle_frame(const unsigned long *patterns,
                                    const unsigned short *map, unsigned short count);
 void render_startup_triangle_finish(void);
+/* T-285: centered 64-column ROM iris crop; begin/frame/finish commit at VBlank. */
+void render_circle_begin(short horizontal, short vertical, const unsigned long *patterns,
+                         const unsigned short *map, unsigned short count);
+void render_circle_frame(const unsigned long *patterns, const unsigned short *map,
+                         unsigned short count);
+void render_circle_finish(unsigned char hold_black);
 
 #endif /* RENDER_ABI_H */
 
