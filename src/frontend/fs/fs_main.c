@@ -146,6 +146,13 @@ static void fs_init(void) {
     render_vram_write_words(&fs_palettes[2][0], 4u);  /* pal 2: Link sprite */
     render_cram_open_write_byte(96u);
     render_vram_write_words(&fs_palettes[3][0], 4u);  /* pal 3: heart cursor */
+    {
+        /* Menu text uses entries 1..3; slot Link sprites use 4..6 and
+         * the heart cursor uses palette 1 entries 7..9. */
+        static const unsigned short dim_text[3]={0x0444u,0x0444u,0x0444u};
+        render_cram_open_write_byte(FS_DIM_TEXT_PALETTE*32u+2u);
+        render_vram_write_words(dim_text,3u);
+    }
 
     {
         /* NES cursor $15/$27/$30 converted by extract_intro_assets.py. */
@@ -232,14 +239,13 @@ static void file_redraw(void) {
     fs_render_file_identity(s_file_slot);
     fs_render_text(8u,7u,"QUEST 1");
     fs_render_quest_stats(s_file_slot,0u,9u);
-    if (save_game_quest_available(s_file_slot,1u)) {
-        fs_render_text(12u,7u,"QUEST 2");
+    fs_render_choice_text(12u,7u,"QUEST 2",save_game_quest_available(s_file_slot,1u));
+    if (save_game_quest_available(s_file_slot,1u))
         fs_render_quest_stats(s_file_slot,1u,13u);
-    } else fs_render_text(12u,7u,"QUEST 2 LOCKED");
-    fs_render_text(16u,7u,save_game_gauntlet_available(s_file_slot) ?
-                   "GANON'S GAUNTLET" : "???");
+    fs_render_choice_text(16u,7u,save_game_gauntlet_available(s_file_slot) ?
+                          "GANON'S GAUNTLET" : "???",save_game_gauntlet_available(s_file_slot));
     fs_render_text(19u,7u,players);
-    fs_render_text(21u,7u,save_game_slot_mode(s_file_slot) ? "OPTIONS" : "OPTIONS REMIX ONLY");
+    fs_render_choice_text(21u,7u,"OPTIONS",save_game_slot_mode(s_file_slot));
     fs_render_text(26u,7u,"BACK");
     fs_render_page_cursor(rows[s_file_row]);
 }

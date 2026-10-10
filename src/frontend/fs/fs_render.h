@@ -29,6 +29,9 @@ void fs_render_rename_menu(void);
 void fs_render_rename_board(uint8_t slot);
 void fs_render_page(const char *title);
 void fs_render_text(uint16_t row,uint8_t col,const char *text);
+/* Palette 3 entries 1..3 are reserved for unavailable menu text. */
+#define FS_DIM_TEXT_PALETTE 3u
+void fs_render_choice_text(uint16_t row,uint8_t col,const char *text,uint8_t enabled);
 void fs_render_page_cursor(uint16_t row);
 void fs_render_quest_stats(uint8_t slot,uint8_t quest,uint16_t row);
 void fs_render_file_identity(uint8_t slot);

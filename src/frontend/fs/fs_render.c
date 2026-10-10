@@ -418,6 +418,10 @@ void fs_render_page(const char *title) {
     misc_title(title); box(3u,29u,5u,28u);
 }
 void fs_render_text(uint16_t row,uint8_t col,const char *text) { write_text(row,col,text); }
+void fs_render_choice_text(uint16_t row,uint8_t col,const char *text,uint8_t enabled) {
+    while (*text && col<32u)
+        put_cell(row,col++,glyph(ascii_tile(*text++)),enabled ? PAL_TEXT : FS_DIM_TEXT_PALETTE);
+}
 void fs_render_file_identity(uint8_t slot) {
     const volatile unsigned char *name=save_game_slot_name(slot);
     for (uint8_t i=0u;i<8u;i++) put_cell(6u,18u+i,glyph(name[i]),0u);
