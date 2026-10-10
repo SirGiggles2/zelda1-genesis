@@ -20,10 +20,15 @@ typedef enum {
     FS_ERASE_CONFIRM,
     FS_OPTIONS,
     FS_HANDOFF,
-    FS_REGISTER      /* T-099: NES Mode $E name entry for an empty slot */
+    FS_REGISTER,     /* NES Mode $E name entry for an empty slot */
+    FS_COPY_CONFIRM,
+    FS_RENAME_PICK,
+    FS_MODE_CHOICE,
+    FS_FILE_MENU,
+    FS_SOUND_TEST
 } fs_phase_t;
 
-#define FS_CURSOR_MAX 6u   /* v3: 7 positions (slot0..OPTIONS), index range 0..6 */
+#define FS_CURSOR_MAX 6u   /* Three files, COPY, ERASE, RENAME, SOUND TEST. */
 
 extern uint8_t s_fs_phase;
 extern uint8_t s_fs_cursor;

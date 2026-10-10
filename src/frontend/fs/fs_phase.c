@@ -29,8 +29,6 @@ void fs_phase_step(void) {
         case FS_LOAD:
             fs_render_clear_screen();
             fs_render_static_layout();
-            fs_render_extra_rows();          /* v3: PLAYERS + OPTIONS labels */
-            fs_render_players_row(s_fs_players_value);
             fs_render_all_slots();
             fs_render_cursor(s_fs_cursor);
             s_fs_phase = FS_NAV;

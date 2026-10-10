@@ -35,6 +35,7 @@
  */
 
 #include "platform_abi.h"
+#include "save_game.h"
 #include "mode_wingame.h"
 #include "draw_dispatch.h"
 #include "sprite_dispatch.h"
@@ -188,15 +189,15 @@ static void mode13_end_game_mode(void)
     RAM(0x00FFu) = 0x30u;
     RAM(0x00FEu) &= 0xE7u; /* TurnOffAllVideo. */
     (void)core_silence_all_sound();
+    /* Preserve completed quest and its statistics before the ending
+     * changes the live profile. Unlock belongs only to CurSaveSlot. */
+    save_game_complete_quest();
     /* Z_02 SwitchProfileToSecondQuest, including after Quest2. Profile
      * RAM owns the reset; save mode persists through the existing codec.
      * Other slots, this slot's name and death count remain intact. */
-    for (i = 0u; i < 384u; ++i) RAM(0x067Fu + i) = 0u;
-    for (i = 0u; i < 40u; ++i) RAM(0x0657u + i) = 0u;
-    RAM(0x066Fu) = 0x22u;
-    RAM(0x0670u) = 0xFFu;
-    RAM(0x067Cu) = 8u;
-    RAM(0x062Du + RAM(0x0016u)) = 1u;
+    (void)i;
+    (void)save_game_select_quest(RAM(0x0016u),1u);
+    (void)save_game_load_slot(RAM(0x0016u));
     roomrom_main_set_quest(2u);
     inventory_sync_from_native();
     mode13_hide_all_sprites();

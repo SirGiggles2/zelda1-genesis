@@ -10,6 +10,7 @@
 #include "fs_options_render.h"
 #include "fs_input.h"
 #include "fs_phase.h"
+#include "fs_main.h"
 #include "../../game/options/options_runtime.h"
 #include "../../game/options/options_state.h"
 #include "../../game/options/options_persistence.h"
@@ -44,9 +45,7 @@ static void exit_to_nav(unsigned char committed)
     if (committed) PROBE[5] = (unsigned char)(PROBE[5] + 1u);
     else PROBE[6] = (unsigned char)(PROBE[6] + 1u);
 
-    fs_options_render_leave(FS_ROW_OPTIONS);
-    s_fs_phase = FS_NAV;
-    s_fs_cursor = FS_ROW_OPTIONS;
+    fs_file_options_exit(committed);
 }
 
 static unsigned char enum_count_for_row(uint8_t row)
@@ -109,6 +108,7 @@ static void apply_right(uint8_t row)
 
 void fs_options_step(uint8_t edge)
 {
+    if (edge & FS_BTN_C) { exit_to_nav(0u); return; }
     if (edge & FS_BTN_UP) {
         if (s_cursor > 0u) {
             s_cursor--;
@@ -140,7 +140,6 @@ void fs_options_step(uint8_t edge)
     if (edge & FS_BTN_A) {
         PROBE[10] = (unsigned char)(PROBE[10] + 1u);
         if (s_cursor == FS_OPTIONS_SAVE_ROW) {
-            options_persistence_commit();
             exit_to_nav(1u);
             return;
         }
@@ -151,7 +150,6 @@ void fs_options_step(uint8_t edge)
     }
     if (edge & FS_BTN_B) {
         PROBE[11] = (unsigned char)(PROBE[11] + 1u);
-        options_persistence_commit();
         exit_to_nav(1u);
         return;
     }

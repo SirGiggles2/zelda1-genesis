@@ -152,7 +152,7 @@ static const char *scroll_value_str(unsigned char v)
 /* Underworld theme by its arranger (README credits). */
 static const char *uwmusic_value_str(unsigned char v)
 {
-    return (v == OPTIONS_UWMUSIC_CYBERDEOUS) ? "CYBERDEOUS" : "INGLEBARD";
+    return (v == OPTIONS_UWMUSIC_CYBERDEOUS) ? "DUNGEON REMIX" : "INGLEBARD";
 }
 
 /* Format START HEARTS numeric as decimal "NN". */
@@ -202,7 +202,9 @@ static void write_row(unsigned short row_idx, uint8_t option_row)
     scratch_clear_row(cells);
     scratch_write_text(cells, LABEL_COL, ROW_LABELS[option_row]);
     if (option_row < FS_OPTIONS_SAVE_ROW) {
-        scratch_write_value(cells, value_string_for_row(option_row, numbuf));
+        if (option_row==OPTION_ID_UW_MUSIC)
+            scratch_write_text(cells,15u,value_string_for_row(option_row,numbuf));
+        else scratch_write_value(cells, value_string_for_row(option_row, numbuf));
     }
     render_plane_write_row(PLANE_A_BASE, row_idx, cells, 32u);
 }
@@ -305,7 +307,6 @@ void fs_options_render_leave(uint8_t fs_nav_cursor)
 
     fs_render_clear_screen();
     fs_render_static_layout();
-    fs_render_extra_rows();
     fs_render_all_slots();
     fs_render_cursor(fs_nav_cursor);
 }

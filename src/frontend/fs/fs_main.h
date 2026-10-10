@@ -14,5 +14,6 @@ void fs_main(void);
  * and does NOT wait for vblank — the caller does. */
 void fs_enter(void);
 void fs_tick(void);
+void fs_file_options_exit(unsigned char committed);
 
 #endif

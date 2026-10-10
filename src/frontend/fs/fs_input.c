@@ -36,7 +36,7 @@ static uint8_t read_pad(void) {
     if (!(hi & 0x04)) btn |= FS_BTN_LEFT;
     if (!(hi & 0x08)) btn |= FS_BTN_RIGHT;
     if (!(hi & 0x10)) btn |= FS_BTN_B;
-    if (!(hi & 0x20)) btn |= FS_BTN_A;       /* C button — used as NES A equivalent */
+    if (!(hi & 0x20)) btn |= FS_BTN_C;
     if (!(lo & 0x10)) btn |= FS_BTN_A;       /* TH=0 A bit (real Genesis A) */
     if (!(lo & 0x20)) btn |= FS_BTN_START;
     return btn;

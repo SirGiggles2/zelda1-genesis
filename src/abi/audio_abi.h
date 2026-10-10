@@ -23,6 +23,11 @@ void audio_xgm_init(void);
 /* Request a song change. song is the song bitmap passed to music_play.
  * Call from any mode; music_tick in the VBlank handler picks it up. */
 void audio_music_play(unsigned char song);
+/* Compiled music catalog for the menu; no game state/option mutation. */
+unsigned char audio_sound_test_count(void);
+const char *audio_sound_test_name(unsigned char index);
+const char *audio_sound_test_source(unsigned char index);
+void audio_sound_test_play(unsigned char index);
 
 /* Request-engine PCM channels (1..4). Stop only the requested sample
  * while it still owns that channel; a newer DMC/SFX must survive. */

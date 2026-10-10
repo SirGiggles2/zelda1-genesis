@@ -10,6 +10,23 @@
 /* Power-on / title Start: cart -> NES save block, then the NES file A
  * validation and slot-info copy (UpdateMode0Demo_Sub1/Sub2). */
 void save_game_boot(void);
+#define SAVE_MODE_ORIGINAL 0u
+#define SAVE_MODE_MD_REMIX 1u
+unsigned char save_game_slot_mode(unsigned char slot);
+/* Per-file menu player count, 1..4; older files default to one. */
+unsigned char save_game_slot_players(unsigned char slot);
+void save_game_set_players(unsigned char slot, unsigned char players);
+unsigned char save_game_register_mode(unsigned char slot, const unsigned char *name, unsigned char mode);
+unsigned char save_game_select_quest(unsigned char slot, unsigned char quest);
+unsigned char save_game_quest_available(unsigned char slot, unsigned char quest);
+/* Both quests beaten, one beaten with ZELDA, or GANON name exception. */
+unsigned char save_game_gauntlet_available(unsigned char slot);
+unsigned char save_game_quest_stat(unsigned char slot, unsigned char quest, unsigned char stat);
+/* stat: 0 hearts, 1 partial heart, 2 deaths. */
+void save_game_complete_quest(void);
+void save_game_options_load(unsigned char slot);
+void save_game_options_store(unsigned char slot);
+unsigned char save_game_any_quest2_complete(void);
 
 /* IsSaveSlotActive[slot] from the slot info (valid after boot). */
 unsigned char save_game_slot_active(unsigned char slot);
@@ -32,6 +49,9 @@ unsigned char save_game_save_current(void);
  * except HeartValues $22, HeartPartial $FF, MaxBombs 8; quest 2 when the
  * name starts with "ZELDA". Returns 1 if a file was created. */
 unsigned char save_game_register(unsigned char slot, const unsigned char *name);
+/* Rename updates name/checksum and grants applicable name unlocks;
+ * earned access is retained. Blank names are rejected. */
+unsigned char save_game_rename(unsigned char slot, const unsigned char *name);
 
 /* Elimination (NES DeleteSlot): FormatFileA + blank name in slot info. */
 void save_game_erase(unsigned char slot);

@@ -10,6 +10,7 @@
 #define FS_BTN_A      0x10  /* Genesis A (or C in 3-button-as-NES-A mapping) */
 #define FS_BTN_B      0x20
 #define FS_BTN_START  0x40
+#define FS_BTN_C      0x80  /* name-entry cancel, separate from A/write */
 
 void fs_input_init(void);
 uint8_t fs_input_pressed(void);   /* edge-triggered (release-then-press) */

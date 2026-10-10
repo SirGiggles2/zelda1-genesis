@@ -13,19 +13,10 @@ extern const uint8_t  fs_heart_cursor_chr[];
 extern const uint8_t  fs_font_chr[];
 extern const uint8_t  fs_border_chr[];
 
-/* CRAM palette indices (matches src/gen/fs_palette.c layout).
- *
- * Genesis only has 4 CRAM palettes vs NES's 4 BG + 4 sprite. Layout:
- *   pal 0  BG attr 0 cells
- *   pal 1  BG attr 1 cells (LIFE/hearts) — also used by heart cursor sprite
- *   pal 2  bright Link  (OCCUPIED save slot)
- *   pal 3  faded  Link  (EMPTY    save slot — Redux dark-olive tint)
- * Heart cursor moved off pal 3 to free pal 3 for the empty-slot Link tint
- * (Redux menu_tweaks.asm:397-404). Cursor palette is now BG pal 1 — close
- * enough red/yellow shading to read as the NES light-red/white heart. */
-#define PAL_BG_LINK_BRIGHT  2u
-#define PAL_BG_LINK_FADED   3u
-#define PAL_BG_CURSOR       1u
+/* Palette 0: BG text/border. Palette 1: LIFE entries 0..3 and heart
+ * cursor entries 7..9. Each slot uses its own palette 1..3, entries 4..6,
+ * so bright green/blue/red and faded colours remain independent. */
+#define PAL_BG_CURSOR 1u
 
 #define PLANE_A_BASE  0xC000
 #define PLANE_B_BASE  0xE000  /* boot.asm Reg4=$8407 → plane B @ $E000 */
@@ -123,13 +114,27 @@ static uint8_t attr_palette_for_cell(uint16_t row, uint16_t col) {
     return (uint8_t)((b >> shift) & 0x03u);
 }
 
-/* v3: shift entire NES menu UP 3 rows so PLAYERS + OPTIONS fit inside the
- * border. Source row r' = r + FS_ROW_SHIFT. Dest rows past the shifted border
- * (>= 30 - SHIFT) get blank fill; PLAYERS/OPTIONS render on top via
- * fs_render_extra_rows. Link sprite + cursor Y tables also subtract the shift. */
-#define FS_ROW_SHIFT  3u
+/* The reference's 224-line viewport crops eight lines from the NES top.
+ * Keep source-space coordinates and translate them once at each writer. */
+#define FS_ROW_SHIFT  1u /* NES reference screenshots crop the top eight pixels. */
+static uint8_t s_misc_scene;
+static uint8_t s_misc_copy;
+static uint8_t s_register_slot = 0xFFu;
+static uint8_t s_anim_clock;
+static uint8_t s_anim_slot = 0xFFu;
+static uint8_t s_board_index, s_name_col;
+static uint16_t s_name_row;
+static void write_text(uint16_t row, uint8_t col, const char *text);
+static void box(uint8_t left,uint8_t right,uint16_t top,uint16_t bottom);
+static void put_cell(uint16_t row,uint16_t col,uint16_t tile,uint8_t pal);
 
 void fs_render_static_layout(void) {
+    render_cram_open_write_byte(34u);
+    render_vram_write_word(fs_palettes[1][1]);
+    s_misc_scene = 0u;
+    s_register_slot = 0xFFu;
+    s_anim_clock = 0u;
+    s_anim_slot = 0xFFu;
     unsigned short cells[32];
     for (unsigned short row = 0; row < 30; row++) {
         unsigned short src = (unsigned short)(row + FS_ROW_SHIFT);
@@ -144,59 +149,37 @@ void fs_render_static_layout(void) {
             }
             cells[col] = (uint16_t)(((uint16_t)pal & 0x3u) << 13) | (uint16_t)tile;
         }
-        /* Shift COPY (dest row 18) + ERASE (dest row 20) text 1 cell right
-         * to match PLAYERS/OPTIONS LABEL_COL=7 alignment. Side rails at
-         * cols 3 + 28 stay untouched; the rightmost shifted cell drops
-         * onto col 28's space slot, so we restore the right rail after. */
-        if (row == 18u || row == 20u) {
-            unsigned short right_rail = cells[28];
-            for (int c = 28; c >= 5; c--) cells[c] = cells[c - 1];
-            cells[4]  = 0x24u;   /* fill the new gap with a space */
-            cells[28] = right_rail;
-        }
         render_plane_write_row(PLANE_A_BASE, row, cells, 32u);
     }
+    /* Extend the original border to enclose both new actions. */
+    for (uint8_t c=4u;c<28u;c++) put_cell(25u,c,0x24u,0u);
+    box(3u,28u,8u,28u);
+    write_text(8u,10u,"NAME");
+    write_text(25u,9u,"RENAME SAVE");
+    write_text(27u,9u,"SOUND TEST");
+    write_text(8u,20u,"MODE");
 }
 
-/* ---------------------------------------------------------------------------
- * fs_render_slot: write Link sprite for one save slot row.
- *
- * NES geometry (Mode1_WriteLinkSprites, Z_02.asm:2634-2638):
- *   base_y = $58 (NES screen Y), X = $30; +$18 per slot.
- *   Slot 0: NES_Y=$58, Slot 1: $70, Slot 2: $88.
- *
- * Genesis SAT coordinates = NES + 128:
- *   Slot 0: sat_y=$D8 (216), Slot 1: $F0 (240), Slot 2: $108 (264)
- *   X: sat_x = 0x30 + 128 = 0xB0 (176)
- *
- * Link occupies 2×2 cells (16×16 px) on Genesis using a single SAT entry
- * with size=0x0500 (H=2cells,V=2cells). The 4 Genesis tiles at LINK_CHR_BASE
- * cover: [0x80]=left-top, [0x81]=left-bot, [0x82]=right-top, [0x83]=right-bot.
- * Genesis stores them as col-major: tile_index=0x80 → left col, 0x82 → right col.
- *
- * Palette assignment:
- *   Occupied slot: palette index matches slot number (0,1,2) → colors green/blue/red.
- *   Empty slot: palette index 3 → dim/grey palette.
- * ---------------------------------------------------------------------------
- */
+/* Redux main Link positions: ($30,$58 + slot*$18) in NES OAM space.
+ * Misc menus use ($50,$30 + slot*$18); visible Y is OAM Y+1, minus crop. */
 void fs_render_slot(uint8_t slot_idx) {
-    /* NES Y base for Link sprites = $58; increment $18 per slot.
-     * v3 shifts UI up FS_ROW_SHIFT*8 px to make room for PLAYERS/OPTIONS. */
-    uint16_t nes_y = (uint16_t)(0x58u - (FS_ROW_SHIFT * 8u) + (uint16_t)slot_idx * 0x18u);
-    uint16_t sat_y = (uint16_t)(nes_y + 128u);   /* +128 SAT bias */
-    uint16_t sat_x = (uint16_t)(0x30u + 128u);   /* NES X=$30, +128 bias → 0xB0 */
+    uint16_t nes_y = (uint16_t)((s_misc_scene ? 0x30u : 0x58u) + (uint16_t)slot_idx * 0x18u);
+    uint16_t sat_y = (uint16_t)(nes_y + 129u - FS_ROW_SHIFT*8u);   /* +128 SAT bias */
+    uint16_t sat_x = (uint16_t)((s_misc_scene ? 0x50u : 0x30u) + 128u);   /* NES X=$30, +128 bias → 0xB0 */
 
-    /* Per-slot tint matching NES Redux:
-     *   occupied slot → pal 2 (bright green Link)
-     *   empty    slot → pal 3 (faded dark-olive Link) — Redux menu_tweaks.asm
-     *                   :397-404 writes $19/$17/$07 to sprite pal buf for any
-     *                   slot where $0633,y == 0.
-     * Per-slot color (blue slot 1 / red slot 2) still deferred — all 3 occupied
-     * slots share pal 2 because Gen has only 4 CRAM palettes. */
     uint8_t sat_entry = (uint8_t)(1u + slot_idx);
-    uint16_t palette = fs_sram_slot_occupied(slot_idx)
-                     ? (uint16_t)PAL_BG_LINK_BRIGHT
-                     : (uint16_t)PAL_BG_LINK_FADED;
+    uint16_t palette = (uint16_t)(slot_idx + 1u);
+    /* Link pixels use entries 4..6, leaving BG LIFE and cursor colours
+     * independent in the same Genesis palette. Exact Redux NES colours. */
+    static const unsigned short bright[3][3] = {
+        {0x00E6u, 0x008Eu, 0x0048u},
+        {0x0E88u, 0x008Eu, 0x0048u},
+        {0x002Cu, 0x008Eu, 0x0048u}
+    };
+    static const unsigned short faded[3] = {0x0082u, 0x0048u, 0x0024u};
+    render_cram_open_write_byte((unsigned short)(palette * 32u + 8u));
+    render_vram_write_words((fs_sram_slot_occupied(slot_idx) || s_register_slot == slot_idx)
+                            ? bright[slot_idx] : faded, 3u);
 
     /* tile_attr: priority=0, palette=palette, no flip, tile=LINK_CHR_BASE.
      * Genesis tile_attr word: pri(15) | pal(14:13) | flipV(12) | flipH(11) | tile(10:0) */
@@ -227,19 +210,10 @@ void fs_render_slot(uint8_t slot_idx) {
  * ---------------------------------------------------------------------------
  */
 void fs_render_cursor(uint8_t row) {
-    /* NES slot Y for cursor (Mode1CursorSpriteYs, Z_02.asm:2591-2592) +
-     * v3 Redux extension: PLAYERS row 25 → Y $C8, OPTIONS row 26 → Y $D0.
-     * (NT_row * 8 matches NES convention used for COPY/ERASE rows.) */
-    /* All Ys reduced by FS_ROW_SHIFT*8 (=24) vs NES original to match v3 menu shift.
-     * PLAYERS row = 23 (post-shift), OPTIONS row = 24. */
-    static const uint8_t cursor_ys[7] = {
-        0x44, 0x5C, 0x74, 0x90, 0xA0,    /* slot0..ERASE shifted up 24 */
-        0xB8,  /* PLAYERS — row 23 (Y = 23*8) */
-        0xC8   /* OPTIONS — row 25 (Y = 25*8); row 24 is visual gap */
-    };
-    if (row >= 7) return;
+    static const uint8_t cursor_ys[7] = {0x5C,0x74,0x8C,0xA8,0xB8,0xC8,0xD8};
+    if (row >= 7u) return;
 
-    uint16_t sat_y = (uint16_t)(cursor_ys[row] + 128u);
+    uint16_t sat_y = (uint16_t)(cursor_ys[row] + 129u - FS_ROW_SHIFT*8u);
     uint16_t sat_x = (uint16_t)(0x28u + 128u);   /* NES X=$28 */
 
     /* tile_attr: palette=PAL_BG_CURSOR (Gen pal 1, shared with BG attr 1), no flip, tile=HEART_CHR_BASE. */
@@ -269,7 +243,7 @@ void fs_render_all_slots(void) {
  * 17, hearts top row cols 18..25 (hearts 8..15) and $2132+$60*(k+1) =
  * row 12+3k cols 18..25 (hearts 0..7). Death count (Mode1DeathCounts-
  * TransferBuf) at row 12+3k col 9, 3 chars. Genesis rows = NES - 3
- * (FS_ROW_SHIFT). Palettes follow the static layout: text pal 0, LIFE
+ * the cropped viewport. Palettes follow the static layout: text pal 0, LIFE
  * (hearts) pal 1.
  * ---------------------------------------------------------------------------
  */
@@ -280,12 +254,11 @@ void fs_render_all_slots(void) {
 #define PAL_TEXT        0u
 #define PAL_LIFE        1u
 
-static void render_side_only_row(unsigned short row);
-static uint16_t slot_row(uint8_t slot) { return (uint16_t)(8u + 3u * slot); }
+static uint16_t slot_row(uint8_t slot) { return (uint16_t)((s_misc_scene ? 6u : 11u) + 3u * slot); }
 
 static void put_cell(uint16_t row, uint16_t col, uint16_t tile, uint8_t pal)
 {
-    render_vram_open_write((unsigned short)(PLANE_A_BASE + row * 64u + col * 2u));
+    render_vram_open_write((unsigned short)(PLANE_A_BASE + (row-FS_ROW_SHIFT) * 64u + col * 2u));
     render_vram_write_word((uint16_t)(((uint16_t)pal & 3u) << 13) | tile);
 }
 
@@ -297,7 +270,6 @@ static uint16_t glyph(uint8_t nes_code)
     case 0x00: return 0x105u;
     case 0x62: return 0x106u;
     case 0x63: return 0x107u;
-    case 0x2B: return 0x108u;
     default:   return nes_code;
     }
 }
@@ -317,59 +289,57 @@ void fs_render_slot_text(uint8_t slot)
 {
     const volatile unsigned char *name = save_game_slot_name(slot);
     uint8_t active = save_game_slot_active(slot);
-    uint8_t hv = save_game_slot_hearts(slot);
-    uint8_t hp = save_game_slot_heart_partial(slot);
     uint16_t row = slot_row(slot);
     uint8_t i;
+    if (s_misc_scene) {
+        for (i = 0u; i < 8u; ++i)
+            put_cell(row, (uint16_t)(13u + i), active ? glyph(name[i]) : 0x24u, PAL_TEXT);
+        return;
+    }
 
     for (i = 0u; i < 8u; ++i)
         put_cell(row, (uint16_t)(SLOT_NAME_COL + i), active ? glyph(name[i]) : 0x24u, PAL_TEXT);
-    put_cell(row, SLOT_DASH_COL, TILE_DASH, PAL_TEXT);
+    put_cell(row, SLOT_DASH_COL, 0x24u, PAL_TEXT);
     for (i = 0u; i < 8u; ++i) {
         put_cell(row, (uint16_t)(SLOT_HEART_COL + i),
-                 active ? heart_tile(hv, hp, (uint8_t)(8u + i)) : 0x24u, PAL_LIFE);
+                 0x24u, PAL_LIFE);
         put_cell((uint16_t)(row + 1u), (uint16_t)(SLOT_HEART_COL + i),
-                 active ? heart_tile(hv, hp, i) : 0x24u, PAL_LIFE);
+                 0x24u, PAL_LIFE);
     }
     /* FormatDecimalByte: 3 digits, leading spaces; an inactive slot shows
      * blanks, an active one at least "0". */
     {
-        uint8_t d = save_game_slot_deaths(slot);
-        uint8_t h = (uint8_t)(d / 100u), t = (uint8_t)((d / 10u) % 10u), o = (uint8_t)(d % 10u);
-        put_cell((uint16_t)(row + 1u), SLOT_NAME_COL,       (active && h) ? glyph(h) : 0x24u, PAL_TEXT);
-        put_cell((uint16_t)(row + 1u), SLOT_NAME_COL + 1u,  (active && (h || t)) ? glyph(t) : 0x24u, PAL_TEXT);
-        put_cell((uint16_t)(row + 1u), SLOT_NAME_COL + 2u,  active ? glyph(o) : 0x24u, PAL_TEXT);
+        for (i=0u;i<3u;i++) put_cell(row+1u,SLOT_NAME_COL+i,0x24u,0u);
     }
+    if (active) write_text(row,SLOT_HEART_COL,
+        save_game_slot_mode(slot)==SAVE_MODE_MD_REMIX ? "MD REMIX" : "ORIGINAL");
 }
 
 /* Name-entry cursor: SAT entry 4, heart tile under the current name
  * character (NES ModeEandFCursorSprites uses the same $F3 heart). */
 void fs_render_name_cursor(uint8_t show, uint8_t col, uint16_t row)
 {
-    uint16_t tile_attr = (uint16_t)((uint16_t)PAL_BG_CURSOR << 13) | (uint16_t)HEART_CHR_BASE;
-    if (!show) { sat_write(4u, 0u, 0u, tile_attr, 0u); return; }
-    sat_write(4u, (uint16_t)(row * 8u + 128u), 0x0000u, tile_attr, (uint16_t)(col * 8u + 128u));
+    s_name_col = col; s_name_row = row;
+    if (!show) { sat_write(4u,0u,0u,0u,0u); sat_write(5u,0u,0u,0u,0u); return; }
+    /* Redux register uses blinking block cursors, not another heart. */
+    sat_write(4u, (s_anim_clock & 8u) ? (uint16_t)(row*8u+128u-FS_ROW_SHIFT*8u) : 0u,
+              5u, (PAL_BG_CURSOR<<13)|0x10Du, (uint16_t)(col*8u+128u));
 }
 
 /* ---------------------------------------------------------------------------
  * T-099 name registration board (NES Mode $E, ModeE_CharMap Z_02.asm:1351):
- * 44 characters, 11 per row, 4 rows. Drawn inside the File Select border in
- * place of the COPY/ERASE/PLAYERS/OPTIONS rows while registering.
+ * 44 characters, 11 per row, 4 rows. Redux adds its own alphabet box.
  * ---------------------------------------------------------------------------
  */
 static const uint8_t k_char_map[44] = {
     0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14,
     0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
-    0x20, 0x21, 0x22, 0x23, 0x62, 0x63, 0x28, 0x29, 0x2A, 0x2B, 0x2C,
+    0x20, 0x21, 0x22, 0x23, 0x2F, 0x2C, 0x28, 0x29, 0x2A, 0x2B, 0x2E,
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x24
 };
-#define BOARD_TITLE_ROW 17u
-#define BOARD_ROW0      19u
+#define BOARD_TITLE_ROW 3u
+#define BOARD_ROW0      17u
 #define BOARD_COL0       6u
-static const uint8_t k_register_title[18] = {   /* REGISTER YOUR NAME */
-    0x1B, 0x0E, 0x10, 0x12, 0x1C, 0x1D, 0x0E, 0x1B, 0x24,
-    0x22, 0x18, 0x1E, 0x1B, 0x24, 0x17, 0x0A, 0x16, 0x0E
-};
 
 uint8_t fs_board_char(uint8_t idx) { return k_char_map[idx % 44u]; }
 
@@ -379,17 +349,150 @@ void fs_board_cell(uint8_t idx, uint8_t *col, uint16_t *row)
     *row = (uint16_t)(BOARD_ROW0 + 2u * (idx / 11u));
 }
 
-void fs_render_register_board(void)
-{
-    uint16_t r;
-    uint8_t i;
-    for (r = 16u; r <= 25u; ++r) render_side_only_row(r);
-    for (i = 0u; i < 18u; ++i) put_cell(BOARD_TITLE_ROW, (uint16_t)(7u + i), k_register_title[i], PAL_TEXT);
-    for (i = 0u; i < 44u; ++i) {
-        uint8_t c; uint16_t row;
-        fs_board_cell(i, &c, &row);
-        put_cell(row, c, glyph(k_char_map[i]), PAL_TEXT);
+static uint8_t ascii_tile(char c) {
+    if (c >= 'A' && c <= 'Z') return (uint8_t)(c-'A'+0x0Au);
+    if (c >= '0' && c <= '9') return (uint8_t)(c-'0');
+    if (c == '?') return 0x2Eu;
+    if (c == '\'') return 0x2Au; /* Existing font apostrophe. */
+    return 0x24u;
+}
+static void write_text(uint16_t row, uint8_t col, const char *text) {
+    while (*text && col < 32u) put_cell(row,col++,glyph(ascii_tile(*text++)),0u);
+}
+static void box(uint8_t left, uint8_t right, uint16_t top, uint16_t bottom) {
+    for (uint16_t r=top;r<=bottom;r++) {
+        put_cell(r,left, r==top ? 0x69u : r==bottom ? 0x6Eu : 0x6Cu,0u);
+        put_cell(r,right,r==top ? 0x6Bu : r==bottom ? 0x6Du : 0x6Cu,0u);
+        if (r==top || r==bottom)
+            for (uint8_t c=(uint8_t)(left+1u);c<right;c++) put_cell(r,c,0x6Au,0u);
     }
+}
+static void misc_title(const char *title) {
+    for (uint8_t c=4u;c<29u;c++) put_cell(3u,c,0x6Au,0u);
+    uint8_t len=0; while(title[len]) len++;
+    uint8_t col=len==18u ? 8u : (uint8_t)((33u-len)/2u);
+    put_cell(3u,(uint16_t)(col-1u),0x24u,0u);
+    write_text(3u,col,title);
+    put_cell(3u,(uint16_t)(col+len),0x24u,0u);
+}
+void fs_render_register_board(uint8_t slot)
+{
+    fs_render_clear_screen();
+    s_misc_scene=1u; s_misc_copy=1u; s_register_slot=slot; s_anim_clock=0u;
+    misc_title("REGISTER YOUR NAME");
+    box(4u,28u,15u,25u);
+    for (uint8_t i=0;i<44u;i++) {
+        uint8_t col; uint16_t row; fs_board_cell(i,&col,&row);
+        put_cell(row,col,glyph(k_char_map[i]),0u);
+    }
+    fs_render_all_slots();
+    fs_render_misc_cursor(slot);
+}
+void fs_render_misc_menu(uint8_t copy)
+{
+    fs_render_clear_screen();
+    s_misc_scene=1u; s_misc_copy=copy; s_register_slot=0xFFu;
+    /* Blue erase cursor, pink copy cursor: Redux file_select.asm $9EB0. */
+    static const unsigned short blue_cursor[3]={0x060Cu,0x0C02u,0x0EEEu};
+    render_cram_open_write_byte(14u);
+    render_vram_write_words(blue_cursor,3u);
+    misc_title(copy ? "COPY SAVE" : "ERASE SAVE");
+    fs_render_all_slots();
+    write_text(15u,10u,"QUIT");
+    box(6u,26u,18u,26u);
+    fs_render_prompt(copy ? "COPY WHICH SAVE?" : "ERASE WHICH SAVE?");
+}
+void fs_render_rename_menu(void) {
+    misc_title("RENAME SAVE");
+    fs_render_prompt("RENAME WHICH SAVE?");
+}
+void fs_render_rename_board(uint8_t slot) {
+    (void)slot;
+    misc_title("RENAME YOUR FILE");
+    write_text(27u,3u,"A WRITE B NEXT C CANCEL");
+}
+void fs_render_page(const char *title) {
+    fs_render_clear_screen();
+    for (uint8_t i=0u;i<80u;i++) sat_clear_entry(i);
+    s_misc_scene=1u; s_register_slot=0xFFu; s_anim_clock=0u;
+    misc_title(title); box(3u,29u,5u,28u);
+}
+void fs_render_text(uint16_t row,uint8_t col,const char *text) { write_text(row,col,text); }
+void fs_render_file_identity(uint8_t slot) {
+    const volatile unsigned char *name=save_game_slot_name(slot);
+    for (uint8_t i=0u;i<8u;i++) put_cell(6u,18u+i,glyph(name[i]),0u);
+}
+void fs_render_page_cursor(uint16_t row) {
+    sat_write(0u,(uint16_t)((row-FS_ROW_SHIFT)*8u+128u),0u,
+              (uint16_t)((PAL_BG_CURSOR<<13)|HEART_CHR_BASE),160u);
+}
+void fs_render_quest_stats(uint8_t slot,uint8_t quest,uint16_t row) {
+    uint8_t h=save_game_quest_stat(slot,quest,0u),p=save_game_quest_stat(slot,quest,1u);
+    uint8_t d=save_game_quest_stat(slot,quest,2u);
+    char deaths[]="DEATHS 000";
+    deaths[7]=(char)('0'+d/100u); deaths[8]=(char)('0'+d/10u%10u); deaths[9]=(char)('0'+d%10u);
+    write_text(row,7u,deaths);
+    for (uint8_t i=0u;i<16u;i++) put_cell(row+1u,7u+i,heart_tile(h,p,i),PAL_LIFE);
+}
+void fs_render_prompt(const char *prompt) {
+    for (uint8_t c=7u;c<26u;c++) put_cell(20u,c,0x24u,0u);
+    write_text(20u,8u,prompt);
+}
+void fs_render_misc_cursor(uint8_t row) {
+    if (row > 3u) return;
+    sat_write(0u,(uint16_t)(0x33u+row*24u+129u-FS_ROW_SHIFT*8u),1u,
+              (uint16_t)(((s_misc_copy ? PAL_BG_CURSOR : 0u)<<13)|HEART_CHR_BASE),0x45u+128u);
+}
+static void slot_name_colour(uint8_t slot, uint8_t pal) {
+    const volatile unsigned char *name=save_game_slot_name(slot);
+    for (uint8_t i=0u;i<8u;i++)
+        put_cell((uint16_t)(6u+slot*3u),(uint16_t)(13u+i),
+                 save_game_slot_active(slot) ? glyph(name[i]) : 0x24u,pal);
+}
+static void misc_marker(uint8_t entry,uint8_t slot,uint8_t pal,uint8_t next) {
+    sat_write(entry,(uint16_t)(0x33u+slot*24u+129u-FS_ROW_SHIFT*8u),next,
+              (uint16_t)((pal<<13)|HEART_CHR_BASE),0x45u+128u);
+}
+void fs_render_copy_destination(uint8_t source) {
+    render_cram_open_write_byte(66u); render_vram_write_word(0x002Cu);
+    slot_name_colour(source,2u);
+    /* File-coloured fixed marker remains at the selected copy source. */
+    static const unsigned short bright[3][3]={
+        {0x00E6u,0x008Eu,0x0048u},{0x0E88u,0x008Eu,0x0048u},{0x002Cu,0x008Eu,0x0048u}};
+    render_cram_open_write_byte(14u);
+    render_vram_write_words(bright[source],3u);
+    misc_marker(4u,source,0u,0u);
+}
+void fs_render_confirmation(const char *prompt, uint8_t choice, uint8_t copy,
+                            uint8_t source, uint8_t destination) {
+    fs_render_prompt(prompt);
+    for (uint8_t c=7u;c<26u;c++) {
+        put_cell(22u,c,0x24u,0u); put_cell(24u,c,0x24u,0u);
+    }
+    write_text(22u,11u,"OKAY"); write_text(24u,11u,"QUIT");
+    /* Grey target sprite/name and coloured file digits from Redux confirmation. */
+    static const unsigned short gray[3]={0x0AAAu,0x0EEEu,0x0666u};
+    render_cram_open_write_byte((unsigned short)((destination+1u)*32u+8u));
+    render_vram_write_words(gray,3u);
+    render_cram_open_write_byte(98u); render_vram_write_word(0x0666u);
+    slot_name_colour(destination,3u);
+    render_cram_open_write_byte(66u); render_vram_write_word(0x002Cu);
+    if (copy) {
+        fs_render_copy_destination(source);
+        render_cram_open_write_byte(34u); render_vram_write_word(0x00A0u); /* Redux BG $1A. */
+        for (uint8_t c=12u;c<20u;c++) put_cell(20u,c,glyph(ascii_tile(prompt[c-8u])),2u);
+        for (uint8_t c=20u;c<24u;c++) put_cell(20u,c,glyph(ascii_tile(prompt[c-8u])),1u);
+        /* Keep source marker and a grey marker at the destination. */
+        render_cram_open_write_byte(78u);
+        render_vram_write_words(gray,3u);
+        misc_marker(4u,source,0u,5u);
+        misc_marker(5u,destination,2u,0u);
+    } else {
+        for (uint8_t c=14u;c<22u;c++) put_cell(20u,c,glyph(ascii_tile(prompt[c-8u])),2u);
+        misc_marker(4u,destination,0u,0u);
+    }
+    sat_write(0u,(uint16_t)(0xAFu+choice*16u+129u-FS_ROW_SHIFT*8u),1u,
+              (uint16_t)(((copy ? PAL_BG_CURSOR : 0u)<<13)|HEART_CHR_BASE),0x4Cu+128u);
 }
 
 /* Name field while typing: the chosen slot's name row, from a buffer. */
@@ -397,114 +500,36 @@ void fs_render_name_field(uint8_t slot, const uint8_t *name)
 {
     uint8_t i;
     for (i = 0u; i < 8u; ++i)
-        put_cell(slot_row(slot), (uint16_t)(SLOT_NAME_COL + i), glyph(name[i]), PAL_TEXT);
+        put_cell(slot_row(slot), (uint16_t)(13u + i), glyph(name[i]), PAL_TEXT);
 }
 
 uint16_t fs_slot_name_row(uint8_t slot) { return slot_row(slot); }
 
-/* Board cursor: the heart sprite (SAT entry 0) left of the character. */
+/* Blinking block over the selected board character; independent heart marks file. */
 void fs_render_board_cursor(uint8_t idx)
 {
-    uint8_t c; uint16_t row;
-    uint16_t tile_attr = (uint16_t)((uint16_t)PAL_BG_CURSOR << 13) | (uint16_t)HEART_CHR_BASE;
-    fs_board_cell(idx, &c, &row);
-    sat_write(0u, (uint16_t)(row * 8u + 128u), 0x0001u, tile_attr, (uint16_t)((c - 1u) * 8u + 128u));
+    uint8_t c; uint16_t row; s_board_index=idx;
+    fs_board_cell(idx,&c,&row);
+    sat_write(5u,(s_anim_clock&8u) ? (uint16_t)(row*8u+128u-FS_ROW_SHIFT*8u) : 0u,
+              0u,(PAL_BG_CURSOR<<13)|0x10Du,(uint16_t)(c*8u+128u));
 }
-
-/* ---------------------------------------------------------------------------
- * v3 Redux extension: PLAYERS + OPTIONS rows.
- *
- * NES capture has 5 menu rows (3 slots + COPY + ERASE). Redux extends FS with
- * PLAYERS (cycle 1..4) and OPTIONS (submenu, v5). These rows aren't in the
- * captured nametable, so we render them in C using existing font tiles
- * (A-Z at NES BG tiles 0x0A-0x23, digits 0-9 at 0x00-0x09).
- *
- * Layout (NT cells, palette 0):
- *   row 25 col 4..10 = "PLAYERS", col 13 = digit (1..4)
- *   row 26 col 4..10 = "OPTIONS"
- *
- * These match NES letter encoding so the same fs_bg_chr_full block renders
- * them correctly without extra CHR upload.
- * ---------------------------------------------------------------------------
- */
-/* v3 row layout (post FS_ROW_SHIFT=3):
- *   row 22 = side-rails only (replaces shifted-down NES bottom border)
- *   row 23 = PLAYERS  N
- *   row 24 = side-rails only (visual gap between PLAYERS and OPTIONS)
- *   row 25 = OPTIONS
- *   row 26 = bottom border line
- * All inside the extended border. */
-#define PLAYERS_ROW   23u
-#define OPTIONS_ROW   25u
-#define LABEL_COL      7u   /* +1 col right vs original NES NT for COPY/ERASE row alignment */
-#define DIGIT_COL     16u   /* "PLAYERS" at col 7..13, 2 spaces, digit at col 16 */
-#define EXTRA_PAL      0u   /* palette 0 — same as COPY/ERASE labels */
-
-static const uint8_t TILE_PLAYERS[7] = { 0x19, 0x15, 0x0A, 0x22, 0x0E, 0x1B, 0x1C };  /* P L A Y E R S */
-static const uint8_t TILE_OPTIONS[7] = { 0x18, 0x19, 0x1D, 0x12, 0x18, 0x17, 0x1C };  /* O P T I O N S */
-#define TILE_SPACE       0x24u
-#define TILE_BORDER_VERT 0x6Cu  /* NES side-border tile (col 3 + col 28 in rows 4..24) */
-#define TILE_BORDER_BL   0x6Eu  /* NES bottom-left corner tile (row 25 col 3) */
-#define TILE_BORDER_HORIZ 0x6Au /* NES bottom horizontal tile (row 25 cols 4..27) */
-#define TILE_BORDER_BR   0x6Du  /* NES bottom-right corner tile (row 25 col 28) */
-#define BORDER_LEFT_COL   3u
-#define BORDER_RIGHT_COL 28u
-#define BOTTOM_BORDER_ROW 26u   /* v3: extended bottom border row (post-shift target) */
-
-static unsigned short s_extra_row_buf[32];
-
-/* Build a row with side borders + label text. Empty cells = space; cols 3 + 28
- * are the vertical border tiles so the box extends to enclose the text. */
-static void render_label_row(unsigned short row, const uint8_t *text7) {
-    for (unsigned short c = 0; c < 32; c++) s_extra_row_buf[c] = (uint16_t)TILE_SPACE;
-    s_extra_row_buf[BORDER_LEFT_COL]  = (uint16_t)TILE_BORDER_VERT;
-    s_extra_row_buf[BORDER_RIGHT_COL] = (uint16_t)TILE_BORDER_VERT;
-    for (unsigned short i = 0; i < 7u; i++) {
-        s_extra_row_buf[LABEL_COL + i] = (uint16_t)((EXTRA_PAL & 0x3u) << 13) | (uint16_t)text7[i];
+void fs_render_tick(uint8_t selected, uint8_t animate)
+{
+    if (s_register_slot != 0xFFu) {
+        s_anim_clock++;
+        fs_render_board_cursor(s_board_index);
+        fs_render_name_cursor(1u,s_name_col,s_name_row);
+        return;
     }
-    render_plane_write_row(PLANE_A_BASE, row, s_extra_row_buf, 32u);
-}
-
-/* Replace the bottom-border line that the shifted nametable wrote into row
- * (25 - SHIFT) = 22 with plain side borders, so PLAYERS/OPTIONS rows below it
- * are inside the enclosing box. */
-static void render_side_only_row(unsigned short row) {
-    for (unsigned short c = 0; c < 32; c++) s_extra_row_buf[c] = (uint16_t)TILE_SPACE;
-    s_extra_row_buf[BORDER_LEFT_COL]  = (uint16_t)TILE_BORDER_VERT;
-    s_extra_row_buf[BORDER_RIGHT_COL] = (uint16_t)TILE_BORDER_VERT;
-    render_plane_write_row(PLANE_A_BASE, row, s_extra_row_buf, 32u);
-}
-
-/* Write the closing bottom-border line: BL corner, horizontal, BR corner. */
-static void render_bottom_border_row(unsigned short row) {
-    for (unsigned short c = 0; c < 32; c++) s_extra_row_buf[c] = (uint16_t)TILE_SPACE;
-    s_extra_row_buf[BORDER_LEFT_COL]  = (uint16_t)TILE_BORDER_BL;
-    for (unsigned short c = BORDER_LEFT_COL + 1u; c < BORDER_RIGHT_COL; c++) {
-        s_extra_row_buf[c] = (uint16_t)TILE_BORDER_HORIZ;
+    uint8_t slot=(animate && selected<3u && fs_sram_slot_occupied(selected)) ? selected : 0xFFu;
+    if (slot != s_anim_slot) {
+        if (s_anim_slot<3u) fs_render_slot(s_anim_slot);
+        s_anim_slot=slot; s_anim_clock=0u;
     }
-    s_extra_row_buf[BORDER_RIGHT_COL] = (uint16_t)TILE_BORDER_BR;
-    render_plane_write_row(PLANE_A_BASE, row, s_extra_row_buf, 32u);
-}
-
-void fs_render_extra_rows(void) {
-    /* Erase the shifted bottom border that landed at row (NES 25 - SHIFT) = 22,
-     * insert a visual gap row 24 between PLAYERS and OPTIONS, extend the side
-     * rails through to row 25, and close the box with a bottom border row. */
-    render_side_only_row(22u);
-    render_label_row(PLAYERS_ROW, TILE_PLAYERS);
-    render_side_only_row(24u);                     /* gap row between PLAYERS and OPTIONS */
-    render_label_row(OPTIONS_ROW, TILE_OPTIONS);
-    render_bottom_border_row(BOTTOM_BORDER_ROW);
-}
-
-void fs_render_players_row(uint8_t value) {
-    /* Patch the digit cell at row PLAYERS_ROW col DIGIT_COL in-place.
-     * Range clamp 1..4 (caller already wraps, but be defensive).
-     * NES digit '1'..'4' = BG tile 0x01..0x04. */
-    if (value < 1u) value = 1u;
-    if (value > 4u) value = 4u;
-
-    unsigned short addr = (unsigned short)(PLANE_A_BASE + (PLAYERS_ROW * 64u) + (DIGIT_COL * 2u));
-    render_vram_open_write(addr);
-    render_vram_write_word((uint16_t)((EXTRA_PAL & 0x3u) << 13) | (uint16_t)value);
+    if (slot<3u && (++s_anim_clock & 7u)==0u) {
+        uint16_t tile=(uint16_t)(LINK_CHR_BASE | ((s_anim_clock&8u) ? 0x0800u : 0u));
+        sat_write((uint8_t)(slot+1u),(uint16_t)(0x58u+slot*24u+129u-FS_ROW_SHIFT*8u),
+                  (uint16_t)(0x0500u|((slot==2u)?4u:slot+2u)),
+                  (uint16_t)(((slot+1u)<<13)|tile),0x30u+128u);
+    }
 }

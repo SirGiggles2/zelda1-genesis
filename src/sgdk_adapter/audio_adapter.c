@@ -239,6 +239,77 @@ void audio_music_play(unsigned char song)
     music_play(song);
 }
 
+/* T-272: all compiled versions are independently playable, including
+ * built-in arrangements that generated NES/local routing can override.
+ * The future custom Quest-2 credits song has no asset/catalog entry yet. */
+static const char *sound_test_song_name(unsigned char song) {
+    switch (song) {
+    case 0x80u: return "TITLE";
+    case 1u: return "OVERWORLD";
+    case 0x40u: return "DUNGEON";
+    case 0x20u: return "LEVEL 9";
+    case 2u: return "GANON";
+    case 4u: return "LEVEL CLEARED";
+    case 6u: return "ZELDA RESCUED";
+    case 8u: return "ITEM GET";
+    case 0x10u: return "ORIGINAL ENDING";
+    default: return "MUSIC";
+    }
+}
+unsigned char audio_sound_test_count(void) {
+    unsigned char n=3u;
+#ifdef ZELDA_NES_MUSIC
+    n+=nes_music_count;
+#endif
+#ifdef ZELDA_LOCAL_MUSIC
+    n+=local_music_count;
+#endif
+    return n;
+}
+static const u8 *sound_test_blob(unsigned char index,unsigned char *song,const char **source) {
+    if (index<3u) {
+        *source=index==2u ? "CYBERDEOUS" : "INGLEBARD";
+        *song=index==0u ? 1u : 0x40u;
+        return index==0u ? ow_theme_xgm : index==1u ? uw_theme_xgm : uw_theme_cyberdeous_xgm;
+    }
+    index-=3u;
+#ifdef ZELDA_NES_MUSIC
+    if (index<nes_music_count) { *song=nes_music[index].song; *source="NES PORT"; return nes_music[index].xgm; }
+    index-=nes_music_count;
+#endif
+#ifdef ZELDA_LOCAL_MUSIC
+    if (index<local_music_count) { *song=local_music[index].song; *source="LOCAL VGM"; return local_music[index].xgm; }
+#endif
+    *song=0u; *source=""; return 0;
+}
+const char *audio_sound_test_name(unsigned char index) {
+    unsigned char song; const char *source;
+    if (index>=audio_sound_test_count()) return "";
+    if (index==0u) return "OVERWORLD ARRANGEMENT";
+    if (index==1u) return "DUNGEON ARRANGEMENT";
+    if (index==2u) return "DUNGEON REMIX";
+    (void)sound_test_blob(index,&song,&source);
+    return sound_test_song_name(song);
+}
+const char *audio_sound_test_source(unsigned char index) {
+    unsigned char song; const char *source;
+    (void)sound_test_blob(index,&song,&source); return source;
+}
+void audio_sound_test_play(unsigned char index) {
+    unsigned char song; const char *source;
+    const u8 *blob;
+    if (index>=audio_sound_test_count()) return;
+    blob=sound_test_blob(index,&song,&source);
+    audio_music_play(0u); /* Clear pending/resume event state before replay. */
+    if (!blob) { audio_music_play(song); return; }
+    if (!xgm_initialized) audio_xgm_init();
+    *music_song_ptr=song; *music_song_req_ptr=0u;
+    *xgm_owns_chip_ptr=1u;
+    s_current_xgm_song=song; s_nes_song_frames=0u; s_resume_xgm_song=0u;
+    if (audio_native_ram_base) audio_native_ram_base[0x0609u]=song;
+    XGM_startPlay(blob);
+}
+
 void audio_sfx_play(unsigned char sfx)
 {
     if (!xgm_initialized) audio_xgm_init();
