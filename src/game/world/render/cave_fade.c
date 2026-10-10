@@ -6,7 +6,6 @@
  */
 
 #include "cave_fade.h"
-#include "../circle_transition.h"
 #include "cave_palette.h"
 #include "ow_render.h"
 #include "render_abi.h"  /* render_vram_read_word, render_set_plane_a_word */
@@ -142,9 +141,8 @@ void cave_fade_begin_enter(cave_id_t cid, unsigned char entrance_tile)
     RAM(0x005Bu) = (cid == 0x6Eu) ? 0x0Cu : 0x0Bu;
     RAM(0x0604u) = 0x80u;
     s_pending_cid   = cid;
-    /* MD Remix's iris replaces the old descend presentation; the shared
-     * cave load/emerge/reset still runs behind the fully closed iris. */
-    s_entrance_tile = circle_transition_enabled() ? 0x70u : entrance_tile;
+    /* Keep the native entrance walk; MD Remix closes its iris afterward. */
+    s_entrance_tile = entrance_tile;
     s_frame_counter = 0u;
     s_step_idx      = 0u;
     s_phase         = CAVE_FADE_LINK_DESCEND;

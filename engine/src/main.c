@@ -1037,6 +1037,10 @@ static void playfield_blank(void);
 static void cave_fade_load_blank_handler(unsigned char stage)
 {
     if (stage == 0u) {
+        /* The native stairs walk has finished. Close around the entrance
+         * before the shared loader replaces the scene. */
+        circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
+                                 s_active_scroll_x,s_active_scroll_y);
         /* Sprite changes reach VRAM at the next VBlank, one frame after
          * the plane writes below: hide Link a tick earlier so both show
          * on the same frame. NES enters mode $0B (cave) here and stays
@@ -3497,8 +3501,6 @@ static void end_prepare_mode(void)
 void roomrom_main_begin_level_entry(const rr_warp_outcome_t *out)
 {
     unsigned char tile;
-    circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
-                             s_active_scroll_x,s_active_scroll_y);
     s_lvl_out = *out;
     /* Z_05.asm @LoadLevel: CaveSourceRoomId = the OW room of the entrance
      * (a Continue in the OW after the level starts there). */
@@ -3517,7 +3519,7 @@ void roomrom_main_begin_level_entry(const rr_warp_outcome_t *out)
     nes_ram[0x0012u] = 0x10u;
     end_prepare_mode();
     s_lvl_target_y = (unsigned char)players[0].y;
-    if (tile == 0x24u && !circle_transition_enabled()) {
+    if (tile == 0x24u) {
         s_lvl_target_y = (unsigned char)(players[0].y + 0x10);
     }
     s_lvl_phase = LVL_STAIRS;
@@ -3920,6 +3922,8 @@ stepped_out:
         if ((unsigned char)players[0].y != s_lvl_target_y) return;
         /* T-171: mode 2's first frame (k_level_enter_tl frame 0): the
          * stairs end here; InitMode2 runs from the next NMI. */
+        circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
+                                 s_active_scroll_x,s_active_scroll_y);
         nes_ram[0x0012u] = 0x02u;
         nes_ram[0x0013u] = 0u;
         nes_ram[0x0011u] = 0u;
@@ -4463,8 +4467,6 @@ static unsigned char play_update_objects(void)
             cave_fade_set_callbacks(&k_cave_fade_callbacks);
             nes_ram[0x0012u] = 0x10u;         /* T-011: NES mode $10 stairs */
             end_prepare_mode();
-            circle_transition_close((short)(players[0].x + 8),(short)(players[0].y + 1),
-                                     s_active_scroll_x,s_active_scroll_y);
             cave_fade_begin_enter(cid, standing_tile);
             inventory_rupee_tick(nes_ram[0x0015u]); /* @FinishUpdatePlay */
             return 1u;
