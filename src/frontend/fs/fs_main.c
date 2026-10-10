@@ -20,6 +20,7 @@ extern void music_play(unsigned char bit);
  * (genesis_shell.asm:681) clears SongRequest before Mode 1. Call kept so call
  * site exists if the design ever changes. */
 #define SONG_FS_BIT  0x00
+unsigned char g_fs_back_requested;
 
 /* Generated assets — defined in src/gen/. */
 extern const uint8_t  fs_bg_chr_full[];        /* 242 tiles × 32 bytes = 7744 bytes */
@@ -46,6 +47,7 @@ extern const unsigned char common_chr[];       /* data/chr/common.c (ROM-extract
  *   Tile 0x104        Heart cursor CHR
  */
 static void fs_init(void) {
+    g_fs_back_requested=0u;
     /* T-204: File Select owns a stationary viewport. Title/story callers
      * may leave either plane scrolled; keep uploads and the initial draw
      * hidden until this scene is complete. */
@@ -200,11 +202,13 @@ static uint8_t s_confirm_choice;
 static uint8_t s_new_mode;
 static uint8_t s_file_slot, s_file_row;
 static uint8_t s_sound_row;
-static void sound_redraw(void) {
+static void sound_redraw(uint8_t full) {
     uint8_t start=(uint8_t)((s_sound_row/7u)*7u),count=audio_sound_test_count();
-    fs_render_page("SOUND TEST");
+    if (full) fs_render_page("SOUND TEST");
+    for (uint8_t i=0u;i<7u;i++) fs_render_text(8u+2u*i,6u,"                        ");
     for (uint8_t i=0u;i<7u && start+i<count;i++)
         fs_render_text(8u+2u*i,6u,audio_sound_test_name(start+i));
+    fs_render_text(23u,6u,"                        ");
     fs_render_text(23u,6u,audio_sound_test_source(s_sound_row));
     fs_render_text(25u,6u,"A PLAY START STOP");
     fs_render_text(27u,6u,"B OR C BACK");
@@ -219,19 +223,23 @@ static void sound_step(uint8_t edge) {
     if (edge&FS_BTN_DOWN) s_sound_row=(uint8_t)((s_sound_row+1u)%count);
     if (edge&FS_BTN_A) audio_sound_test_play(s_sound_row);
     if (edge&FS_BTN_START) audio_music_play(0u);
-    if (edge) sound_redraw();
+    if (edge&(FS_BTN_UP|FS_BTN_DOWN)) sound_redraw(0u);
 }
 
+static void mode_cursor(void) { fs_render_page_cursor(s_new_mode ? 14u : 10u); }
 static void mode_redraw(void) {
     fs_render_page("CHOOSE FILE MODE");
     fs_render_text(10u,7u,"ORIGINAL");
     fs_render_text(14u,7u,"MD REMIX");
     fs_render_text(20u,5u,"MODE LOCKS WHEN CREATED");
     fs_render_text(24u,6u,"A CREATE B BACK");
-    fs_render_page_cursor(s_new_mode ? 14u : 10u);
+    mode_cursor();
+}
+static void file_cursor(void) {
+    static const uint8_t rows[6]={8u,12u,16u,19u,21u,26u};
+    fs_render_page_cursor(rows[s_file_row]);
 }
 static void file_redraw(void) {
-    static const uint8_t rows[6]={8u,12u,16u,19u,21u,26u};
     char players[]="PLAYERS 1";
     players[8]=(char)('0'+s_fs_players_value);
     fs_render_page("SELECT QUEST");
@@ -247,7 +255,7 @@ static void file_redraw(void) {
     fs_render_text(19u,7u,players);
     fs_render_choice_text(21u,7u,"OPTIONS",save_game_slot_mode(s_file_slot));
     fs_render_text(26u,7u,"BACK");
-    fs_render_page_cursor(rows[s_file_row]);
+    file_cursor();
 }
 static void file_enter(uint8_t slot) {
     s_file_slot=slot; s_file_row=save_game_slot_quest(slot);
@@ -273,6 +281,8 @@ static void file_step(uint8_t edge) {
         if (players!=s_fs_players_value) {
             s_fs_players_value=players;
             save_game_set_players(s_file_slot,players);
+            char text[]="PLAYERS 1"; text[8]=(char)('0'+players);
+            fs_render_text(19u,7u,text);
         }
     }
     if (edge&(FS_BTN_A|FS_BTN_START)) {
@@ -282,7 +292,7 @@ static void file_step(uint8_t edge) {
             s_fs_phase=FS_OPTIONS; fs_options_enter(); return;
         } else if (s_file_row==5u) { s_fs_cursor=s_file_slot; s_fs_phase=FS_LOAD; return; }
     }
-    if (edge) file_redraw();
+    if (edge&(FS_BTN_UP|FS_BTN_DOWN)) file_cursor();
 }
 
 static void register_redraw(void) {
@@ -306,7 +316,7 @@ static void register_enter(uint8_t slot) {
 }
 
 static void register_step(uint8_t edge) {
-    if (edge & FS_BTN_C) {
+    if (edge & (FS_BTN_B|FS_BTN_C)) {
         s_fs_cursor = s_reg_rename ? FS_ROW_RENAME : s_reg_slot;
         s_fs_phase = FS_LOAD;
         return;
@@ -332,8 +342,6 @@ static void register_step(uint8_t edge) {
     if (edge & FS_BTN_DOWN)  s_reg_board = (uint8_t)((s_reg_board + 11u) % 44u);
     if (edge & FS_BTN_A) {                      /* ModeE_HandleAOrB: A writes */
         s_reg_name[s_reg_pos] = fs_board_char(s_reg_board);
-        s_reg_pos = (uint8_t)((s_reg_pos + 1u) & 7u);
-    } else if (edge & FS_BTN_B) {               /* B only moves the cursor */
         s_reg_pos = (uint8_t)((s_reg_pos + 1u) & 7u);
     }
     if (edge) register_redraw();
@@ -407,7 +415,7 @@ static void fs_input_dispatch(uint8_t edge) {
         if (edge&(FS_BTN_B|FS_BTN_C)) {
             s_fs_phase=FS_REGISTER; fs_render_register_board(s_reg_slot); register_redraw(); return;
         }
-        if (edge&(FS_BTN_UP|FS_BTN_DOWN|FS_BTN_LEFT|FS_BTN_RIGHT)) { s_new_mode^=1u; mode_redraw(); }
+        if (edge&(FS_BTN_UP|FS_BTN_DOWN|FS_BTN_LEFT|FS_BTN_RIGHT)) { s_new_mode^=1u; mode_cursor(); }
         if (edge&(FS_BTN_A|FS_BTN_START)) {
             if (save_game_register_mode(s_reg_slot,s_reg_name,s_new_mode)) file_enter(s_reg_slot);
         }
@@ -422,8 +430,9 @@ static void fs_input_dispatch(uint8_t edge) {
         s_fs_phase == FS_ERASE_PICK || s_fs_phase == FS_ERASE_CONFIRM ||
         s_fs_phase == FS_COPY_CONFIRM || s_fs_phase == FS_RENAME_PICK) { pick_step(edge); return; }
     if (s_fs_phase != FS_NAV) return;
+    if (edge & (FS_BTN_B|FS_BTN_C)) { g_fs_back_requested=1u; return; }
     if (s_fs_cursor==FS_ROW_SOUND && (edge&(FS_BTN_A|FS_BTN_START))) {
-        s_sound_row=0u; s_fs_phase=FS_SOUND_TEST; sound_redraw(); return;
+        s_sound_row=0u; s_fs_phase=FS_SOUND_TEST; sound_redraw(1u); return;
     }
     if ((edge & (FS_BTN_A|FS_BTN_START)) && s_fs_cursor >= FS_ROW_COPY) {
         s_fs_phase = s_fs_cursor == FS_ROW_RENAME ? FS_RENAME_PICK :
@@ -471,6 +480,7 @@ void fs_main(void) {
         fs_phase_step();
         fs_input_dispatch(fs_input_pressed());
         fs_render_tick(s_fs_cursor,s_fs_phase==FS_NAV);
+        if (g_fs_back_requested) return;
     }
 }
 

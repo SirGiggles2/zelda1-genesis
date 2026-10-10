@@ -15,7 +15,7 @@ extern const uint8_t  fs_border_chr[];
 
 /* Palette 0: BG text/border. Palette 1: LIFE entries 0..3 and heart
  * cursor entries 7..9. Each slot uses its own palette 1..3, entries 4..6,
- * so bright green/blue/red and faded colours remain independent. */
+ * so occupied green and faded colours remain independent on menu 1. */
 #define PAL_BG_CURSOR 1u
 
 #define PLANE_A_BASE  0xC000
@@ -179,7 +179,7 @@ void fs_render_slot(uint8_t slot_idx) {
     static const unsigned short faded[3] = {0x0082u, 0x0048u, 0x0024u};
     render_cram_open_write_byte((unsigned short)(palette * 32u + 8u));
     render_vram_write_words((fs_sram_slot_occupied(slot_idx) || s_register_slot == slot_idx)
-                            ? bright[slot_idx] : faded, 3u);
+                            ? bright[s_misc_scene ? slot_idx : 0u] : faded, 3u);
 
     /* tile_attr: priority=0, palette=palette, no flip, tile=LINK_CHR_BASE.
      * Genesis tile_attr word: pri(15) | pal(14:13) | flipV(12) | flipH(11) | tile(10:0) */
@@ -387,6 +387,7 @@ void fs_render_register_board(uint8_t slot)
     }
     fs_render_all_slots();
     fs_render_misc_cursor(slot);
+    write_text(27u,3u,"A WRITE B BACK START DONE");
 }
 void fs_render_misc_menu(uint8_t copy)
 {
@@ -409,7 +410,7 @@ void fs_render_rename_menu(void) {
 void fs_render_rename_board(uint8_t slot) {
     (void)slot;
     misc_title("RENAME YOUR FILE");
-    write_text(27u,3u,"A WRITE B NEXT C CANCEL");
+    write_text(27u,3u,"A WRITE B BACK START DONE");
 }
 void fs_render_page(const char *title) {
     fs_render_clear_screen();

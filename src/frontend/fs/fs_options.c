@@ -3,7 +3,7 @@
  * Drain Rule D1 stance: GREENFIELD. Layered on top of options_runtime
  * (Task 9.1) and options_persistence (Task 9.2). Owns no SRAM region;
  * commits live state via options_persistence_commit() when user
- * presses B or A on the SAVE row.
+ * accepts SAVE with A or Start; B returns without committing.
  */
 
 #include "fs_options.h"
@@ -108,7 +108,10 @@ static void apply_right(uint8_t row)
 
 void fs_options_step(uint8_t edge)
 {
-    if (edge & FS_BTN_C) { exit_to_nav(0u); return; }
+    if (edge & (FS_BTN_B|FS_BTN_C)) {
+        if (edge & FS_BTN_B) PROBE[11] = (unsigned char)(PROBE[11] + 1u);
+        exit_to_nav(0u); return;
+    }
     if (edge & FS_BTN_UP) {
         if (s_cursor > 0u) {
             s_cursor--;
@@ -148,14 +151,9 @@ void fs_options_step(uint8_t edge)
             fs_options_render_row_value(s_cursor);
         }
     }
-    if (edge & FS_BTN_B) {
-        PROBE[11] = (unsigned char)(PROBE[11] + 1u);
-        exit_to_nav(1u);
-        return;
-    }
     if (edge & FS_BTN_START) {
         PROBE[12] = (unsigned char)(PROBE[12] + 1u);
-        exit_to_nav(0u);
+        exit_to_nav(1u);
         return;
     }
 }

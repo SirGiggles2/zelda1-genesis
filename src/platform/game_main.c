@@ -24,6 +24,7 @@
  * in this TU. The three symbols are stable and plain. */
 extern void fs_enter(void);
 extern void fs_tick(void);
+extern unsigned char g_fs_back_requested;
 extern unsigned char g_fs_handoff_requested;
 extern unsigned char g_fs_handoff_slot;
 
@@ -163,11 +164,11 @@ static void debug_poll_title(void)
     intro_phase_step();
 
     joy = JOY_readJoypad(JOY_1);
-    /* Start enters File Select. ABC+Start is handled by state_dump_poll
+    /* A or Start enters File Select. ABC+Start is handled by state_dump_poll
      * above; no title shortcut bypasses the normal new/save-game path. */
     {
-        unsigned char start_now  = (joy & BUTTON_START) ? 1u : 0u;
-        unsigned char start_prev = (s_prev_joy & BUTTON_START) ? 1u : 0u;
+        unsigned char start_now  = (joy & (BUTTON_A|BUTTON_START)) ? 1u : 0u;
+        unsigned char start_prev = (s_prev_joy & (BUTTON_A|BUTTON_START)) ? 1u : 0u;
         if (start_now && !start_prev)
         {
             s_prev_joy = joy;
@@ -294,6 +295,12 @@ int debug_main_after_a4(bool hardReset)
             ++s_frame;
             state_dump_poll(STATE_DUMP_CTX_FS);
             fs_tick();
+            if (g_fs_back_requested) {
+                g_fs_back_requested=0u;
+                debug_enter_title();
+                s_prev_joy=JOY_readJoypad(JOY_1);
+                continue;
+            }
 
             /* The File Select sets this when the player commits to a
              * slot; CurSaveSlot ($0016) is already seeded by then. This
