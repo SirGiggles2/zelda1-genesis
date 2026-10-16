@@ -592,11 +592,35 @@ static void set_bg_scroll(short h_scroll, short v_scroll)
  * (v_scroll_blank_other_slot) and plane B looks at it (all blank) until
  * the next horizontal scroll or pause, which set B back to A. */
 static u8 s_b_blank_col = 0xFFu;   /* slot column base plane B shows, or none */
+/* T-172: the blank is 28 plane rows of 32 cells, ~147 lines of VDP port
+ * writes in active display (V counter, t003_digdogger_revisit L? $24
+ * north edge): done in the edge tick it pushed that tick past VBlank.
+ * The NES scroll leaves the camera at rest for mode 6 and mode 7 Sub0-2,
+ * and while it rests plane B at plane A's scroll looks the same as the
+ * blank slot (same cells under A; under the HUD the cleared underlay),
+ * so the rows are written a few per tick there and B points at them once
+ * all are written; a camera move first writes all that remain. */
+#define B_BLANK_ROWS        28u
+#define B_BLANK_ROWS_STEP   4u
+static u8 s_b_blank_next = B_BLANK_ROWS;   /* next row to blank; 28 = none */
+static u8 s_b_blank_pend_col;
+static u16 s_b_blank_pend_tick;           /* s_frame_counter of the edge tick */
+
+static void b_blank_rows(u8 n)
+{
+    while (n-- && s_b_blank_next < B_BLANK_ROWS)
+        render_plane_fill_row(0u, s_b_blank_pend_col, s_b_blank_next++, 32u, 0u);
+    if (s_b_blank_next >= B_BLANK_ROWS) s_b_blank_col = s_b_blank_pend_col;
+}
 
 static void set_bg_scroll_with_sprites(short h_scroll, short v_scroll)
 {
     const u8 v = (u8)(s_scroll_state == SCROLL_V_DOWN || s_scroll_state == SCROLL_V_UP);
     if (s_scroll_hold) return;
+    if (v && s_b_blank_next < B_BLANK_ROWS &&
+        (u16)s_frame_counter != s_b_blank_pend_tick)
+        b_blank_rows((h_scroll == s_scroll_start_x && v_scroll == s_scroll_start_y)
+                     ? B_BLANK_ROWS_STEP : B_BLANK_ROWS);
     nes_ram[0x01FDu] = 0xFFu;   /* committed in VBlank */
     VDP_setHorizontalScrollVSync(BG_A, h_scroll);
     VDP_setVerticalScrollVSync(BG_A, v_scroll);
@@ -2618,6 +2642,7 @@ static void edge_load_or_clamp(void)
              * Clear only its HUD zone before the horizontal camera sees it. */
             clear_hud_underlay_for_slot(s_active_row_base, target_slot_x);
             s_b_blank_col = 0xFFu;       /* the other slot takes the room */
+            s_b_blank_next = B_BLANK_ROWS;
             /* H scroll within the active plane: render incoming into the
              * OTHER slot (cols 0..31 vs 32..63) and slide that plane. */
             set_room_render_target_plane(s_active_plane);
@@ -2634,12 +2659,11 @@ static void edge_load_or_clamp(void)
             set_room_render_target_plane(s_active_plane);
             /* T-168: blank view for plane B behind the HUD (see
              * set_bg_scroll_with_sprites): rows 0-27 of the other slot. */
-            {
-                const u8 base = roomrom_main_menu_col_base();
-                u16 r;
-                for (r = 0u; r < 28u; ++r) render_plane_fill_row(0u, base, r, 32u, 0u);
-                s_b_blank_col = base;
-            }
+            s_b_blank_col = 0xFFu;
+            s_b_blank_pend_col = roomrom_main_menu_col_base();
+            s_b_blank_pend_tick = (u16)s_frame_counter;
+            s_b_blank_next = 0u;
+            if (!nes_scroll_enabled()) b_blank_rows(B_BLANK_ROWS);   /* camera moves next tick */
             /* Active plane target: scrolls out. V_DOWN -> active scrolls
              * down (v_scroll +176 = view shifts down = plane content moves
              * up on screen, i.e. active room exits via top). V_UP mirrors. */
@@ -2716,6 +2740,7 @@ static void scroll_finalize_room(void)
 {
     u8 was_v_scroll = (u8)(s_scroll_state == SCROLL_V_DOWN ||
                            s_scroll_state == SCROLL_V_UP);
+    s_b_blank_next = B_BLANK_ROWS;   /* an unfinished blank is not shown */
     if (s_scroll_state == SCROLL_H_RIGHT ||
         s_scroll_state == SCROLL_H_LEFT) {
         s_active_slot_x ^= 1u;
