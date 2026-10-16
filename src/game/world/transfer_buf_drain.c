@@ -1,6 +1,7 @@
 /* transfer_buf_drain.c — see transfer_buf_drain.h for full task header. */
 
 #include "transfer_buf_drain.h"
+#include "../../state/game_profile.h"
 #include "world_state.h"          /* TRANSFER_BUF_POS, TRANSFER_BUF_BYTE */
 #include "bg_palette.h"           /* roomrom_bg_palette_nes_to_cram */
 #include "render_abi.h"           /* render_cram_write_color, render_set_plane_a_word */
@@ -9,16 +10,67 @@
 #include "../../../engine/src/engine_state.h" /* roomrom_main_current_scene */
 #include "render/ow_render.h"    /* roomrom_ow_room_render_set_tile */
 #include "../dungeon/uw_render.h"  /* roomrom_uw_room_render_palette_at */
+#include "../hud/hud_dispatch.h"    /* hud_status_bar_output */
 #include "../hud/hud_runtime.h"    /* roomrom_hud_status_bar_map_cue */
 #include "ending_render.h"
+#include "../../../engine/src/bg_sparse_chr.h"
 
 /* Plane-bridge: NES PPU nametable ($2000-$2FFF) writes mapped to
  * Genesis Plane A cells. Uses bg_sparse_tile_lut[nes_tile_id][sub_pal]
  * to translate NES tile id to Genesis VRAM slot. Sub-palette is fixed
  * at 0 for text writes (cave NPC dialogue, UW person text all use
  * sub-pal 0). HUD offset = +7 plane rows for playfield region. */
-extern const unsigned short bg_sparse_tile_lut[256][4];
 #define PLANE_BRIDGE_BLANK_TILE 0u
+
+/* NES source: TransferTileBuf / attribute writes retain NT pattern IDs.
+ * Drained C: this decoder and sparse BG upload owner.
+ * Coverage: FULL missing common-font palette pairs; Stance: EXTEND.
+ * The sparse atlas has no M..T/V palette2 and some punctuation copies.
+ * Keep its indices fixed; bias authenticated palette0 pixels on demand. */
+static unsigned char s_text_extra_valid[ROOMROM_TEXT_EXTRA_TILE_COUNT / 8u];
+_Static_assert(ROOMROM_TEXT_EXTRA_TILE_BASE >=
+    ROOMROM_CORE_BG_EXTRA_TILE_BASE + ROOMROM_CORE_BG_EXTRA_TILE_COUNT,
+    "text patterns overlap protected BG patterns");
+_Static_assert(ROOMROM_TEXT_EXTRA_TILE_BASE + ROOMROM_TEXT_EXTRA_TILE_COUNT <=
+    ROOMROM_SUBSCREEN_SPRITE_TILE_BASE, "text patterns overlap pause sprites");
+
+static unsigned short missing_font_word(unsigned char raw, unsigned char pal)
+{
+    unsigned char t, p, index = 0u;
+    unsigned short base;
+    const unsigned char *blob;
+    unsigned char pixels[32];
+    if (!game_profile_is_remix() || raw >= 0x30u ||
+        bg_sparse_tile_lut[raw][0] == 0xFFFFu) return PLANE_BRIDGE_BLANK_TILE;
+    for (t = 0u; t <= raw; ++t) {
+        if (bg_sparse_tile_lut[t][0] == 0xFFFFu) continue;
+        for (p = 1u; p < 4u; ++p) {
+            if (bg_sparse_tile_lut[t][p] != 0xFFFFu) continue;
+            if (t == raw && p == pal) goto found;
+            ++index;
+        }
+    }
+    return PLANE_BRIDGE_BLANK_TILE;
+found:
+    if (index >= ROOMROM_TEXT_EXTRA_TILE_COUNT) return PLANE_BRIDGE_BLANK_TILE;
+    base = (unsigned short)(ROOMROM_TEXT_EXTRA_TILE_BASE + index);
+    if (!(s_text_extra_valid[index >> 3] & (1u << (index & 7u)))) {
+        unsigned char i;
+        blob = roomrom_main_current_scene() == ROOMROM_MAIN_SCENE_UW
+            ? bg_sparse_chr_redux_uw : bg_sparse_chr_redux_ow;
+        blob += (unsigned short)(bg_sparse_tile_lut[raw][0] * 32u);
+        for (i = 0u; i < 32u; ++i) {
+            unsigned char hi = (unsigned char)(blob[i] >> 4);
+            unsigned char lo = (unsigned char)(blob[i] & 15u);
+            if (hi) hi = (unsigned char)(hi + pal * 4u);
+            if (lo) lo = (unsigned char)(lo + pal * 4u);
+            pixels[i] = (unsigned char)((hi << 4) | lo);
+        }
+        render_chr_upload((unsigned short)(base * 32u), pixels, 32u);
+        s_text_extra_valid[index >> 3] |= (unsigned char)(1u << (index & 7u));
+    }
+    return base;
+}
 
 /* NES source: Z_06 CellarAttrsTransferBuf, Z_05 CopyNextRow.
  * Drained C: this active transfer decoder and OW column renderer.
@@ -30,7 +82,7 @@ static unsigned short playfield_tile_word(unsigned char raw, unsigned char pal)
     unsigned short slot;
     if (RAM(0x0012u) == 9u) return roomrom_cellar_tile_word(raw);
     slot = bg_sparse_tile_lut[raw][pal];
-    return slot == 0xFFFFu ? PLANE_BRIDGE_BLANK_TILE : ROOMROM_BG_TILE_BASE + slot;
+    return slot == 0xFFFFu ? missing_font_word(raw, pal) : ROOMROM_BG_TILE_BASE + slot;
 }
 
 /* Maximum buffer span. NES NMI clears DynTileBuf and resets length
@@ -129,6 +181,10 @@ static const unsigned char k_ghost_row7[]       = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 
 static const unsigned char k_green_bg_row7[]    = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x1Au, 0x37u, 0x12u, 0xFFu }; /* $22 */
 static const unsigned char k_brown_bg_row7[]    = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x17u, 0x37u, 0x12u, 0xFFu }; /* $24 */
 static const unsigned char k_ganon_row7[]       = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x16u, 0x2Cu, 0x3Cu, 0xFFu }; /* $36 */
+/* Redux gfx/palettes.asm bank6 $A205, verified live native room entry.
+ * D1: source Z_06:GanonPaletteTransferBuf; drained C this decoder;
+ * coverage PARTIAL (Original static rows adopted); stance EXTEND. */
+static const unsigned char k_redux_ganon_row7[] = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x06u, 0x22u, 0x30u, 0xFFu };
 static const unsigned char k_red_armos_row7[]   = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x0Fu, 0x1Cu, 0x16u, 0xFFu }; /* $7A */
 static const unsigned char k_gleeok_row7[]      = { 0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x2Au, 0x1Au, 0x0Cu, 0xFFu }; /* $7C */
 /* $06 LevelPaletteRow7TransferBuf: InitMode5 @UseLevelPalette patches
@@ -177,7 +233,9 @@ static const unsigned char *resolve_static_buffer(unsigned char selector,
     case 0x20u: *out_len = (unsigned char)sizeof k_ghost_row7;       return k_ghost_row7;
     case 0x22u: *out_len = (unsigned char)sizeof k_green_bg_row7;    return k_green_bg_row7;
     case 0x24u: *out_len = (unsigned char)sizeof k_brown_bg_row7;    return k_brown_bg_row7;
-    case 0x36u: *out_len = (unsigned char)sizeof k_ganon_row7;       return k_ganon_row7;
+    case 0x36u:
+        *out_len = (unsigned char)sizeof k_ganon_row7;
+        return game_profile_is_remix() ? k_redux_ganon_row7 : k_ganon_row7;
     case 0x7Au: *out_len = (unsigned char)sizeof k_red_armos_row7;   return k_red_armos_row7;
     case 0x7Cu: *out_len = (unsigned char)sizeof k_gleeok_row7;      return k_gleeok_row7;
     case 0x18u:
@@ -294,15 +352,38 @@ static unsigned char s_attr_shadow_active;
  * write redraws nothing; PlayAreaTiles still holds the last room. */
 static unsigned char s_nt_cleared;
 
+/* NES source: PPU NT writes do not change PlayAreaTiles collision data.
+ * Drained C: emit_nametable_record / emit_attribute_record.
+ * Coverage: FULL three native person-text rows; Stance: EXTEND.
+ * Retain only these 72 visible NT cells, independently of collision RAM.
+ * Attribute fades must recolor their current letters, not old floor tiles. */
+static unsigned char s_text_nt[72];
+static unsigned char s_text_nt_valid[9];
+
+static unsigned char attribute_raw_tile(unsigned char col, unsigned char row)
+{
+    if (game_profile_is_remix() && row >= 13u && row <= 15u &&
+        col >= 4u && col < 28u) {
+        unsigned char i = (unsigned char)((row - 13u) * 24u + col - 4u);
+        if (s_text_nt_valid[i >> 3] & (1u << (i & 7u))) return s_text_nt[i];
+    }
+    return nes_ram[0x6530u + (unsigned short)col * 0x16u + (unsigned char)(row - 8u)];
+}
+
 void transfer_buf_attr_shadow_reset(void)
 {
+    unsigned char i;
     s_attr_shadow_active = 0u;
     s_nt_cleared = 0u;
+    for (i = 0u; i < sizeof s_text_nt_valid; ++i) s_text_nt_valid[i] = 0u;
+    for (i = 0u; i < sizeof s_text_extra_valid; ++i) s_text_extra_valid[i] = 0u;
 }
 
 void transfer_buf_nt_cleared(void)
 {
+    unsigned char i;
     s_nt_cleared = 1u;
+    for (i = 0u; i < sizeof s_text_nt_valid; ++i) s_text_nt_valid[i] = 0u;
 }
 
 static unsigned char attr_shadow_pal(unsigned char col, unsigned char row)
@@ -344,8 +425,6 @@ static unsigned char emit_attribute_rows(unsigned char attr_off, unsigned char r
     for (row = row0; row < row1; ++row) {
         unsigned short *w = stage + (unsigned short)(row - 8u) * 32u;
         /* PlayAreaTiles is column-major (22 rows): step a column at a time. */
-        const unsigned char *pa = (const unsigned char *)(unsigned long)
-            &nes_ram[0x6530u + (unsigned char)(row - 8u)];
         const unsigned char *at = &s_attr_shadow[(row >> 2) << 3];
         const unsigned char vshift = (unsigned char)(((row >> 1) & 1u) << 2);
         unsigned short pc, pr;
@@ -354,9 +433,8 @@ static unsigned char emit_attribute_rows(unsigned char attr_off, unsigned char r
             /* attr_shadow_pal: one 2x2 quadrant per two columns. */
             const unsigned char pal = (unsigned char)((at[col >> 2] >>
                 (vshift | (((col >> 1) & 1u) << 1))) & 3u);
-            w[col] = playfield_tile_word(pa[0], pal);
-            w[col + 1u] = playfield_tile_word(pa[0x16u], pal);
-            pa += 2u * 0x16u;
+            w[col] = playfield_tile_word(attribute_raw_tile(col, row), pal);
+            w[col + 1u] = playfield_tile_word(attribute_raw_tile((unsigned char)(col + 1u), row), pal);
         }
         /* Columns are consecutive plane cells (scroll offsets are whole
          * cells: ((col << 3) - sx) & 511 >> 3 = first + col, mod 64). */
@@ -414,8 +492,7 @@ static void emit_attribute_record(unsigned char attr_off,
                 const unsigned char col = (unsigned char)(((k & 7u) << 2) + dc);
                 const unsigned char q = (unsigned char)(((dr >> 1) << 1) | (dc >> 1));
                 const unsigned char pal = (unsigned char)((v >> (q << 1)) & 3u);
-                const unsigned char raw =
-                    nes_ram[0x6530u + (unsigned short)col * 0x16u + (unsigned char)(row - 8u)];
+                const unsigned char raw = attribute_raw_tile(col, row);
                 unsigned short pc, pr;
                 roomrom_main_nt_cell_to_plane(col, row, &pc, &pr);
                 render_set_plane_a_word(pc, pr, playfield_tile_word(raw, pal));
@@ -423,6 +500,10 @@ static void emit_attribute_record(unsigned char attr_off,
         }
     }
 }
+
+/* T-172: set by emit_nametable_record when a record took the bounded NT0
+ * HUD path (its only effect is roomrom_hud_transfer_record). */
+static unsigned char s_rec_hud;
 
 static void emit_nametable_record(unsigned char hi,
                                   unsigned char lo,
@@ -448,6 +529,18 @@ static void emit_nametable_record(unsigned char hi,
     }
     unsigned char nes_row  = (unsigned char)(ppu_off >> 5);   /* /32 */
     unsigned char nes_col  = (unsigned char)(ppu_off & 0x1Fu);/* mod 32 */
+    /* NES source: Z_01 FormatStatusBarText / Z_06 TransferTileBuf.
+     * Drained C: this decoder + hud_runtime.c:draw_hud_dynamic.
+     * Coverage: FULL bounded status records under the fixed Window.
+     * Stance: EXTEND. The Window owner already publishes the authoritative
+     * HUD on its native NMI cadence. The generic bridge was also copying
+     * each status record to hidden Plane A cells every even game tick.
+     * Keep formatter, buffer consumption, cues and scratch writes intact.
+     * Only skip a complete record wholly covered by the displayed HUD. */
+    if (!game_profile_is_remix() && RAM(0x0012u) == 5u && RAM(0x0011u) && nes_row >= 1u && nes_row <= 7u &&
+        (vertical ? (unsigned short)nes_row + count <= 8u
+                  : (unsigned short)nes_col + count <= 32u) &&
+        roomrom_hud_owns_status_bar()) return;
     /* Name-table rows are screen rows (person text line 1 = $21A4 = row
      * 13). The plane cell comes from the room's scroll
      * (roomrom_main_nt_cell_to_plane: NT row r at screen line 8r - 8).
@@ -462,11 +555,35 @@ static void emit_nametable_record(unsigned char hi,
         count = src_avail;
     }
 
+    /* NES source: Z_06 TransferTileBuf (FormatStatusBarText records).
+     * Drained C: per-cell roomrom_hud_transfer_tile branch below.
+     * Coverage: FULL for Redux NT0 records wholly inside HUD rows 1..7.
+     * Stance: EXTEND. Same cells/order/words; one bounded HUD loop (T-172). */
+    if (game_profile_is_remix() && hi < 0x24u && nes_row >= 1u && nes_row <= 7u &&
+        (vertical ? (unsigned short)nes_row + count <= 8u
+                  : (unsigned short)nes_col + count <= 32u)) {
+        roomrom_hud_transfer_record(nes_col, nes_row, count, vertical, repeat,
+                                    src + src_off);
+        s_rec_hud = 1u;
+        return;
+    }
+
     unsigned char i;
     for (i = 0u; i < count; i++) {
         unsigned char nes_tile = src[src_off + (repeat ? 0u : i)];
         unsigned char cell_row = (unsigned char)(nes_row + (vertical ? i : 0u));
         unsigned char cell_col = (unsigned char)(nes_col + (vertical ? 0u : i));
+        if (game_profile_is_remix() && hi < 0x24u && cell_row >= 1u &&
+            cell_row <= 7u && cell_col < 32u) {
+            roomrom_hud_transfer_tile(cell_col, cell_row, nes_tile);
+            continue;
+        }
+        if (game_profile_is_remix() && cell_row >= 13u && cell_row <= 15u &&
+            cell_col >= 4u && cell_col < 28u) {
+            unsigned char k = (unsigned char)((cell_row - 13u) * 24u + cell_col - 4u);
+            s_text_nt[k] = nes_tile;
+            s_text_nt_valid[k >> 3] |= (unsigned char)(1u << (k & 7u));
+        }
         if (RAM(0x0012u) == 9u && cell_row >= 8u && cell_row < 30u && cell_col < 32u) {
             unsigned short pc, pr;
             roomrom_main_nt_cell_to_plane(cell_col, cell_row, &pc, &pr);
@@ -474,13 +591,10 @@ static void emit_nametable_record(unsigned char hi,
             continue;
         }
         if (s_attr_shadow_active && cell_row < 30u && cell_col < 32u) {
-            const unsigned short sl =
-                bg_sparse_tile_lut[nes_tile][attr_shadow_pal(cell_col, cell_row)];
             unsigned short qc, qr;
             roomrom_main_nt_cell_to_plane(cell_col, cell_row, &qc, &qr);
-            render_set_plane_a_word(qc, qr, (sl == 0xFFFFu)
-                ? (unsigned short)PLANE_BRIDGE_BLANK_TILE
-                : (unsigned short)(ROOMROM_BG_TILE_BASE + sl));
+            render_set_plane_a_word(qc, qr,
+                playfield_tile_word(nes_tile, attr_shadow_pal(cell_col, cell_row)));
             continue;
         }
         if (ow && cell_row >= 8u && cell_row < 30u && cell_col < 32u &&
@@ -505,7 +619,7 @@ static void emit_nametable_record(unsigned char hi,
          * missing). Byte-verified: Gen Plane A row held slots $48/$6D/$6A...
          * = I/T/S = "IT'S DANGEROUS" but displayed shifted by -1 tile. */
         unsigned short tile = (raw_slot == 0xFFFFu)
-            ? (unsigned short)PLANE_BRIDGE_BLANK_TILE
+            ? missing_font_word(nes_tile, (unsigned char)(pal & 3u))
             : (unsigned short)(ROOMROM_BG_TILE_BASE + raw_slot);
         unsigned short pc, pr;
         roomrom_main_nt_cell_to_plane((unsigned char)(cell_col & 0x1Fu), cell_row, &pc, &pr);
@@ -542,10 +656,108 @@ static void drain_record_buffer(const unsigned char *buf, unsigned char len)
     }
 }
 
+/* NES source: Z_06 TransferTileBuf of Z_01 FormatStatusBarText's DynTileBuf.
+ * Drained C: drain_dynamic_buffer (below) + roomrom_hud_transfer_record.
+ * Coverage: FULL for buffers made only of bounded NT0 HUD records.
+ * Stance: EXTEND (presentation). The formatter rebuilds the same status
+ * records every even game tick (T-172 room $38: ~180k master clocks to
+ * decode cells that were all word-cache hits). If the whole buffer equals
+ * the last one applied, every record took the HUD path, and the HUD epoch
+ * and clean cache are unchanged, reapplying it writes nothing: consume the
+ * buffer without decoding. Any other record kind clears the snapshot. */
+/* The formatter's memo holds its last full output; the drain remembers
+ * which output generation it last applied completely (and how many bytes,
+ * through the $FF terminator) under which HUD epoch. No buffer copy. */
+static unsigned char s_hud_applied_len;   /* 0 = nothing applied */
+static unsigned char s_hud_applied_gen;
+static unsigned char s_hud_applied_epoch;
+
+static unsigned char hud_status_matches(const unsigned char *out, unsigned char len)
+{
+    const unsigned short *a = (const unsigned short *)&TRANSFER_BUF_BYTE(0);
+    const unsigned short *b = (const unsigned short *)out;
+    unsigned char n = (unsigned char)(len >> 1);
+    while (n--) if (*a++ != *b++) return 0u;
+    if ((len & 1u) && (unsigned char)TRANSFER_BUF_BYTE(len - 1u) != out[len - 1u]) return 0u;
+    return 1u;
+}
+
+static unsigned char hud_snap_matches(void)
+{
+    unsigned char gen;
+    const unsigned char *out = hud_status_bar_output(&gen);
+    if (s_hud_applied_len == 0u || out == 0 || TRANSFER_BUF_POS != 0u ||
+        gen != s_hud_applied_gen || !roomrom_hud_cache_clean() ||
+        s_hud_applied_epoch != roomrom_hud_cache_epoch()) return 0u;
+    return hud_status_matches(out, s_hud_applied_len);
+}
+
+/* NES source: Z_06 TransferTileBuf of an updated FormatStatusBarText buffer.
+ * Drained C: drain_dynamic_buffer full path (per-record HUD emission).
+ * Coverage: FULL for the formatter's fixed status-bar layout (its records
+ * never overlap); Stance: EXTEND (presentation).
+ * When the buffer is the formatter output one generation after the output
+ * last applied completely, with identical record headers, under the same
+ * HUD epoch and a clean word cache, every unchanged payload byte would hit
+ * the word cache: emit only the changed cells, in record order (T-172 room
+ * $38 heart loss: ~195k master clocks for the full re-decode). */
+static unsigned char hud_status_delta_apply(void)
+{
+    unsigned char gen, from, count, j, pass;
+    const unsigned char *out = hud_status_bar_output(&gen);
+    const unsigned char *chg = hud_status_bar_delta(&from, &count);
+    const unsigned char len = s_hud_applied_len;
+    if (len == 0u || out == 0 || chg == 0 || from != s_hud_applied_gen ||
+        TRANSFER_BUF_POS != 0u || !roomrom_hud_cache_clean() ||
+        s_hud_applied_epoch != roomrom_hud_cache_epoch() ||
+        out[len - 1u] < 0x80u || !hud_status_matches(out, len)) return 0u;
+    /* Pass 0: every changed byte must be payload inside the applied layout
+     * (a header or terminator change takes the full path). Pass 1 emits,
+     * in ascending byte order = record order. */
+    for (pass = 0u; pass < 2u; ++pass) {
+        for (j = 0u; j < count; ++j) {
+            const unsigned char k = chg[j];
+            unsigned char pos = 0u;
+            if (k >= (unsigned char)(len - 1u)) return 0u;
+            while (out[pos] < 0x80u) {
+                const unsigned char ctrl = out[pos + 2u];
+                const unsigned char repeat = (unsigned char)(ctrl & 0x40u);
+                unsigned char n = (unsigned char)(ctrl & 0x3Fu);
+                const unsigned char end = (unsigned char)(pos + 3u + (repeat ? 1u : (n ? n : 64u)));
+                if (k < end) {
+                    if (k < (unsigned char)(pos + 3u)) return 0u;       /* header */
+                    if (pass) {
+                        const unsigned short ppu = (unsigned short)(((out[pos] & 0x0Fu) << 8) | out[pos + 1u]);
+                        const unsigned char vertical = (unsigned char)(ctrl & 0x80u);
+                        const unsigned char row = (unsigned char)(ppu >> 5), col = (unsigned char)(ppu & 0x1Fu);
+                        unsigned char i = (unsigned char)(k - (pos + 3u)), last = i;
+                        if (n == 0u) n = 64u;
+                        if (repeat) { i = 0u; last = (unsigned char)(n - 1u); }
+                        for (;; ++i) {
+                            roomrom_hud_transfer_tile((unsigned char)(col + (vertical ? 0u : i)),
+                                                      (unsigned char)(row + (vertical ? i : 0u)), out[k]);
+                            if (i == last) break;
+                        }
+                    }
+                    break;
+                }
+                pos = end;
+            }
+            if (out[pos] >= 0x80u) return 0u;                           /* past the records */
+        }
+    }
+    s_hud_applied_gen = gen;
+    s_hud_applied_epoch = roomrom_hud_cache_epoch();
+    return 1u;
+}
+
 /* Drain the dynamic TRANSFER_BUF at nes_ram[$0302..]. */
 static void drain_dynamic_buffer(void)
 {
     unsigned char end = (unsigned char)TRANSFER_BUF_POS;
+    const unsigned char sized = end;
+    unsigned char hud_only = 1u;
+    unsigned char terminated = 0u;
     if (end == 0u) {
         /* TransferCurTileBuf (selector 0) walks DynTileBuf records up to
          * the $FF terminator whatever DynTileBufLen says; some writers
@@ -556,13 +768,20 @@ static void drain_dynamic_buffer(void)
     if (end > TRANSFER_BUF_MAX_OFFSET) {
         end = TRANSFER_BUF_MAX_OFFSET;
     }
+    if (game_profile_is_remix() && (hud_snap_matches() || hud_status_delta_apply())) {
+        TRANSFER_BUF_POS     = 0u;
+        TRANSFER_BUF_BYTE(0) = 0xFFu;
+        return;
+    }
     unsigned char pos = 0u;
     while (pos < end) {
         unsigned char hi = (unsigned char)TRANSFER_BUF_BYTE(pos);
         if (hi >= 0x80u) {
+            terminated = 1u;
             break;
         }
         if ((unsigned char)(pos + 2u) >= end) {
+            hud_only = 0u;
             break;
         }
         unsigned char lo   = (unsigned char)TRANSFER_BUF_BYTE(pos + 1u);
@@ -591,11 +810,30 @@ static void drain_dynamic_buffer(void)
                     copy_len = count;
                 }
                 emit_palette_record(lo, copy_len, payload, 0u, copy_len);
+                hud_only = 0u;
             } else {
+                s_rec_hud = 0u;
                 emit_nametable_record(hi, lo, ctrl, count, payload, 0u, copy_len);
+                if (!s_rec_hud) hud_only = 0u;
             }
+        } else {
+            hud_only = 0u;
         }
         pos = (unsigned char)(pos + 3u + ((ctrl & 0x40u) ? 1u : count));
+    }
+    /* Remember a complete unsized all-HUD buffer equal to the formatter's
+     * last output (records + $FF terminator). */
+    s_hud_applied_len = 0u;
+    if (hud_only && terminated && !sized && pos != 0u &&
+        game_profile_is_remix() && roomrom_hud_cache_clean()) {
+        unsigned char gen;
+        const unsigned char *out = hud_status_bar_output(&gen);
+        const unsigned char len = (unsigned char)(pos + 1u);
+        if (out != 0 && len <= 62u && hud_status_matches(out, len)) {
+            s_hud_applied_gen = gen;
+            s_hud_applied_epoch = roomrom_hud_cache_epoch();
+            s_hud_applied_len = len;
+        }
     }
     TRANSFER_BUF_POS     = 0u;
     TRANSFER_BUF_BYTE(0) = 0xFFu;

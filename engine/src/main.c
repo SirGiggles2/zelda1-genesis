@@ -59,6 +59,7 @@
 #include "../../src/game/cave/uw_person_dispatch.h"    /* T-120: CheckPersonBlocking */
 #include "probes/metadata_probe.h"     /* Task 5.4: Gate D in-ROM probe */
 #include "atlas/level_chr_swap.h"        /* PR-4a: scene-bank DMA state machine */
+#include "game_profile.h"
 #include "player_state.h"                 /* Phase 6 Task 6.1: typed players[] */
 #include "enemy_loop.h"                   /* Phase 7 Task 7.2 step 2 (WT-5) */
 #include "enemy_loop_probe.h"             /* Phase 7 Task 7.2 step 2 probe */
@@ -200,7 +201,7 @@ void roomrom_set_b_item_from_inv_cursor(unsigned char cursor_slot)
 static unsigned long s_hud_b_key;
 static unsigned char s_hud_b_key_valid;
 
-static void roomrom_hud_b_item_update(void)
+static void roomrom_hud_b_item_update(unsigned char native_descriptors)
 {
     /* T-092: NES DrawStatusBarItemsAndEnsureItemSelected (Z_07.asm). B box
      * at ($7C,$1F), A box (sword) at ($94,$1F); DrawItemBySlot tile/attr,
@@ -212,6 +213,21 @@ static void roomrom_hud_b_item_update(void)
     unsigned short battr = 0u, aattr = 0u;
     const s16 hud_y = (s16)(0x1Fu - 7u);   /* -8 top-crop + 1 user nudge = -7 */
     const unsigned char has_b = hud_status_bar_b_item(&slot);
+    unsigned char native_b_tile = 0u, native_b_attr = 0u;
+    unsigned char native_a_tile = 0u, native_a_attr = 0u;
+    /* NES source: Z_07:DrawStatusBarItemsAndEnsureItemSelected.
+     * Drained C: draw_dispatch.c native inventory sprite chain.
+     * Coverage: PARTIAL (mandatory Redux HUD descriptor ordering).
+     * Stance: EXTEND. Only SAT publication is cached: native descriptors
+     * still run B then A each frame, after the world object sweep. */
+    if (game_profile_is_remix() && native_descriptors) {
+        if (has_b)
+            native_b_tile = draw_hud_inventory_item(slot, 0x7Cu, 0x1Fu,
+                                                    &native_b_attr);
+        if (nes_ram[0x0657u])
+            native_a_tile = draw_hud_inventory_item(0u, 0x94u, 0x1Fu,
+                                                    &native_a_attr);
+    }
     {
         /* T-172: the two sprites only change with the item, its value, the
          * sword, the 8-frame flash phase or the pause edge; recomputing
@@ -226,12 +242,18 @@ static void roomrom_hud_b_item_update(void)
         s_hud_b_key_valid = 1u;
     }
     if (has_b) {
-        tile = draw_item_icon(slot, nes_ram[0x0657u + slot], &attr);
+        if (game_profile_is_remix() && native_descriptors) {
+            tile = native_b_tile;
+            attr = native_b_attr;
+        } else tile = draw_item_icon(slot, nes_ram[0x0657u + slot], &attr);
         battr = enemy_render_item_sat(tile, attr);
         bx = (s16)(0x7Cu + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
     }
     if (nes_ram[0x0657u] != 0u) {
-        tile = draw_item_icon(0u, nes_ram[0x0657u], &attr);
+        if (game_profile_is_remix() && native_descriptors) {
+            tile = native_a_tile;
+            attr = native_a_attr;
+        } else tile = draw_item_icon(0u, nes_ram[0x0657u], &attr);
         aattr = enemy_render_item_sat(tile, attr);
         ax = (s16)(0x94u + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
     }
@@ -251,6 +273,10 @@ static void roomrom_hud_b_item_update(void)
             roomrom_sprites_invalidate_cache();
         }
     }
+}
+void roomrom_hud_prepare_items(void)
+{
+    roomrom_hud_b_item_update(1u);
 }
 static link_dir_t  s_link_dir  = LINK_DIR_NONE;  /* NES ObjDir: last active axis */
 static unsigned char s_doorway_dir = UW_WALK_DOOR_NONE; /* active UW doorway */
@@ -883,7 +909,7 @@ static void circle_open_here(void)
     if (!circle_transition_waiting()) return;
     roomrom_hud_set_counts_hidden(0u);
     roomrom_hud_draw(roomrom_uw_room_render_get_map(),s_room_id,s_scene == SCENE_UW);
-    roomrom_hud_b_item_update();
+    roomrom_hud_b_item_update(1u);
     roomrom_sprites_set_link_pose(players[0].x,players[0].y,players[0].face,0u);
     VDP_updateSprites(80u,DMA_QUEUE);
     circle_transition_open((short)(players[0].x + 8),(short)(players[0].y + 1),
@@ -1593,6 +1619,7 @@ static void request_boss_chr_if_boss_room(void)
  * roomrom_combat_set_redux at boot and after every C-button toggle. */
 static unsigned char current_redux_flag(void)
 {
+    if (game_profile_current()->active) return game_profile_is_remix();
     if (s_scene == SCENE_UW)
         return (unsigned char)(roomrom_uw_room_render_get_map() != 0u);
     return (unsigned char)(roomrom_ow_room_render_get_map() != 0u);
@@ -2294,7 +2321,7 @@ static unsigned char link_walkable_at(short x, short y, link_dir_t dir)
     nes_ram[0x0070u] = sx;
     nes_ram[0x0084u] = sy;
     nes_ram[NES_OBJ_DIR] = sdir;
-    return (tile < nes_ram[0x034Au]) ? 1u : 0u;
+    return collision_moving_tile_is_obstacle(tile) ? 0u : 1u;
 }
 
 /* S4: edge-triggered room transition. Both OW and UW use the same 16x8 grid
@@ -3815,7 +3842,7 @@ static void level_entry_tick(void)
                  * stamp moves then too (s_step_out_restamp). */
                 s_step_out_restamp = 1u;
             }
-            roomrom_hud_b_item_update();          /* DrawSpritesBetweenRooms */
+            roomrom_hud_b_item_update(1u);          /* DrawSpritesBetweenRooms */
             level_entry_draw_link();
             nes_ram[0x0011u] = 1u;
             VDP_updateSprites(ROOMROM_SPRITE_SLOT_ENEMY_FIRST, DMA_QUEUE);
@@ -4115,6 +4142,12 @@ void roomrom_debug_enter(void)
     /* PR-4a: init scene-bank state machine BEFORE first scene_load so the
      * first scene_load enqueues into a clean state. */
     level_chr_swap_init();
+    if (game_profile_current()->active) {
+        unsigned char variant = game_profile_is_remix();
+        roomrom_ow_room_render_set_map(variant);
+        roomrom_uw_room_render_set_map(variant);
+    }
+    roomrom_sprites_set_redux(current_redux_flag());
     upload_scene_chr();
     /* PR-4b regression fix: persistent sprite CHR (common 1025..1262 +
      * Link walk 1263..1294 + attack 1295..1310) was orphaned when PR-4b
@@ -4820,6 +4853,7 @@ void roomrom_debug_tick(void)
             audio_music_play(song);
         }
         roomrom_hud_play_flush();     /* T-172: last play tick's status bar */
+        render_vblank_work_end();     /* T-172: actual end of required VBlank work */
         state_dump_poll(STATE_DUMP_CTX_GAME);   /* A+B+C+Start: freeze + dump */
         if (s_arch_restore_ticks && --s_arch_restore_ticks == 0u)
             cave_fade_restore_arch();           /* after a step out */
@@ -5065,7 +5099,7 @@ void roomrom_debug_tick(void)
                      * mode 3 laid out the room. Continue can re-enter the
                      * same room, so bypass the scroll duplicate guard. */
                     else {
-                        roomrom_hud_b_item_update();
+                        roomrom_hud_b_item_update(1u);
                         enemy_loop_room_reenter(s_room_id, (unsigned char)s_scene,
                             s_scene == SCENE_UW ? roomrom_uw_room_render_get_level() : 0u,
                             s_scene == SCENE_UW ? roomrom_uw_room_render_get_quest() : 0u);
@@ -5689,6 +5723,7 @@ void roomrom_debug_tick(void)
          * Link's collisions, it fell a frame off the NES (t012_route
          * t1321). */
         if (!cave_fade_is_active()) {
+            roomrom_ow_room_render_animation_tick();
             /* BeginUpdateWorld (Z_07.asm:1841): with the clock (InvClock
              * $66C) Link's invincibility timer gains $10 every frame. */
             if (nes_ram[0x066Cu] != 0u)
@@ -6158,7 +6193,7 @@ void roomrom_debug_tick(void)
          * budget recovered. Floor of 10 keeps Link + gameplay sprites
          * (slots 0..9) always covered. */
         /* HUD B-item icon per-frame update (slot 10). */
-        roomrom_hud_b_item_update();
+        if (!game_profile_is_remix()) roomrom_hud_b_item_update(0u);
 
         {
             unsigned short dma_count = g_enemy_render_last_sat_slot;

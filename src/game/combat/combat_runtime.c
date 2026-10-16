@@ -8,6 +8,11 @@
 #include "../options/options_state.h"
 #include "platform_abi.h"
 #include "render_abi.h"
+
+/* NES source: Redux sword_draw.asm:sword_detect and magic_beam_align.asm.
+ * Drained C: update_sword_or_rod and roomrom_combat_try_swing below.
+ * Coverage: PARTIAL(core states/pose; target hitboxes and lifecycle pending).
+ * Stance: EXTEND native weapon owner; remove independent core shortcut. */
 #include "../enemies/enemy_render.h"   /* T-116 item SAT */
 #include "../items/sword_shot.h"        /* T-116 slot $0E */
 #include "../world/draw_dispatch.h"     /* draw_item_frame_tile */
@@ -41,30 +46,6 @@
  * varies per facing (Link's hand position differs).
  */
 
-/* NES Z1 doesn't visibly draw a sword windup (sword raised UP above
- * Link for all facings before extending). Verified 2026-05-01 via
- * BizHawk OAM scan of NES Z1 sword swing: gameplay sword sprite first
- * appears at state 2 extend in facing direction — disassembly's state 1
- * branch may exist but isn't visible on real hardware. State 1 skipped
- * here to match observed NES behavior. */
-#define COMBAT_STATE1_FRAMES   0u
-#define COMBAT_STATE2_FRAMES   8u
-#define COMBAT_STATE3_FRAMES   1u
-#define COMBAT_STATE4_FRAMES   1u
-#define COMBAT_STATE5_FRAMES   1u
-#define COMBAT_TOTAL_FRAMES    (COMBAT_STATE1_FRAMES + COMBAT_STATE2_FRAMES \
-                                + COMBAT_STATE3_FRAMES + COMBAT_STATE4_FRAMES \
-                                + COMBAT_STATE5_FRAMES)
-
-typedef enum {
-    COMBAT_IDLE  = 0,
-    COMBAT_ACTIVE
-} combat_state_t;
-
-static combat_state_t s_state    = COMBAT_IDLE;
-static unsigned char  s_frame    = 0u;   /* 0..COMBAT_TOTAL_FRAMES-1 */
-static link_face_t    s_face     = LINK_FACE_DOWN;
-
 /* Latched per-frame sword pose for nes_ram_sync_sword (Plan v5). */
 static unsigned char  s_pub_state = 0u;
 static short          s_pub_x     = 0;
@@ -79,10 +60,13 @@ link_face_t   roomrom_combat_get_swing_face(void)  { return s_pub_face; }
 /* Sword visual Y bias; see recompute_y_bias (0 except Redux UW). */
 static short s_uw_y_bias = 0;
 
-/* engine currently boots with wood sword (Items=1). NES
+/* NES source: Redux sword_draw.asm:load_attr and Z_07:CalcSwordAttrs.
+ * Drained C: roomrom_combat_update Redux sprite selection.
+ * Coverage: FULL equipment subpalette; Stance: EXTEND current owner.
+ * NES
  * @CalcSwordAttrs (Z_07.asm:4471) computes sub-pal = base_attr +
  * Items - 1 with base_attr = 0 (RDirectionToWeaponBaseAttribute),
- * so sub-pal == Items - 1. Future white sword (Items=2) -> 1,
+ * so sub-pal == Items - 1. White sword (Items=2) -> 1,
  * magic sword (Items=3) -> 2. Defensive: clamp >3 (NES Items
  * tops out at 3 for sword). */
 static unsigned char sword_subpal_for_items(unsigned char items_val) {
@@ -90,10 +74,6 @@ static unsigned char sword_subpal_for_items(unsigned char items_val) {
     if (items_val > 4u) items_val = 4u;       /* clamp */
     return (unsigned char)(items_val - 1u);
 }
-
-/* Track current sword level (1=wood, 2=white, 3=magic). Default 1.
- * Future inventory wiring populates this from $0657 ITEMS register. */
-static unsigned char s_sword_level = 1u;
 
 /* Track UW separately so set_redux can recompute bias in case the redux
  * flag changes after set_uw was called. */
@@ -131,7 +111,7 @@ static void recompute_y_bias(void)
     s_uw_y_bias = (s_redux && s_in_uw) ? (short)-2 : (short)0;
 }
 
-/* Redux ALttP-style 8-frame arc swing.
+/* Mandatory Redux core 8-frame state-2 sweep; optional ALttP is separate.
  *
  * Source: Zelda1-Redux/code/gameplay/sword_draw.asm wide_sword_xpos/ypos/
  * sprite/face/flip/flip_h16 tables. Each direction has 8 frames; the sword
@@ -142,8 +122,6 @@ static void recompute_y_bias(void)
  * index). engine link_face_t uses DOWN, UP, LEFT, RIGHT — tables below
  * are reordered to match.
  */
-#define REDUX_TOTAL_FRAMES   8u
-#define REDUX_BEAM_SPAWN     7u
 
 /* Per-face per-frame sword X/Y offsets from Link's top-left. */
 static const signed char redux_x[4][8] = {
@@ -179,7 +157,7 @@ static const unsigned char redux_sprite[4][8] = {
 static const unsigned char redux_hflip[4][8] = {
     /* DOWN  */ { 1, 1, 0, 0, 0, 0, 1, 1 },
     /* UP    */ { 0, 0, 1, 1, 1, 1, 0, 0 },
-    /* LEFT  */ { 0, 0, 0, 0, 0, 1, 1, 1 },
+    /* LEFT  */ { 0, 0, 0, 0, 0, 0, 1, 1 },
     /* RIGHT */ { 0, 0, 1, 1, 1, 1, 0, 0 },
 };
 
@@ -190,31 +168,17 @@ static const unsigned char redux_vflip[4][8] = {
     /* RIGHT */ { 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
-/* Per-state, per-facing X offset. Index: [state-1][face].
- * face order: 0=DOWN, 1=UP, 2=LEFT, 3=RIGHT.
- * NES tables are in reverse direction order (up, down, left, right);
- * reordered here to match engine's link_face_t enum. */
-static const signed char sword_offset_x[4][4] = {
-    /*               DOWN UP   LEFT  RIGHT */
-    /* state 1 */ {  +1, -1,    0,   -8 },
-    /* state 2 */ {  +1, -1,  -11,  +11 },
-    /* state 3 */ {  +1, -1,   -7,   +7 },
-    /* state 4 */ {  +1, -1,   -3,   +3 },
-};
-
-static const signed char sword_offset_y[4][4] = {
-    /*               DOWN UP   LEFT  RIGHT */
-    /* state 1 */ { -14, -9,  -11,  -11 },
-    /* state 2 */ { +13,-10,   +3,   +3 },
-    /* state 3 */ {  +9, -9,   +3,   +3 },
-    /* state 4 */ {  +5, -1,   +3,   +3 },
+/* Weapon orientation is independent of Link facing during the sweep.
+ * Rows match link_face_t (DOWN, UP, LEFT, RIGHT). */
+static const unsigned char redux_face[4][8] = {
+    {2,2,4,4,4,4,4,4}, {1,1,8,8,8,8,8,8},
+    {8,8,2,2,2,2,2,2}, {8,8,1,1,1,1,1,1}
 };
 
 void roomrom_combat_init(void)
 {
     RAM(0x00ACu + 0x0Du) = 0u;   /* T-116: sword slot $0D */
-    s_state = COMBAT_IDLE;
-    s_frame = 0u;
+    s_pub_state = 0u;
     roomrom_sprites_clear_sword();
     sword_shot_init();           /* T-116: shot slot $0E */
 }
@@ -240,7 +204,7 @@ static unsigned char sword_blocked_by_bubble(void)
  * (movement gate). State lives in the NES cells so collision and lockstep
  * see it: Link ObjState $AC / ObjAnimCounter $3D0 / ObjAnimFrame $3E4,
  * sword ObjState $B9, counter $3DD, X $7D, Y $91, dir $A5, q-speed $3C9.
- * Redux keeps its own 8-frame arc path below. */
+ * Redux extends this same native state machine. */
 #define L_STATE     RAM(0x00ACu)
 #define L_ANIMCNT   RAM(0x03D0u)
 #define L_ANIMFRAME RAM(0x03E4u)
@@ -340,23 +304,13 @@ static void update_sword_or_rod(unsigned char x);
 
 void roomrom_combat_try_swing(link_face_t face, short link_x, short link_y)
 {
-    (void)link_x; (void)link_y;
+    (void)face; (void)link_x; (void)link_y;
     if (nes_ram[0x0657u] == 0u) return;   /* T-092: NES WieldSword, no sword */
-    if (s_redux) {
-        if (s_state != COMBAT_IDLE) return;
-        if (sword_blocked_by_bubble() != 0u) return;
-        s_state = COMBAT_ACTIVE;
-        s_frame = 0u;
-        s_face  = face;
-        nes_ram[0x0603u] |= 0x01u;   /* WieldSword: PlayEffect $01 */
-        return;
-    }
     /* Link_HandleInput: A only in the idle state, sword not blocked. */
     if (L_STATE != 0u) return;
     if (sword_blocked_by_bubble() != 0u) return;
     /* WieldSword. */
     if (SW_STATE != 0u) return;
-    s_face = face;
     SW_CNT = 5u;
     /* WieldWeapon(state 1): q-speed $C0, PlaceWeaponForPlayerStateAndAnim,
      * vertical directions move the weapon right 3 pixels. */
@@ -406,29 +360,13 @@ void roomrom_combat_end_move_and_animate(void)
      * ($522) != 0: no warps, no animation (Z_07.asm; T-171
      * t171_flute_whirlwind t346, ObjAnimCounter). */
     if (nes_ram[0x0522u] != 0u) return;
-    /* Redux keeps the NES walk cadence; its swing never sets ObjState. */
+    /* Both profiles use native Link attack states and animation cadence. */
     link_anim_state_step();
 }
 
 unsigned char roomrom_combat_link_locked(void)
 {
-    if (s_redux) return s_state != COMBAT_IDLE;
     return link_item_use_blocks_move();
-}
-
-/* Returns 1..5 for active states, 0 for idle. */
-static unsigned char compute_state(unsigned char frame)
-{
-    unsigned char acc = 0u;
-    acc = (unsigned char)(acc + COMBAT_STATE1_FRAMES);
-    if (frame < acc) return 1u;
-    acc = (unsigned char)(acc + COMBAT_STATE2_FRAMES);
-    if (frame < acc) return 2u;
-    acc = (unsigned char)(acc + COMBAT_STATE3_FRAMES);
-    if (frame < acc) return 3u;
-    acc = (unsigned char)(acc + COMBAT_STATE4_FRAMES);
-    if (frame < acc) return 4u;
-    return 5u;
 }
 
 /* Phase 9 Task 9.4 OPTION_ID_SWORD_STYLE gate.
@@ -458,74 +396,6 @@ static unsigned char sword_style_allows_beam(void)
 
 void roomrom_combat_update(short link_x, short link_y, link_face_t face)
 {
-    unsigned char st;
-    short sx, sy;
-
-    if (s_redux && s_state == COMBAT_IDLE) {
-        s_pub_state = 0u;
-        sword_shot_update();
-        return;
-    }
-
-    /* Redux 8-frame ALttP-style arc swing — separate state machine. */
-    if (s_redux) {
-        unsigned char fr = s_frame;
-        unsigned char face_idx = (unsigned char)s_face;
-        unsigned char sprite_type;
-        short narrow_x_shift;
-        if (fr >= REDUX_TOTAL_FRAMES) fr = (unsigned char)(REDUX_TOTAL_FRAMES - 1u);
-
-        roomrom_sprites_set_link_attack_pose(link_x, link_y, s_face);
-
-        sprite_type = redux_sprite[face_idx][fr];
-        /* NES @Narrow path adds +4 to X to center the half-width sprite
-         * within its 16x16 bounding box (Z_01.asm:5289). Applies to
-         * vertical (sprite type 0) and diagonal (type 2). Wide
-         * horizontal (type 1) is not centered — its 2 sprites already
-         * span the full 16-pixel width. */
-        narrow_x_shift = (sprite_type == 1u) ? (short)0 : (short)4;
-
-        sx = (short)(link_x + redux_x[face_idx][fr] + narrow_x_shift);
-        sy = (short)(link_y + redux_y[face_idx][fr] + s_uw_y_bias);
-
-        switch (sprite_type) {
-        case 0:
-            roomrom_sprites_set_sword_vertical(sx, sy, redux_vflip[face_idx][fr],
-                                               sword_subpal_for_items(s_sword_level));
-            break;
-        case 1:
-            roomrom_sprites_set_sword_horizontal(sx, sy, redux_hflip[face_idx][fr],
-                                                 sword_subpal_for_items(s_sword_level));
-            break;
-        case 2:
-            roomrom_sprites_set_sword_diagonal(sx, sy,
-                                               redux_hflip[face_idx][fr],
-                                               redux_vflip[face_idx][fr],
-                                               sword_subpal_for_items(s_sword_level));
-            break;
-        }
-
-        if (s_frame == REDUX_BEAM_SPAWN)
-            sword_shot_make(sword_style_allows_beam());
-        sword_shot_update();
-
-        s_pub_state = 2u;
-        s_pub_x     = sx;
-        s_pub_y     = sy;
-        s_pub_face  = s_face;
-
-        s_frame++;
-        if (s_frame >= REDUX_TOTAL_FRAMES) {
-            s_state = COMBAT_IDLE;
-            s_frame = 0u;
-            s_pub_state = 0u;
-            roomrom_sprites_clear_sword();
-        }
-        return;
-    }
-
-    (void)st;
-    (void)sx; (void)sy;
     /* Vanilla: NES UpdateSwordOrRod (T-116). Runs after Link's input,
      * movement and AnimateLinkBase (roomrom_combat_end_move_and_animate,
      * T-102), then the weapons update in slot order. */
@@ -540,7 +410,9 @@ void roomrom_combat_update(short link_x, short link_y, link_face_t face)
     s_pub_state = (unsigned char)(SW_STATE & 0x0Fu);
     s_pub_x     = (short)SW_X;
     s_pub_y     = (short)SW_Y;
-    s_pub_face  = s_face;
+    s_pub_face  = (SW_DIR & 8u) ? LINK_FACE_UP :
+                  (SW_DIR & 4u) ? LINK_FACE_DOWN :
+                  (SW_DIR & 2u) ? LINK_FACE_LEFT : LINK_FACE_RIGHT;
 }
 
 /* UpdateSwordOrRod (Z_07.asm:4351) for the sword ($0D) or the rod ($12).
@@ -572,10 +444,44 @@ static void update_sword_or_rod(unsigned char x)
         else              roomrom_sprites_clear_arrow();
         return;
     }
+    /* Redux modifies only sword state 2; windup/retraction continue
+     * through the native owner and keep their native timer/body behavior. */
+    if (s_redux && x == SW_SLOT && st == 2u) {
+        unsigned char fr = (unsigned char)(8u - SW_CNT);
+        unsigned char fi = (L_DIR & 8u) ? LINK_FACE_UP :
+                           (L_DIR & 4u) ? LINK_FACE_DOWN :
+                           (L_DIR & 2u) ? LINK_FACE_LEFT : LINK_FACE_RIGHT;
+        unsigned char kind = redux_sprite[fi][fr];
+        unsigned char pal = sword_subpal_for_items(RAM(0x0657u));
+        short sx, sy;
+        SW_X = (unsigned char)(RAM(0x0070u) + redux_x[fi][fr]);
+        SW_Y = (unsigned char)(RAM(0x0084u) + redux_y[fi][fr]);
+        SW_DIR = redux_face[fi][fr];
+        sx = (short)(SW_X + ((kind == 1u) ? 0 : 4));
+        sy = (short)((short)SW_Y + s_uw_y_bias);
+        if (kind == 0u)
+            roomrom_sprites_set_sword_nes(sx, sy, 0u,
+                enemy_render_item_sat(0x20u, (unsigned char)(pal |
+                    (redux_hflip[fi][fr] << 6) | (redux_vflip[fi][fr] << 7))));
+        else if (kind == 1u)
+            roomrom_sprites_set_sword_horizontal(sx, sy, redux_hflip[fi][fr], pal);
+        else
+            roomrom_sprites_set_sword_diagonal(sx, sy, redux_hflip[fi][fr],
+                                               redux_vflip[fi][fr], pal);
+        return;
+    }
     RAM(0x0098u + x) = L_DIR;
     idx = (unsigned char)((st - 1u) * 4u + rdir_index(L_DIR));
     RAM(0x0070u + x) = (unsigned char)(RAM(0x0070u) + k_pw_off_x[idx]);
     RAM(0x0084u + x) = (unsigned char)(RAM(0x0084u) + k_pw_off_y[idx]);
+    if (s_redux && st == 1u) {
+        /* magic_beam_align reuses these dummy-state offset cells as
+         * sword/rod palettes. Retain the source's unrendered ObjX/Y. */
+        unsigned char di = rdir_index(L_DIR);
+        unsigned char dummy = (di == 1u) ? 0xC0u : 0u;
+        RAM(0x0070u + x) = (unsigned char)(RAM(0x0070u) + dummy);
+        RAM(0x0084u + x) = (unsigned char)(RAM(0x0084u) + dummy + 1u);
+    }
     dir = (st == 1u) ? 0x08u : RAM(0x0098u + x);
     idx = rdir_index(dir);
     /* @CalcSwordAttrs: base attribute + sword level - 1; the rod uses
@@ -584,6 +490,7 @@ static void update_sword_or_rod(unsigned char x)
         attr = (unsigned char)(k_rdir_base_attr[idx] + nes_ram[0x0657u] - 1u);
     else
         attr = (unsigned char)(k_rdir_base_attr[idx] | 0x01u);
+    if (s_redux && idx == 1u) attr = (unsigned char)(attr | 0x40u);
     if (idx == 2u) attr = (unsigned char)(attr | 0x40u);
     if (st == 1u) {                      /* windup: not shown */
         if (x == SW_SLOT) roomrom_sprites_clear_sword();
@@ -597,7 +504,7 @@ static void update_sword_or_rod(unsigned char x)
     dx = wide ? 0 : 4;
     if (x == SW_SLOT)
         roomrom_sprites_set_sword_nes((short)(RAM(0x0070u + x) + dx),
-                                      (short)((short)RAM(0x0084u + x) + s_uw_y_bias), wide,
+                                      (short)RAM(0x0084u + x), wide,
                                       enemy_render_item_sat(tile, attr));
     else
         roomrom_sprites_set_arrow_nes((short)(RAM(0x0070u + x) + dx),

@@ -63,6 +63,9 @@
 
 /* tile 0 is always blank (transparent fallback for any plane). */
 #define ROOMROM_BLANK_TILE              0u
+/* T-269 live OW census: separate slots preserve the Original sparse bank. */
+#define ROOMROM_CORE_BG_EXTRA_TILE_BASE 1172u
+#define ROOMROM_CORE_BG_EXTRA_TILE_COUNT 10u
 
 /* BG bank — Phase J (2026-05-18): sparse atlas replaces 4x pixel-bias
  * replication. Only (tile_id, sub_pal) combos USED by UW + OW rooms +

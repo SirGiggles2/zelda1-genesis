@@ -39,6 +39,11 @@ void hud_format_decimal_count_byte_in_text_buf(unsigned char val,
 /* Fill 41-byte status bar transfer buf from template + LINK_HEARTS +
  * LINK_RUPEES + LINK_BOMB_COUNT + key count. drain at hud_runtime.c:76-93. */
 void hud_format_status_bar_text(void);
+/* T-172: last full formatter output (62/41 bytes) and its generation. */
+const unsigned char *hud_status_bar_output(unsigned char *gen);
+/* Ascending indices of the bytes changed from generation *from_gen to the
+ * current output (*count entries); 0 when unavailable. */
+const unsigned char *hud_status_bar_delta(unsigned char *from_gen, unsigned char *count);
 
 /* Per-frame rupee animation tick: drain $067D credit accumulator into
  * LINK_RUPEES, drain CAVE_DOOR_REPAIR_RUPEE_DELTA into LINK_RUPEES--,

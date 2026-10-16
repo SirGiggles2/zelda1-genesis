@@ -330,7 +330,15 @@ unsigned char ow_scroll_tick(short *x, short *y)
                 break;
             }
             /* fall through: Sub7 */
-        default: MODE = 4u; SUB = 1u; UPD = 0u; break;
+        default:
+            /* UpdateMode7Scroll_Sub7 (Z_05.asm:1194): also zeroes $010C,
+             * the CalculateNextRoom door bit [$E7] (set in Sub1) and
+             * IsSprite0CheckActive ($E3). Lockstep: $E7 stayed set after
+             * every scroll (NES 00, GEN direction bit). */
+            nes_ram[0x010Cu] = 0u;
+            nes_ram[0x00E7u] = 0u;
+            nes_ram[0x00E3u] = 0u;
+            MODE = 4u; SUB = 1u; UPD = 0u; break;
         }
     } else if (MODE == 4u) {
         if (SUB == 1u) {

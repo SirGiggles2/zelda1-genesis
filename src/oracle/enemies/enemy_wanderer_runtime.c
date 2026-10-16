@@ -60,7 +60,8 @@ void enrt_update_common_wanderer(unsigned int turn_rate, unsigned int slot) {
  *     distance heuristics, set "wants to shoot" flag, then dispatch to the
  *     boomerang/shoot path.
  */
-void enrt_wanderer_target_player(unsigned int slot) {
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) void enrt_wanderer_target_player(unsigned int slot) {
     unsigned char d3_dir = 0;        /* chosen direction once SetDirTowardTarget runs */
     int set_dir = 0;                 /* whether we should set facing/timer/shoot */
 
@@ -249,7 +250,8 @@ void enrt_update_goriya(unsigned int slot) {
  *   Always: input direction ($03F8) := facing direction ($0098).
  *   Goriya only: maybe spawn a boomerang shot tracked by both monster and shot.
  */
-void enrt_walker_set_input_dir_and_try_shooting_boomerang(unsigned int slot) {
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) void enrt_walker_set_input_dir_and_try_shooting_boomerang(unsigned int slot) {
     /* Set input direction to facing direction. */
     ENEMY_PUSH_DIR_SCRATCH(slot) = ENEMY_DIR(slot);
 

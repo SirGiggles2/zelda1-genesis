@@ -1,3 +1,7 @@
+/* T-294 D1: NES source: Z_02.asm:InitDemoSubphasePlayTitleSong / Redux title_screen.asm, story.asm.
+ * Drained C: intro_title_setup, intro_story_load and intro_story_step below.
+ * Coverage: PARTIAL(shared native presentation; approved Genesis scroll/layout).
+ * Stance: EXTEND. One shared Redux intro explicitly selected by user. */
 /* src/intro_title.c
  *
  * Title runtime: load assets, per-vblank step (glow only for now;
@@ -12,17 +16,13 @@ extern void roomrom_hud_invalidate(void);
 
 /* S1.F4: display-enable register writes moved to render_display_enable(). */
 
-extern const unsigned char  intro_title_bg_chr[];
-extern const unsigned long  intro_title_bg_chr_size;
-extern const unsigned char  intro_title_sprite_chr[];
-extern const unsigned long  intro_title_sprite_chr_size;
-extern const unsigned short intro_title_tilemap_rows;
-extern const unsigned short intro_title_tilemap[];
-extern const unsigned short intro_title_palette[64];
-extern const unsigned short intro_title_fade_cycles[14][64];
+#include "intro_redux_assets.h"
 extern const unsigned short intro_title_fade_delays[14];
-extern const unsigned short intro_title_glow_colors[8];
-extern const unsigned char  intro_title_glow_delays[8];
+extern const unsigned char intro_title_glow_delays[8];
+#define intro_title_tilemap_rows 30u
+#define intro_title_tilemap core_redux_intro_title_map
+#define intro_title_palette core_redux_intro_title_palette
+#define intro_title_glow_colors core_redux_intro_title_glow
 
 #define PLANE_A_BASE 0xC000u
 
@@ -33,7 +33,7 @@ static unsigned short s_fade_delay = 0;
 static unsigned char s_waterfall_frame = 0;
 static unsigned char s_waterfall_phase = 0;
 /* Per-wave-row rolling Y counter (NES TitleWaveYs[0..2]). Each frame
- * Y += 2; wraps $E3 -> $B2. Initial values $B6/$C8/$D8 set in setup
+ * Y += 1; wraps $E3 -> $B2. Initial values $B6/$C8/$D8 set in setup
  * (linker has no .data section so non-zero statics must init at runtime). */
 static unsigned char s_wave_ys[3];
 
@@ -155,7 +155,7 @@ static void title_sprite_upload(void) {
 /* Per Z_02.asm:1034 UpdateSpritesForWaterfallWave + :1086 Crest:
  *
  *   Wave row R (R=0..2):
- *     - TitleWaveYs[R] += 2 each frame; if >= $E3 wrap to $B2.
+ *     - TitleWaveYs[R] += 1 each frame; if >= $E3 wrap to $B2.
  *     - Tile offset depends on the new Y:
  *         Y < $B9  -> offset 0
  *         Y < $C2  -> offset 8
@@ -181,9 +181,9 @@ static void title_waterfall_step(void) {
     }
     unsigned char crest_offset = s_waterfall_phase ? 8u : 0u;
 
-    /* 3 wave rows: Y += 2; wrap. Update sprites. */
+    /* 3 wave rows: Y += 1; wrap. Update sprites. */
     for (unsigned char r = 0; r < 3u; r++) {
-        unsigned char y = (unsigned char)(s_wave_ys[r] + 2u);
+        unsigned char y = (unsigned char)(s_wave_ys[r] + 1u);
         if (y >= 0xE3u) y = 0xB2u;
         s_wave_ys[r] = y;
         unsigned char wave_off = wave_tile_offset(y);
@@ -225,10 +225,10 @@ void intro_title_setup(void) {
     render_display_enable(0);
 
     /* CHR uploads. */
-    render_chr_upload(0x0000, intro_title_bg_chr,
-                      (unsigned short)intro_title_bg_chr_size);
-    render_chr_upload(0x2000, intro_title_sprite_chr,
-                      (unsigned short)intro_title_sprite_chr_size);
+    render_chr_upload(0x0000, core_redux_common_chr + 0x0E00, 0x0E00);
+    render_chr_upload(0x0E00, core_redux_demo_chr + 0x1200, 0x1040);
+    render_chr_upload(0x1E40, core_redux_common_chr + 0x1C00, 448);
+    render_chr_upload(0x2000, core_redux_intro_sprite_chr, 8192);
 
     /* Plane A: title rows. Plane B blank. */
     render_plane_fill(PLANE_A_BASE, 0x0024u, 32u * 32u);
@@ -279,7 +279,7 @@ void intro_title_step(void) {
 
 void intro_title_fade_apply(unsigned char idx) {
     if (idx >= 14u) return;
-    render_cram_upload(intro_title_fade_cycles[idx], 64u);
+    render_cram_upload(&core_redux_intro_title_fade[(unsigned short)idx * 64u], 64u);
     s_fade_delay = intro_title_fade_delays[idx];
     s_fade_cycle = idx;
 }

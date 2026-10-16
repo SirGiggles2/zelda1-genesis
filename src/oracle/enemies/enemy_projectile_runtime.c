@@ -150,7 +150,8 @@ void enrt_update_boulder_set(unsigned int slot) {
  *   - Sword/magic shot ($57..$59) -> DrawSwordShotOrMagicShot
  *   - Else: prep position, pick attr (flash if type >= $55, else shift X+4)
  */
-void enrt_draw_shot(unsigned int slot) {
+/* T-172: inlined into its per-object callers (call overhead). */
+__attribute__((always_inline)) void enrt_draw_shot(unsigned int slot) {
     unsigned char type = ENEMY_TYPE(slot);
     if (type == 0x5B) {
         c_draw_arrow(slot);

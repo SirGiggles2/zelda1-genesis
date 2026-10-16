@@ -21,6 +21,7 @@
  */
 
 #include "draw_dispatch.h"
+#include "../../state/game_profile.h"
 #include <stdint.h>
 #include "platform_abi.h"
 #include "scratch_state.h"     /* ZP_TMP0..ZP_TMPF */
@@ -321,7 +322,13 @@ static void anim_write_sprite_pair_not_flashing(void)
          * detects + routes the tile to ITEM atlas via lookup. */
         unsigned char publish_attr = attr;
         if (g_draw_in_item_context) publish_attr |= 0x08u;
-        enemy_render_publish_pair_left(tile, publish_attr, x, y);
+        /* NES source: Z_07:DrawStatusBarItemsAndEnsureItemSelected.
+         * Drained C: native item descriptor/pair writer above.
+         * Coverage: PARTIAL (HUD descriptors; native SAT owner below).
+         * Stance: EXTEND. HUD submissions use their dedicated SAT slots;
+         * keep native descriptor/cursor effects without adding an enemy. */
+        if (g_draw_in_item_context != 2u)
+            enemy_render_publish_pair_left(tile, publish_attr, x, y);
 
         off = (unsigned char)DRAW_RIGHT_SPRITE_OFFSET;
 
@@ -338,7 +345,8 @@ static void anim_write_sprite_pair_not_flashing(void)
 /* Anim_WriteSpritePair (Z_01.asm:2261). Apply hit-flash palette
  * override if MON_HIT_REACTION(slot) is non-zero, then call
  * not-flashing writer. */
-static void anim_write_sprite_pair(unsigned int slot)
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) static void anim_write_sprite_pair(unsigned int slot)
 {
     const unsigned char hit = (unsigned char)MON_HIT_REACTION(slot);
     if (hit != 0u) {
@@ -620,9 +628,10 @@ void anim_write_item_sprites(unsigned int slot,
     DRAW_LEFT_SPRITE_OFFSET = k_sprite_offsets[cur_idx & 0x3Fu];
     DRAW_RIGHT_SPRITE_OFFSET =
         k_sprite_offsets[(cur_idx + 1u) & 0x3Fu];
-    g_draw_in_item_context = 1u;
+    const unsigned char previous_context = g_draw_in_item_context;
+    g_draw_in_item_context = previous_context == 2u ? 2u : 1u;
     anim_write_specific_item_sprites(slot, item_slot);
-    g_draw_in_item_context = 0u;
+    g_draw_in_item_context = previous_context;
 }
 
 /* Anim_WriteStaticItemSpritesWithAttributes (Z_01.asm:2338).
@@ -694,13 +703,23 @@ unsigned char draw_item_frame_tile(unsigned char item_slot, unsigned char frame)
 /* T-092: DrawItemBySlot's frame-0 tile and sprite attributes for an item
  * slot and inventory value, computed without writing sprites (status-bar
  * A/B boxes). Same rules as draw_item_by_slot below. */
+/* NES source: Z_07:DrawItemBySlot / Redux gameplay/misc.asm $E73D.
+ * Drained C: draw_dispatch.c:draw_item_by_slot and draw_item_icon.
+ * Coverage: PARTIAL (Original palette cycle; Redux rupee exemption missing).
+ * Stance: EXTEND the shared native draw predicate, independent of options. */
+static unsigned char item_palette_flashes(unsigned char item_slot)
+{
+    if (item_slot == 0x16u && game_profile_is_remix()) return 0u;
+    return (unsigned char)(item_slot == 0x16u || item_slot == 0x1Au ||
+                           item_slot == 0x1Bu || item_slot == 0x19u);
+}
+
 unsigned char draw_item_icon(unsigned char item_slot, unsigned char item_value,
                              unsigned char *attr_out)
 {
     unsigned char slot = item_slot;
     unsigned char attrs = k_item_slot_to_palette_offsets_or_values[item_slot & 0x1Fu];
-    if (item_slot == 0x16u || item_slot == 0x1Au ||
-        item_slot == 0x1Bu || item_slot == 0x19u) {
+    if (item_palette_flashes(item_slot)) {
         attrs = options_consumer_get_no_reduced_flashing()
             ? 1u
             : (unsigned char)((((unsigned char)FRAME_COUNTER >> 3) & 0x01u) + 1u);
@@ -729,9 +748,7 @@ void draw_item_by_slot(unsigned int item_slot, unsigned int slot)
     unsigned char attrs = k_item_slot_to_palette_offsets_or_values[idx];
 
     /* Slots $16/$1A/$1B/$19 flash-cycle palette via FRAME_COUNTER. */
-    int flash =
-        (item_slot == 0x16u || item_slot == 0x1Au ||
-         item_slot == 0x1Bu || item_slot == 0x19u);
+    int flash = item_palette_flashes((unsigned char)item_slot);
 
     if (flash) {
         /* Phase 9 Task 9.4 NO_REDUCED_FLASHING consumer.
@@ -781,6 +798,23 @@ void draw_item_in_inventory(unsigned int item_slot, unsigned int slot)
     draw_item_by_slot(item_slot, slot);
 }
 
+/* NES source: Z_07:DrawStatusBarItemB/DrawStatusBarSword.
+ * Drained C: draw_item_in_inventory/anim_write_item_sprites.
+ * Coverage: PARTIAL (HUD icon descriptors, cache-independent native state).
+ * Stance: EXTEND; the engine HUD owner publishes the resulting icon. */
+unsigned char draw_hud_inventory_item(unsigned char item_slot,
+                                      unsigned char x, unsigned char y,
+                                      unsigned char *attr_out)
+{
+    DRAW_X = x;
+    DRAW_Y = y;
+    g_draw_in_item_context = 2u;
+    draw_item_in_inventory(item_slot, 0x0Fu);
+    g_draw_in_item_context = 0u;
+    *attr_out = (unsigned char)DRAW_LEFT_ATTR;
+    return (unsigned char)DRAW_LEFT_TILE;
+}
+
 void draw_write_boss_sprite(unsigned char tile, unsigned char x,
                             unsigned char y, unsigned char attr)
 {
@@ -804,6 +838,16 @@ void draw_write_boss_sprite(unsigned char tile, unsigned char x,
 void draw_animate_item_object(unsigned char item_id, unsigned int slot)
 {
     /* drain Z_07.asm:1955-2003. */
+    /* NES source: Z_07:AnimateItemObject; pinned Redux live72F9/731D.
+     * Drained C: draw_animate_item_object native descriptor lookup.
+     * Coverage: FULL(drop art with absent/wood/silver ownership in OW/UW).
+     * Stance: EXTEND extended ID before indexing the legacy36-entry table. */
+    if (game_profile_is_remix() && item_id == 0x55u)
+        /* AnimateItemObject's unbounded ID55 lookup reads slot2/value9,
+         * producing arrow tile28/palette0 even when silver is owned.
+         * ArrowDrop's ownership-dependent hook belongs to TakeItem, not
+         * this renderer. Normalize to the equivalent wood-arrow art. */
+        item_id = 8u;
     const unsigned char timer = (unsigned char)DRAW_ITEM_LIFETIME(slot);
     if (timer >= 0xF0u) {
         /* Lifetime flash — skip draw on even ticks (LSR-with-carry

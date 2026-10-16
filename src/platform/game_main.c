@@ -30,6 +30,7 @@ extern unsigned char g_fs_handoff_slot;
 
 /* Persistent NES-format saves (T-100). src/state is on the include path. */
 #include "save_game.h"
+#include "game_profile.h"
 #include "../game/world/bg_palette.h"   /* refresh_link_color */
 #include "../game/world/startup_triangle.h"
 #include "../game/world/circle_transition.h"
@@ -140,6 +141,7 @@ static void frontend_video_layout(void)
 
 static void debug_enter_title(void)
 {
+    game_profile_clear();
     s_state = COMBINED_STATE_TITLE;
     s_prev_joy = 0u;
     frontend_video_layout();
@@ -327,6 +329,7 @@ int debug_main_after_a4(bool hardReset)
                  * before entry because level data installs per quest. */
                 {
                     unsigned char slot = g_fs_handoff_slot;
+                    (void)game_profile_activate(slot);
                     unsigned char q2 = (save_game_slot_active(slot) &&
                                         save_game_slot_quest(slot)) ? 1u : 0u;
                     roomrom_main_set_quest(q2 ? 2u : 1u);
@@ -334,7 +337,21 @@ int debug_main_after_a4(bool hardReset)
                 g_debug_session = 0u;   /* T-090: real game, no debug */
                 s_state = COMBINED_STATE_ROOMROM;
                 probe_publish();
-                roomrom_debug_enter();
+                {
+                    /* NES source: Z_07.asm InitMode2 ClearRoomHistory (keeps
+                     * CurRoomHistoryIndex $620) + RunCrossRoomTasks history.
+                     * Drained C: room_clear_room_history / room_record_history.
+                     * Coverage: FULL history cells $620-$626; Stance: EXTEND.
+                     * The scaffold room init inside roomrom_debug_enter has
+                     * no NES counterpart; it recorded the start room before
+                     * mode 2 cleared the history, leaving $620 one ahead of
+                     * the NES (lockstep: every preset, t=0 $620 NES 01 GEN
+                     * 02, write-watch room_record_history frames 331/420). */
+                    unsigned char history[7], i;   /* index + six rooms */
+                    for (i = 0u; i < 7u; ++i) history[i] = nes_ram[NES_ROOM_HISTORY_IDX + i];
+                    roomrom_debug_enter();
+                    for (i = 0u; i < 7u; ++i) nes_ram[NES_ROOM_HISTORY_IDX + i] = history[i];
+                }
 
                 /* Continue vs New Game. roomrom_debug_enter seeds the
                  * default profile, so the restore has to run AFTER it or
@@ -369,6 +386,7 @@ int debug_main_after_a4(bool hardReset)
              * runs. Genesis: the same validation, then its File Select. */
             if (RAM(0x0012u) == 0x00u && RAM(0x0013u) == 0x01u)
             {
+                game_profile_clear();
                 s_state = COMBINED_STATE_FS;
                 s_prev_joy = 0u;
                 render_cram_defer(0u);   /* the File Select writes CRAM itself */

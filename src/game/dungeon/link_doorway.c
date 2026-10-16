@@ -77,7 +77,8 @@ static unsigned char opposite_dir(unsigned char dir)
 }
 
 /* Z_05.asm MaskInputInBorder. [00] direction, [02] coordinate. */
-static void mask_input_in_border(unsigned char mask, unsigned char y)
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) static void mask_input_in_border(unsigned char mask, unsigned char y)
 {
     unsigned char coord = nes_ram[TMP_02];
     unsigned char crossed;

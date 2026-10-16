@@ -9,6 +9,7 @@
  * through render_set_sprite_full; RENDER_SPRITE_SIZE/RENDER_TILE_ATTR_FULL/PALn
  * use portable RENDER_* macros from render_abi.h. */
 #include "sprite_render.h"
+#include "redux_chr.h"
 #include "../../enemies/enemy_render.h"
 #include "render_abi.h"
 #include "sprite_slots.h"
@@ -239,7 +240,14 @@ static void roomrom_sprites_set_full_cached(unsigned short slot,
 
 void roomrom_sprites_set_redux(unsigned char redux)
 {
-    s_item_chr_variant = redux ? 1u : 0u;
+    unsigned char variant = redux ? 1u : 0u;
+    if (s_item_chr_variant != variant) roomrom_sprites_invalidate_cache();
+    s_item_chr_variant = variant;
+}
+
+static const unsigned char *active_common_chr(void)
+{
+    return s_item_chr_variant ? core_redux_common_chr : common_chr;
 }
 
 /* Horizontally flip a Genesis 4bpp 8x8 tile (32 bytes) in place.
@@ -278,7 +286,7 @@ static void upload_pose(unsigned short vram_tile_base,
         if (pose->nes_ids[t] >= COMMON_SPRITE_PATTERN_TILE_COUNT) {
             for (i = 0; i < 32; i++) buf[i] = 0;
         } else {
-            for (i = 0; i < 32; i++) buf[i] = common_chr[nes_off + i];
+            for (i = 0; i < 32; i++) buf[i] = active_common_chr()[nes_off + i];
         }
         if (pose->per_tile_hflip & (1u << t)) {
             hflip_tile_inplace(buf);
@@ -300,25 +308,26 @@ static void upload_pose(unsigned short vram_tile_base,
 
 void roomrom_sprites_upload_persistent_chr(void)
 {
+    enemy_render_invalidate_chr_cache();
     /* Phase 3: sprite bank is 1x (sub-pal 0 only). sprites_chr (OW
      * enemies) deferred -- not uploaded. Common gameplay sprite block
      * (Link, sword, hearts) goes first. */
     render_chr_upload((unsigned short)(COMMON_VRAM_TILE_BASE * 32u),
-                      common_chr, COMMON_CHR_BYTES);
+                      active_common_chr(), COMMON_CHR_BYTES);
     /* HUD position marker $3E/$3F outside the scene overlay. */
     render_chr_upload((unsigned short)(ROOMROM_HUD_MARKER_TILE_BASE * 32u),
-                      common_chr + 0x3Eu * 32u,
+                      active_common_chr() + 0x3Eu * 32u,
                       ROOMROM_HUD_MARKER_TILE_COUNT * 32u);
     /* T-195: live NES shop OAM tile $56, paired with $57. Source bytes
      * match the ROM-derived common block; protect them from OW/UW banks. */
     render_chr_upload((unsigned short)(ROOMROM_SHIELD_TILE_BASE * 32u),
-                      common_chr + 0x56u * 32u,
+                      active_common_chr() + 0x56u * 32u,
                       ROOMROM_SHIELD_TILE_COUNT * 32u);
     /* T-011: Link item-lift pair $78/$79 outside the scene overlay. The
      * NES sprite table's $70.. tiles are the extracted demo block (tile k
      * = NES $70 + k; byte-matched to NES CHR-RAM in a cave, t011 f520). */
     render_chr_upload((unsigned short)(ROOMROM_LINK_LIFT_TILE_BASE * 32u),
-                      demo_chr + (0x78u - 0x70u) * 32u,
+                      (s_item_chr_variant ? core_redux_demo_chr : demo_chr) + (0x78u - 0x70u) * 32u,
                       ROOMROM_LINK_LIFT_TILE_COUNT * 32u);
 
     /* Walk poses (32 tiles). */
@@ -366,7 +375,7 @@ void roomrom_sprites_upload_persistent_chr(void)
      * theirs (T-056: neither is in the items atlas; its $76 entry is
      * not the ladder). */
     render_chr_upload((unsigned short)(ROOMROM_SUBSCREEN_SPRITE_TILE_BASE * 32u),
-                      &k_inventory_sprite_chr[0][0],
+                      s_item_chr_variant ? core_redux_inventory_chr : &k_inventory_sprite_chr[0][0],
                       (unsigned short)(ROOMROM_SUBSCREEN_SPRITE_TILE_COUNT * 32u));
 
     /* Prepare fixed FX with persistent CHR, before controller play.
@@ -397,7 +406,7 @@ void roomrom_sprites_upload_items_chr(void)
                                    * (unsigned long)s;
         render_chr_upload(
             (unsigned short)(vram_tile * 32u),
-            &roomrom_atlas_items_x4[variant][blob_off],
+            variant ? &core_redux_items_chr[blob_off] : &roomrom_atlas_items_x4[0][blob_off],
             (unsigned short)ROOMROM_ATLAS_ITEMS_X4_PER_PAL_BYTES
         );
     }

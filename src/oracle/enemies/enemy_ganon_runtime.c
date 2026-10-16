@@ -56,6 +56,7 @@
 #include "enemy_wizzrobe_runtime.h"
 #include "platform_abi.h"
 #include "core/core_dispatch.h"
+#include "world/progress_dispatch.h"
 #include "../combat/collision_runtime.h"
 #include "../combat/link_collision_runtime.h"
 #include "../world/sprite_runtime.h"
@@ -94,10 +95,6 @@ static const unsigned char GanonSpriteHFlips[4]   = { 0x00u, 0x01u, 0x00u, 0x01u
 
 static const unsigned char GanonColorTransferRecord[8] = {
     0x3Fu, 0x1Cu, 0x04u, 0x0Fu, 0x07u, 0x17u, 0x27u, 0xFFu
-};
-
-static const unsigned char GanonColorSets[9] = {
-    0x07u, 0x17u, 0x30u, 0x16u, 0x2Cu, 0x3Cu, 0x27u, 0x06u, 0x16u
 };
 
 /* ---------- Ganon-specific RAM macros (per ObjVars.inc + Variables.inc) ---------- */
@@ -580,7 +577,7 @@ static void ganon_append_palette_row_transfer_record(unsigned char y_end)
      * (T-171). */
     y = y_end;
     for (rev = 2; rev >= 0; --rev) {
-        GANON_DYNTILEBUF((unsigned int)(4u + (unsigned int)rev)) = GanonColorSets[y];
+        GANON_DYNTILEBUF((unsigned int)(4u + (unsigned int)rev)) = progress_ganon_palette_color(y);
         --y;
     }
 }

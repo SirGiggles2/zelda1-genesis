@@ -53,7 +53,12 @@ extern volatile unsigned char *nes_ram;
 #else
 /* Zelda.md variant: A4-register pinned. Boot shell loads A4 = $FF0000
  * before C entry; -ffixed-a4 flag prevents gcc from clobbering. */
-register volatile unsigned char *nes_ram asm("a4");
+/* T-172: not volatile. The mirror is only touched by this single-threaded
+ * code path (V-Int hook, DMA and Z80 never write it; no inline asm writes it),
+ * so re-reading every access only blocked register allocation across the
+ * inlined enemy pipeline (room $38: Remix updates past $C5 93 -> 20, Original
+ * 30 -> 0; end-of-tick parity exact in OW rooms $38/$37/$3A/$77, both modes). */
+register unsigned char *nes_ram asm("a4");
 #endif
 
 /* SGDK memory_base.h defines an object-like RAM (0xE0FF0000). No project

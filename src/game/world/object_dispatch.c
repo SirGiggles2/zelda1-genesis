@@ -93,7 +93,8 @@ __attribute__((always_inline)) void object_bound_direction_vertically(unsigned i
     }
 }
 
-unsigned char object_bound_by_room(unsigned int slot)
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) unsigned char object_bound_by_room(unsigned int slot)
 {
     /* NES BoundByRoom (Z_01.asm:3457):
      *   JSR BoundDirectionHorizontally
@@ -105,7 +106,8 @@ unsigned char object_bound_by_room(unsigned int slot)
     return (unsigned char)RAM(NES_OBJ_DIR);
 }
 
-unsigned char object_bound_by_room_with_dir(unsigned char direction,
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) unsigned char object_bound_by_room_with_dir(unsigned char direction,
                                             unsigned int slot)
 {
     /* NES sets $0F = direction before JSR BoundByRoom; drain wrapper
@@ -114,7 +116,8 @@ unsigned char object_bound_by_room_with_dir(unsigned char direction,
     return object_bound_by_room(slot);
 }
 
-void object_move_object(unsigned short slot)
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) void object_move_object(unsigned short slot)
 {
     /* NES source: reference/aldonunez/Z_07.asm:MoveObject.
      * Drained C: src/oracle/world/object_runtime.c:objrt_move_object.

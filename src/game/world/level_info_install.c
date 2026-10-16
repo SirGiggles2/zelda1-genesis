@@ -51,6 +51,8 @@
 
 #include "level_info_install.h"
 #include "platform_abi.h"
+#include "../../../state/game_profile.h"
+#include "render/redux_chr.h"
 #include "../../../data/rooms/dungeons_offsets.h"
 #include "../../../engine/src/engine_state.h"  /* roomrom_main_current_quest */
 
@@ -62,6 +64,22 @@ extern const unsigned char rooms_dungeons[];
 #define NES_LBA_BLOCK_BYTES     768u
 #define NES_LEVEL_INFO_BASE     0x6B7Eu
 #define NES_LEVEL_INFO_BYTES    256u
+
+/* NES source: Redux move_maps.asm: dungeon/OW offsets and map transfers.
+ * Drained C: existing level_info installers below.
+ * Coverage: FULL(installed HUD offset/macro); other Redux level fields separate.
+ * Stance: EXTEND the shared native record owner, preserving Original. */
+extern const unsigned char core_redux_dungeon_hud[864];
+static void install_redux_hud_metadata(unsigned char level, unsigned char quest)
+{
+    const unsigned char *record;
+    if (!game_profile_is_remix()) return;
+    if (level == 0u) { RAM(0x6BACu) = 0xA0u; return; }
+    if (level > 9u || quest < 1u || quest > 2u) return;
+    record = &core_redux_dungeon_hud[((quest - 1u) * 9u + level - 1u) * 48u];
+    RAM(0x6BACu) = record[0];
+    for (unsigned char i = 0u; i < record[1]; ++i) RAM(0x6BCDu + i) = record[2u + i];
+}
 
 /* Blob offsets per data/rooms/MANIFEST.json. */
 #define BLOB_OW_LEVELBLOCK_OFF  0u
@@ -167,10 +185,16 @@ void level_info_apply_q2_ow_patch(void)
 
 void level_info_install_ow(void)
 {
+    /* NES source: Z_06:LevelBlockOW / UpdateMode2Load_Full.
+     * Drained C: level_info_install.c:level_info_install_ow.
+     * Coverage: PARTIAL (profile-specific OW attributes).
+     * Stance: EXTEND the existing SRAM installer and cache owner. */
     const unsigned char q2 = (unsigned char)(roomrom_main_current_quest() == 2u);
-    if (lba_differs(&rooms_overworld[BLOB_OW_LEVELBLOCK_OFF], q2)) lba_changed();
+    const unsigned char *attrs = game_profile_is_remix() ?
+        core_redux_ow_attributes : &rooms_overworld[BLOB_OW_LEVELBLOCK_OFF];
+    if (lba_differs(attrs, q2)) lba_changed();
     copy_to_nes_ram(NES_LBA_A_BASE,
-                    &rooms_overworld[BLOB_OW_LEVELBLOCK_OFF],
+                    attrs,
                     NES_LBA_BLOCK_BYTES);
     copy_to_nes_ram(NES_LEVEL_INFO_BASE,
                     &rooms_overworld[BLOB_OW_LEVELINFO_OFF],
@@ -180,6 +204,7 @@ void level_info_install_ow(void)
     if (roomrom_main_current_quest() == 2u) {
         level_info_apply_q2_ow_patch();
     }    room_patch_level_palette_link_color();
+    install_redux_hud_metadata(0u, roomrom_main_current_quest());
 }
 
 /* OW LevelInfo_StartRoomId ($6BAD in the OW install), read while a level's
@@ -230,6 +255,7 @@ void level_info_apply_q2_patch(unsigned char level)
     for (k = 1u; k < level; ++k) src += sizes[k - 1u];
     count = (unsigned int)sizes[level - 1u] + 1u;
     copy_to_nes_ram(ROOMROM_UW_Q2_LI_PATCH_DEST, &rooms_dungeons[src], count);
+    install_redux_hud_metadata(level, 2u);
 }
 
 void level_info_install_uw(unsigned char level, unsigned char quest)
@@ -262,6 +288,7 @@ void level_info_install_uw(unsigned char level, unsigned char quest)
     }
     room_patch_level_palette_link_color();
 
+    install_redux_hud_metadata(level, quest);
     /* LevelInfo_WorldFlagsAddr ($6BAF/$6BB0) comes from the ROM record
      * unmodified. ROM-verified 2026-09-24 (pointer-read, 252-byte records):
      * OW $067F, L1-L6 $06FF, L7-L9 $077F -- three separate live NES flag
@@ -290,6 +317,7 @@ void level_info_mode2_step(unsigned char step, unsigned char level,
                                   ((unsigned int)(level - 1u)) * BLOB_UW_LEVELINFO_STRIDE];
         copy_to_nes_ram(NES_LEVEL_INFO_BASE, src, NES_LEVEL_INFO_BYTES);
         room_patch_level_palette_link_color();
+        install_redux_hud_metadata(level, q2 ? 2u : 1u);
     } else if (q2) {
         if (level == 0u) level_info_apply_q2_ow_patch();
         else level_info_apply_q2_patch(level);

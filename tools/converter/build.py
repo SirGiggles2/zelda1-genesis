@@ -240,6 +240,7 @@ def nes_stages(rom_path: Path, redux_path: Path | None) -> list[list[str]]:
     if redux_path is not None:
         r = str(redux_path)
         stages += [
+            ["tools/converter/redux_graphics.py", "--redux", r],
             # Redux overworld layouts/heaps/CHR located by hash in the ROM.
             ["tools/converter/rom_blobs.py", "--redux", r],
             ["engine/tools/gen_redux_assets.py"],

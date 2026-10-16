@@ -11,6 +11,7 @@
 #include "render_abi.h"  /* render_vram_read_word, render_set_plane_a_word */
 #include "platform_abi.h"  /* RAM(): FrameCounter $15 */
 #include "../../enemies/enemy_loop.h"  /* enemy_loop_enter_cave_objects (T-171) */
+#include "../../enemies/enemy_render.h"
 #include "../../combat/collision_dispatch.h"  /* InitMode10 GetCollidableTileStill (T-171) */
 
 /* Genesis Plane A VRAM base + cell stride. Per src/sgdk_adapter
@@ -327,6 +328,14 @@ void cave_fade_tick(void)
         if (s_cb.on_swap_entry != 0) {
             s_cb.on_swap_entry(s_pending_cid);
         }
+        /* NES source: Z_07.asm:HideObjectSprites / InitModeB cave handoff.
+         * Drained C: enemy_render_reset_oam / native_sweep.
+         * Coverage: FULL outgoing actor-cache lifetime at cave handoff.
+         * Stance: EXTEND. Reset native draw entries as well as object RAM;
+         * the iris can reveal the cave before its first object-loop draw. */
+        enemy_render_reset_oam();
+        enemy_render_weapon_reset_all();
+        enemy_render_native_sweep();
         /* NES: cave-load is followed by InitMode_WalkCave (the emerge), not an
          * idle. Spawn Link at the cave bottom ($DD) and hand off to the emerge
          * walk-up. on_swap_entry already placed Link at the spawn; seed the

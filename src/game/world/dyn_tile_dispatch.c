@@ -21,6 +21,7 @@
                                   NES_TILE_XFER_BUF_BASE */
 #include "room_state.h"        /* ROOM_TILE_XFER_BUF_IDX,
                                   ROOM_TILE_XFER_BUF */
+#include "../../state/game_profile.h"
 
 /* NES PlayAreaColumnAddrs (Z_07.asm:336): 32 LE 16-bit pointers into
  * nes_ram (range $6530..$67DA). Duplicated from collision_dispatch.c
@@ -114,7 +115,14 @@ void dyn_tile_change_play_map_square_ow(unsigned int slot)
     unsigned char square_index = 0x10u;
     const unsigned char primary = (unsigned char)RAM(0x0005u);
 
-    if (primary < 0x27u || primary >= 0xF3u) {
+    /* NES source: Redux visible_secrets.asm:$ABED / ChangePlayMapSquareOW.
+     * Drained C: this native dynamic-square publisher.
+     * Coverage: PARTIAL (bomb reveal). Stance: EXTEND.
+     * The source deliberately maps arch $54 through type-3 fallback ($24)
+     * for collision while the transfer buffer retains visible $54..$57.
+     */
+    const unsigned char type3_limit = game_profile_is_remix() ? 0x57u : 0x27u;
+    if (primary < type3_limit || primary >= 0xF3u) {
         /* Type-3: scan k_primary_squares_ow[14..1] for a match. */
         unsigned char idx = 0x0Eu;
         while (idx > 0u) {

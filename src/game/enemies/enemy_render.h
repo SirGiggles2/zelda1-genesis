@@ -108,6 +108,7 @@ void enemy_render_weapon_add_cloud(unsigned char slot, unsigned char frame,
                                    unsigned char y);
 
 unsigned short enemy_render_item_sat(unsigned char nes_tile, unsigned char nes_attrs);
+void enemy_render_invalidate_chr_cache(void);
 /* T-097: death spark ($62/$64) in Link's slots, sprite palette of the NES attrs. */
 unsigned short enemy_render_spark_sat(unsigned char nes_tile, unsigned char nes_attrs);
 #endif

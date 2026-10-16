@@ -53,10 +53,19 @@ CFLAGS = [
     "-fomit-frame-pointer",
     "-ffixed-a4",
 ]
+# Explicit local playtest only; normal Debug builds contain no drop shortcut.
+if os.environ.get("ZELDA_DROP_TEST") == "1":
+    CFLAGS += ["-DZELDA_DROP_TEST"]
 # build.py --music: your own VGMs (tools/converter/local_music.py writes
 # build/local_music/local_music.c). Off by default; local builds only.
 LOCAL_MUSIC = os.environ.get("ZELDA_LOCAL_MUSIC") == "1"
-NES_MUSIC = os.environ.get("ZELDA_NES_MUSIC") == "1"
+# Seven songs (title, item, level 9, Ganon, triforce, Zelda, ending) are
+# generated from the user's NES ROM by tools/converter/nes_music.py into
+# build/nes_music/. On by default: a plain Build.bat build used to leave
+# them unlinked (only build.py set ZELDA_NES_MUSIC=1), so the playable ROM
+# shipped 3 of 10 music tracks. ZELDA_NES_MUSIC=0 is the explicit opt-out.
+NES_MUSIC = os.environ.get("ZELDA_NES_MUSIC") != "0"
+NES_MUSIC_DIR = ROOT / "build" / "nes_music"
 if NES_MUSIC:
     CFLAGS += ["-DZELDA_NES_MUSIC", f"-I{ROOT / 'build' / 'nes_music'}"]
 if LOCAL_MUSIC:
@@ -135,23 +144,8 @@ TITLE_C_SOURCES = [
     ("src/frontend/intro/intro_phase.c", "intro_phase.o"),
     ("src/frontend/intro/intro_title.c", "intro_title.o"),
     ("src/frontend/intro/intro_story.c", "intro_story.o"),
-    ("data/intro/intro_font_chr.c", "intro_font_chr.o"),
-    ("data/intro/intro_art_chr.c", "intro_art_chr.o"),
-    ("data/intro/intro_palette.c", "intro_palette.o"),
-    ("data/intro/intro_story_tilemap.c", "intro_story_tilemap.o"),
-    ("data/intro/intro_title_bg_chr.c", "intro_title_bg_chr.o"),
-    ("data/intro/intro_title_sprite_chr.c", "intro_title_sprite_chr.o"),
-    ("data/intro/intro_title_palette.c", "intro_title_palette.o"),
-    ("data/intro/intro_title_tilemap.c", "intro_title_tilemap.o"),
     ("data/intro/intro_title_fade.c", "intro_title_fade.o"),
     ("data/intro/intro_title_glow.c", "intro_title_glow.o"),
-    ("data/intro/intro_common_bg_chr.c", "intro_common_bg_chr.o"),
-    ("data/intro/intro_sprite_chr.c", "intro_sprite_chr.o"),
-    ("data/intro/intro_misc_chr.c", "intro_misc_chr.o"),
-    ("src/frontend/intro/intro_punct_chr.c", "intro_punct_chr.o"),
-    ("data/intro/intro_blink_chr.c", "intro_blink_chr.o"),
-    ("data/intro/intro_combined_palette.c", "intro_combined_palette.o"),
-    ("data/intro/intro_treasures_tilemap.c", "intro_treasures_tilemap.o"),
     # Phase 9 Task 9.3 — File Select OPTIONS submenu (compile-only; FS
     # frontend wire-up into Zelda.md gameplay path is a follow-up task).
     ("src/frontend/fs/fs_options.c", "fs_options.o"),
@@ -219,6 +213,7 @@ ROOMROM_C_SOURCES = [
     # different mirror ($FF6000). save_game.c owns the copy between them,
     # which is why save_slot_serialize had no callers before now.
     ("src/state/save_game.c",                   "save_game.o"),
+    ("src/state/game_profile.c",                "game_profile.o"),
     # Cart SRAM backend. sram_adapter.c's _sram_* externs claimed to come
     # from src/nes_io.asm, which is NOT linked into Zelda.md (nor is
     # genesis_shell.asm, which called _sram_load_save_slots at boot), so
@@ -557,6 +552,7 @@ ROOMROM_C_SOURCES = [
     ("engine/src/redux_uw_bg.c", "redux_uw_bg.o"),
     ("engine/src/redux_hud_chr.c", "redux_hud_chr.o"),
     ("data/chr/common.c", "common.o"),
+    ("build/generated/core_redux_chr.c", "core_redux_chr.o"),
     ("data/chr/sprites.c", "sprites.o"),
     # T-011: NES sprite tiles $70.. (demo block; Link item-lift pose $78/$79).
     ("data/chr/demo.c", "demo_chr.o"),
@@ -652,6 +648,53 @@ def compile_asm(src: Path, obj_name: str, label: str, mri: bool = False) -> Path
     return obj_path
 
 
+def find_nes_rom() -> Path | None:
+    """Same lookup as the extractors (ZELDA_NES_ROM, then repo root), plus
+    roms/, where the local reference ROM lives."""
+    env = os.environ.get("ZELDA_NES_ROM", "")
+    for cand in ([Path(env)] if env else []) + [
+            ROOT / "Legend of Zelda, The (USA).nes",
+            ROOT / "roms" / "Legend of Zelda, The (USA).nes"]:
+        if cand.is_file():
+            return cand
+    return None
+
+
+def ensure_nes_music() -> bool:
+    """Regenerate build/nes_music/nes_music.c when missing or stale (other
+    ROM, newer generator). build.py already generated it from the user's
+    ROM before calling us; trust that table when no ROM is found here."""
+    table = NES_MUSIC_DIR / "nes_music.c"
+    rom = find_nes_rom()
+    if rom is None:
+        if table.is_file():
+            return True
+        print("ERROR: ROM music table missing (build/nes_music/nes_music.c) and no NES ROM "
+              "found. Set ZELDA_NES_ROM, or ZELDA_NES_MUSIC=0 to build without the seven "
+              "ROM songs.")
+        return False
+    import hashlib
+    import json
+    digest = hashlib.sha256(rom.read_bytes()).hexdigest()
+    report = NES_MUSIC_DIR / "capture.json"
+    gens = [ROOT / "tools" / "converter" / n for n in ("nes_music.py", "local_music.py")]
+    stale = not (table.is_file() and report.is_file())
+    if not stale:
+        try:
+            stale = json.loads(report.read_text()).get("rom_sha256") != digest
+        except ValueError:
+            stale = True
+    if not stale:
+        stale = max(g.stat().st_mtime for g in gens) > table.stat().st_mtime
+    if stale:
+        print(f"[0] Generating ROM music from {rom.name}...")
+        r = subprocess.run([sys.executable, str(gens[0]), "--rom", str(rom)], cwd=ROOT)
+        if r.returncode or not table.is_file():
+            print("ERROR: tools/converter/nes_music.py failed")
+            return False
+    return True
+
+
 def main() -> int:
     if not GCC.exists():
         print(f"ERROR: gcc not found at {GCC}")
@@ -685,6 +728,10 @@ def main() -> int:
 
     print("[Build][CHR-1 gate] check_generated_freshness.py")
     run([sys.executable, ROOT / "tools" / "probes" / "check_generated_freshness.py"])
+    print("[Build][UW coverage gate] Redux Q2 L1 normal destinations")
+    run([sys.executable, ROOT / "tools" / "audit" / "check_redux_q2_l1_coverage.py"])
+    print("[Build][CHR-1 gate] authenticated core Redux banks")
+    run([sys.executable, ROOT / "tools" / "converter" / "redux_graphics.py", "--verify"])
 
     print("[1] Compiling sgdk/src/boot/rom_head.c...")
     run(gcc_prefix() + CFLAGS + include_args() + ["-c", SGDK / "src" / "boot" / "rom_head.c", "-o", OUT / "rom_head.o"], cwd=PROJ)
@@ -715,8 +762,7 @@ def main() -> int:
     # (compile_c / up_to_date). Link order stays the source-list order.
     c_units = list(TITLE_C_SOURCES) + list(ROOMROM_C_SOURCES)
     if NES_MUSIC:
-        if not (ROOT / "build/nes_music/nes_music.c").is_file():
-            print("ERROR: ROM music table missing; run build.py with your NES ROM")
+        if not ensure_nes_music():
             return 1
         c_units.append(("build/nes_music/nes_music.c", "nes_music.o"))
     if LOCAL_MUSIC:

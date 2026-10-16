@@ -6,10 +6,8 @@
  * Lifecycle:
  *   FS_NAV : cursor on OPTIONS row + A pressed -> fs_options_enter()
  *   FS_OPTIONS : fs_options_step() drives input every vblank
- *   B button OR A on SAVE row : commit live state to SRAM via
- *                               options_persistence_commit() and return
- *                               to FS_NAV
- *   START button : abandon (no commit) and return to FS_NAV
+ *   A on SAVE row OR START: commit the selected file's live settings.
+ *   B OR C: restore the selected file's committed settings.
  *
  * Probe RAM contract ($FF7EA0..$FF7EAF):
  *   [0]   = 'O'  (0x4F) magic
@@ -35,10 +33,11 @@
 
 #define FS_OPTIONS_PROBE_BASE  0x00FF7EA0UL
 
-/* Total navigable rows in the OPTIONS submenu.
- * 16 OptionId values (8 bool + 7 enum + 1 numeric) + SAVE row. */
-#define FS_OPTIONS_ROW_COUNT   17u
-#define FS_OPTIONS_SAVE_ROW    16u
+/* Core is informational; only implemented preferences/modifiers are editable.
+ * Row identity is independent of the wire-stable OptionId/save layout. */
+#define FS_OPTIONS_ROW_COUNT   8u
+#define FS_OPTIONS_SAVE_ROW    7u
+#define FS_OPTIONS_CORE_ROW    0u
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +49,9 @@ void fs_options_probe_init(void);
 /* Enter phase from FS_NAV (caller flips s_fs_phase to FS_OPTIONS first
  * to keep state-machine ownership in fs_phase.c). */
 void fs_options_enter(void);
+
+/* Returns OPTION_ID_COUNT for informational/action rows. */
+unsigned int fs_options_id_for_row(uint8_t row);
 
 /* One-vblank step. Reads input edges, updates live options state via
  * options_set, and may commit + return to FS_NAV. */

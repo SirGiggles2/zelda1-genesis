@@ -76,9 +76,19 @@ def parse_constants():
     text_item = ITEM_CHR_H.read_text(encoding="utf-8")
 
     consts = {}
+    # T302: main-owned fallback text patterns do not expand the frozen
+    # sparse atlas. Check their reservation against every resident bank.
+    text_header = ROOT.parent / "src/game/world/transfer_buf_drain.h"
+    if text_header.exists():
+        for name in ("ROOMROM_TEXT_EXTRA_TILE_BASE", "ROOMROM_TEXT_EXTRA_TILE_COUNT"):
+            m = re.search(rf"#define\s+{name}\s+(\d+)u?", text_header.read_text())
+            if not m:
+                fail(f"missing {name} in {text_header}")
+            consts[name] = int(m.group(1))
 
     # --- BG and SPR banks (literal numeric defines in vram_layout.h) ---
-    for name in ("ROOMROM_BG_TILE_BASE",
+    for name in ("ROOMROM_CORE_BG_EXTRA_TILE_BASE", "ROOMROM_CORE_BG_EXTRA_TILE_COUNT",
+                 "ROOMROM_BG_TILE_BASE",
                  "ROOMROM_BG_TILE_COUNT_PER_PAL",
                  "ROOMROM_BG_SUBPAL_COUNT",
                  "ROOMROM_SPR_TILE_BASE",
@@ -244,7 +254,7 @@ def main():
         fail(f"Boss palette-3 bank ends at {boss_subpal3_end}, beyond VDP tables")
     banks = {"BG": bg_range, "SPR": spr_range, "ITEM": item_range,
              "BOSS_PAL3": tile_range_bytes(item_end_tile, c["ROOMROM_BOSS_SUBPAL3_TILE_COUNT"])}
-    for name in ("SUBSCREEN_SPRITE", "CLOUD", "FIREBALL", "FIREBALL_SUBPAL3", "SPARK", "SPARK_SUBPAL3",
+    for name in ("CORE_BG_EXTRA", "SUBSCREEN_SPRITE", "CLOUD", "FIREBALL", "FIREBALL_SUBPAL3", "SPARK", "SPARK_SUBPAL3",
                  "HUD_MARKER", "SHIELD", "CELLAR_BG", "LINK_LIFT", "LINK_FLASH3", "LINK_ATTACK_FLASH3",
                  "PT1_PAIR", "SUBPAL3_PAIR"):
         region = tile_range_bytes(c[f"ROOMROM_{name}_TILE_BASE"], c[f"ROOMROM_{name}_TILE_COUNT"])
@@ -254,6 +264,27 @@ def main():
             if overlaps(region, occupied):
                 fail(f"{name} overlaps {other}")
         banks[name] = region
+    if "ROOMROM_TEXT_EXTRA_TILE_BASE" in c:
+        region = tile_range_bytes(c["ROOMROM_TEXT_EXTRA_TILE_BASE"], c["ROOMROM_TEXT_EXTRA_TILE_COUNT"])
+        if region[1] > TILE_DATA_LIMIT_BYTES:
+            fail("TEXT_EXTRA extends into VDP tables")
+        for other, occupied in banks.items():
+            if overlaps(region, occupied):
+                fail(f"TEXT_EXTRA overlaps {other}")
+        banks["TEXT_EXTRA"] = region
+        # Renderer uses deterministic ranks of missing common-font pairs.
+        lut_text = (ROOT / "src/bg_sparse_chr.c").read_text()
+        lut_text = lut_text[lut_text.index("const unsigned short bg_sparse_tile_lut"):]
+        rows = re.findall(r"\{([^}]+)\}", lut_text)
+        needed = 0
+        for row in rows[:48]:
+            values = [int(v, 16) for v in re.findall(r"0x([0-9A-Fa-f]+)", row)]
+            if len(values) != 4:
+                fail("malformed font LUT row")
+            if values[0] != 0xFFFF:
+                needed += sum(v == 0xFFFF for v in values[1:])
+        if needed > c["ROOMROM_TEXT_EXTRA_TILE_COUNT"]:
+            fail(f"TEXT_EXTRA needs {needed} tiles, reservation is too small")
     headroom_tiles = TILE_DATA_LIMIT_TILES - max(end for _, end in banks.values()) // 32
     # Phase J.2 (2026-05-18 doc-only): BG bank reserves 1024 tiles for
     # legacy 4x layout (still used by redux UW per uw_render.c branch)
@@ -280,6 +311,9 @@ def main():
         f"ITEM=tiles {item_base}..{item_end_tile - 1}  "
         f"BOSS=SCENE_OBJ-shared (NES parity)  "
         f"BOSS_PAL3=tiles {item_end_tile}..{boss_subpal3_end - 1}  "
+        f"CORE_BG_EXTRA=tiles {c['ROOMROM_CORE_BG_EXTRA_TILE_BASE']}..{c['ROOMROM_CORE_BG_EXTRA_TILE_BASE'] + c['ROOMROM_CORE_BG_EXTRA_TILE_COUNT'] - 1}  "
+        + (f"TEXT_EXTRA=tiles {c['ROOMROM_TEXT_EXTRA_TILE_BASE']}..{c['ROOMROM_TEXT_EXTRA_TILE_BASE'] + c['ROOMROM_TEXT_EXTRA_TILE_COUNT'] - 1}  "
+           if "ROOMROM_TEXT_EXTRA_TILE_BASE" in c else "") +
         f"CLOUD=tiles {c['ROOMROM_CLOUD_TILE_BASE']}..{c['ROOMROM_CLOUD_TILE_BASE'] + c['ROOMROM_CLOUD_TILE_COUNT'] - 1}  "
         f"FIREBALL=tiles {c['ROOMROM_FIREBALL_TILE_BASE']}..{c['ROOMROM_FIREBALL_TILE_BASE'] + c['ROOMROM_FIREBALL_TILE_COUNT'] - 1}  "
         f"FIREBALL_PAL3=tiles {c['ROOMROM_FIREBALL_SUBPAL3_TILE_BASE']}..{c['ROOMROM_FIREBALL_SUBPAL3_TILE_BASE'] + c['ROOMROM_FIREBALL_SUBPAL3_TILE_COUNT'] - 1}  "

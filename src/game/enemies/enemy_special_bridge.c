@@ -31,6 +31,8 @@
 #include "enemies/enemy_dispatch.h"     /* enemy_hide_sprites_over_link */
 #include "../options/options_consumer.h" /* options_consumer_get_like_like_behavior */
 #include "../options/options_state.h"    /* OPTIONS_LIKELIKE_VANILLA */
+#include "game_profile.h"
+#include "core/core_dispatch.h"          /* core_update_dead_dummy */
 
 /* NES RAM cell aliases not yet in enemy_state.h. */
 #define LIKELIKE_CAPTURE_TIMER(slot)    OBJ(0x042Cu, (slot))  /* ObjCaptureTimer */
@@ -464,6 +466,19 @@ draw_and_check:
         (unsigned char)ENEMY_DRAW_FRAME(slot), slot);
     POLS_INVINCIBILITY_MASK(slot) = 0xFEu;
     c_check_monster_collisions(slot);
+    /* NES source: Redux gameplay/pols_voice.asm:flute_pols_call ($9C36);
+     * $FEA6 is UpdateDeadDummy, not HandleMonsterDied (no kill-count change).
+     * Drained C: enrt_update_pols_voice; core_dispatch.c:core_update_dead_dummy.
+     * Coverage: FULL(UsedFlute/timer/sign gate and native death handoff).
+     * Stance: EXTEND the existing collision tail, preserving Original.
+     * Redux runs this even when the clock or stun bypasses movement. */
+    if (game_profile_is_remix() && RAM(0x051Bu) != 0u) {
+        unsigned char timer = (unsigned char)OBJ(0x0028u, slot);
+        if (timer == 0u)
+            OBJ(0x0028u, slot) = 0xC3u;
+        else if ((timer & 0x80u) == 0u)
+            core_update_dead_dummy(slot);
+    }
     (void)dir_idx;
 }
 

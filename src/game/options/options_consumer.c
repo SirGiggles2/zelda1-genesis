@@ -4,6 +4,17 @@
 #include "options_runtime.h"
 #include "options_state.h"
 #include "../../state/inventory.h"
+#include "../../state/game_profile.h"
+
+/* NES source: Redux main.asm includes automap, palettes, visible_secrets
+ * and sword_draw/sword_swing unconditionally; optional.asm is separate.
+ * Drained C: existing options_consumer_get_* below.
+ * Coverage: PARTIAL(core policy; subsystem completion remains tracked).
+ * Stance: EXTEND. Historical OFF bits cannot disable the Remix base. */
+static unsigned char core_enabled(unsigned int id)
+{
+    return game_profile_is_remix() ? 1u : options_get(id);
+}
 
 static unsigned char clamp_start_hearts_to_nibble(unsigned char v)
 {
@@ -49,22 +60,22 @@ unsigned char options_consumer_get_low_health_warning(void)
 
 unsigned char options_consumer_get_automap(void)
 {
-    return options_get((unsigned int)OPTION_ID_AUTOMAP);
+    return core_enabled((unsigned int)OPTION_ID_AUTOMAP);
 }
 
 unsigned char options_consumer_get_dungeon_colors(void)
 {
-    return options_get((unsigned int)OPTION_ID_DUNGEON_COLORS);
+    return core_enabled((unsigned int)OPTION_ID_DUNGEON_COLORS);
 }
 
 unsigned char options_consumer_get_visible_secrets(void)
 {
-    return options_get((unsigned int)OPTION_ID_VISIBLE_SECRETS);
+    return core_enabled((unsigned int)OPTION_ID_VISIBLE_SECRETS);
 }
 
 unsigned char options_consumer_get_diagonal_sword(void)
 {
-    return options_get((unsigned int)OPTION_ID_DIAGONAL_SWORD);
+    return core_enabled((unsigned int)OPTION_ID_DIAGONAL_SWORD);
 }
 
 unsigned char options_consumer_get_no_reduced_flashing(void)

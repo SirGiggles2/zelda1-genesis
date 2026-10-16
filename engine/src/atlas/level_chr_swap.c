@@ -15,6 +15,7 @@
 #include "enemy_chr.h"
 #include "boss_chr.h"
 #include "../vram_layout.h"
+#include "../../../src/game/world/render/redux_chr.h"
 
 /* Per-scene contract resolver. PR-4b wires UW enemy banks via
  * PatternBlockUWSP{127,358,469}. OW NPC / cave-dweller hooks land
@@ -44,23 +45,23 @@ static const roomrom_vram_contract_t *contract_for_scene(roomrom_scene_id_t s)
  * PR-4c: OW NPC + cave-dweller bank = single OWSP block (z_03.asm:42),
  * 1x sub-pal (sprites use NES sprite sub-pal 0..3 via per-OBJ ObjAttr,
  * not via CHR replication). */
-static const unsigned char *enemy_blob_for_scene(roomrom_scene_id_t s)
+static const unsigned char *enemy_blob_for_scene(roomrom_scene_id_t s, unsigned char variant)
 {
     switch (s) {
     case ROOMROM_SCENE_UW_L1:
     case ROOMROM_SCENE_UW_L2:
     case ROOMROM_SCENE_UW_L7:
-        return roomrom_atlas_enemy_uwsp127;
+        return variant ? core_redux_enemy_uwsp127_chr : roomrom_atlas_enemy_uwsp127;
     case ROOMROM_SCENE_UW_L3:
     case ROOMROM_SCENE_UW_L5:
     case ROOMROM_SCENE_UW_L8:
-        return roomrom_atlas_enemy_uwsp358;
+        return variant ? core_redux_enemy_uwsp358_chr : roomrom_atlas_enemy_uwsp358;
     case ROOMROM_SCENE_UW_L4:
     case ROOMROM_SCENE_UW_L6:
     case ROOMROM_SCENE_UW_L9:
-        return roomrom_atlas_enemy_uwsp469;
+        return variant ? core_redux_enemy_uwsp469_chr : roomrom_atlas_enemy_uwsp469;
     case ROOMROM_SCENE_OVERWORLD:
-        return roomrom_atlas_enemy_owsp;
+        return variant ? core_redux_enemy_owsp_chr : roomrom_atlas_enemy_owsp;
     default:
         return 0;
     }
@@ -88,6 +89,11 @@ static unsigned short s_request_count = 0u;
  * full 114-tile slot, recovering ~2560 B of CPU-fill work per swap.
  * Tail (last_used..max_capacity) stays zero across same-size swaps. */
 static unsigned short s_last_used_tiles = 0u;
+static unsigned char s_variant, s_target_variant, s_active_variant;
+static unsigned char s_boss_target_variant, s_boss_active_variant;
+
+void level_chr_swap_set_variant(unsigned char variant) { s_variant = variant ? 1u : 0u; }
+unsigned char level_chr_swap_active_variant(void) { return s_active_variant; }
 
 /* PR-5 boss state machine — declared up here so level_chr_swap_init()
  * can reset both at once. Definitions of *_for_scene helpers + the
@@ -107,6 +113,8 @@ static unsigned short s_boss_last_used_tiles = 0u;
 
 void level_chr_swap_init(void)
 {
+    s_variant = s_target_variant = s_active_variant = 0u;
+    s_boss_target_variant = s_boss_active_variant = 0u;
     s_state = LEVEL_CHR_SWAP_IDLE;
     s_target = ROOMROM_SCENE_BOOT;
     s_active = ROOMROM_SCENE_BOOT;
@@ -128,7 +136,7 @@ void level_chr_swap_init(void)
 void level_chr_swap_request(roomrom_scene_id_t scene)
 {
     /* A resident boss bank overlaps this bank, even in the same level. */
-    if (s_active == scene && s_state == LEVEL_CHR_SWAP_READY &&
+    if (s_active == scene && s_active_variant == s_variant && s_state == LEVEL_CHR_SWAP_READY &&
         s_boss_state == LEVEL_CHR_SWAP_IDLE) {
         return;
     }
@@ -136,6 +144,7 @@ void level_chr_swap_request(roomrom_scene_id_t scene)
     s_boss_state = LEVEL_CHR_SWAP_IDLE;
     s_boss_active = ROOMROM_SCENE_BOOT;
     s_target = scene;
+    s_target_variant = s_variant;
     s_target_contract = contract_for_scene(scene);
     s_state = LEVEL_CHR_SWAP_REQUESTED;
     s_request_count = (unsigned short)(s_request_count + 1u);
@@ -154,6 +163,7 @@ void level_chr_swap_tick(void)
         if (c == 0 || c->tile_count == 0u || c->blob_bytes == 0u) {
             /* Empty contract: collapse to READY in one tick. */
             s_active = s_target;
+            s_active_variant = s_target_variant;
             s_state = LEVEL_CHR_SWAP_READY;
             return;
         }
@@ -184,7 +194,7 @@ void level_chr_swap_tick(void)
     }
 
     case LEVEL_CHR_SWAP_DMA_SCENE_A: {
-        const unsigned char *blob = enemy_blob_for_scene(s_target);
+        const unsigned char *blob = enemy_blob_for_scene(s_target, s_target_variant);
         if (c != 0 && blob != 0 && c->tile_count > 0u) {
             unsigned short half_a = (unsigned short)(c->tile_count >> 1);
             if (half_a > 0u) {
@@ -198,7 +208,7 @@ void level_chr_swap_tick(void)
     }
 
     case LEVEL_CHR_SWAP_DMA_SCENE_B: {
-        const unsigned char *blob = enemy_blob_for_scene(s_target);
+        const unsigned char *blob = enemy_blob_for_scene(s_target, s_target_variant);
         if (c != 0 && blob != 0 && c->tile_count > 0u) {
             unsigned short half_a = (unsigned short)(c->tile_count >> 1);
             unsigned short half_b = (unsigned short)(c->tile_count - half_a);
@@ -212,6 +222,7 @@ void level_chr_swap_tick(void)
             }
         }
         s_active = s_target;
+        s_active_variant = s_target_variant;
         s_state = LEVEL_CHR_SWAP_READY;
         return;
     }
@@ -245,22 +256,28 @@ unsigned short level_chr_swap_request_count(void)   { return s_request_count; }
  *   L9             -> UWSPBoss9
  * Non-UW scenes return 0 (no boss bank). */
 static const unsigned char *boss_blob_for_scene(roomrom_scene_id_t s,
-                                                unsigned char subpal3)
+                                                unsigned char subpal3, unsigned char variant)
 {
     switch (s) {
     case ROOMROM_SCENE_UW_L1:
     case ROOMROM_SCENE_UW_L2:
     case ROOMROM_SCENE_UW_L5:
     case ROOMROM_SCENE_UW_L7:
+        if (variant) return subpal3 ? core_redux_boss_uwspboss1257_chr_subpal3
+                                   : core_redux_boss_uwspboss1257_chr;
         return subpal3 ? roomrom_atlas_boss_uwspboss1257_subpal3
                        : roomrom_atlas_boss_uwspboss1257;
     case ROOMROM_SCENE_UW_L3:
     case ROOMROM_SCENE_UW_L4:
     case ROOMROM_SCENE_UW_L6:
     case ROOMROM_SCENE_UW_L8:
+        if (variant) return subpal3 ? core_redux_boss_uwspboss3468_chr_subpal3
+                                   : core_redux_boss_uwspboss3468_chr;
         return subpal3 ? roomrom_atlas_boss_uwspboss3468_subpal3
                        : roomrom_atlas_boss_uwspboss3468;
     case ROOMROM_SCENE_UW_L9:
+        if (variant) return subpal3 ? core_redux_boss_uwspboss9_chr_subpal3
+                                   : core_redux_boss_uwspboss9_chr;
         return subpal3 ? roomrom_atlas_boss_uwspboss9_subpal3
                        : roomrom_atlas_boss_uwspboss9;
     default:
@@ -289,11 +306,12 @@ static const roomrom_vram_contract_t *boss_contract_for_scene(roomrom_scene_id_t
 
 void level_chr_boss_request(roomrom_scene_id_t scene)
 {
-    if (s_boss_active == scene && s_boss_state == LEVEL_CHR_SWAP_READY) {
+    if (s_boss_active == scene && s_boss_active_variant == s_variant && s_boss_state == LEVEL_CHR_SWAP_READY) {
         return;
     }
 
     s_boss_target = scene;
+    s_boss_target_variant = s_variant;
     s_boss_target_contract = boss_contract_for_scene(scene);
     s_boss_state = LEVEL_CHR_SWAP_REQUESTED;
     s_boss_request_count = (unsigned short)(s_boss_request_count + 1u);
@@ -317,6 +335,7 @@ void level_chr_boss_tick(void)
         }
         if (c == 0 || c->tile_count == 0u || c->blob_bytes == 0u) {
             s_boss_active = s_boss_target;
+            s_boss_active_variant = s_boss_target_variant;
             s_boss_state = LEVEL_CHR_SWAP_READY;
             return;
         }
@@ -345,8 +364,8 @@ void level_chr_boss_tick(void)
     }
 
     case LEVEL_CHR_SWAP_DMA_SCENE_A: {
-        const unsigned char *blob = boss_blob_for_scene(s_boss_target, 0u);
-        const unsigned char *subpal3 = boss_blob_for_scene(s_boss_target, 1u);
+        const unsigned char *blob = boss_blob_for_scene(s_boss_target, 0u, s_boss_target_variant);
+        const unsigned char *subpal3 = boss_blob_for_scene(s_boss_target, 1u, s_boss_target_variant);
         if (c != 0 && blob != 0 && c->tile_count > 0u) {
             unsigned short half_a = (unsigned short)(c->tile_count >> 1);
             if (half_a > 0u) {
@@ -362,8 +381,8 @@ void level_chr_boss_tick(void)
     }
 
     case LEVEL_CHR_SWAP_DMA_SCENE_B: {
-        const unsigned char *blob = boss_blob_for_scene(s_boss_target, 0u);
-        const unsigned char *subpal3 = boss_blob_for_scene(s_boss_target, 1u);
+        const unsigned char *blob = boss_blob_for_scene(s_boss_target, 0u, s_boss_target_variant);
+        const unsigned char *subpal3 = boss_blob_for_scene(s_boss_target, 1u, s_boss_target_variant);
         if (c != 0 && blob != 0 && c->tile_count > 0u) {
             unsigned short half_a = (unsigned short)(c->tile_count >> 1);
             unsigned short half_b = (unsigned short)(c->tile_count - half_a);
@@ -380,6 +399,7 @@ void level_chr_boss_tick(void)
             }
         }
         s_boss_active = s_boss_target;
+        s_boss_active_variant = s_boss_target_variant;
         s_boss_state = LEVEL_CHR_SWAP_READY;
         return;
     }

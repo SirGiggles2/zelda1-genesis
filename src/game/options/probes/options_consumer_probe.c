@@ -5,6 +5,7 @@
 #include "../options_state.h"
 #include "../options_consumer.h"
 #include "../../../state/inventory.h"
+#include "../../../state/game_profile.h"
 
 #define PROBE  ((volatile unsigned char *)OPTIONS_CONSUMER_PROBE_BASE)
 
@@ -176,11 +177,19 @@ static unsigned char test_getter_start_hearts_5(void)
 static unsigned char bool_set_zero_returns_zero(unsigned int id,
     unsigned char (*getter)(void))
 {
+    /* NES source: Redux main.asm unconditional core includes.
+     * Drained C: existing bool_set_zero_returns_zero probe.
+     * Coverage: FULL(core getter policy under active Original/Remix).
+     * Stance: EXTEND. Clearing a saved bit disables only optional tweaks. */
+    unsigned char expected = 0u;
+    if (game_profile_is_remix() && (id == OPTION_ID_AUTOMAP ||
+        id == OPTION_ID_DUNGEON_COLORS || id == OPTION_ID_VISIBLE_SECRETS ||
+        id == OPTION_ID_DIAGONAL_SWORD)) expected = 1u;
     options_runtime_init();
     options_set(id, 1u);          /* arm at one */
     if (getter() != 1u) return 0u;
     options_set(id, 0u);          /* clear */
-    return (getter() == 0u) ? 1u : 0u;
+    return (getter() == expected && options_get(id) == 0u) ? 1u : 0u;
 }
 
 static unsigned char test_set_zero_low_health_warning(void)

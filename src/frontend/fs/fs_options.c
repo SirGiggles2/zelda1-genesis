@@ -19,6 +19,18 @@
 
 static uint8_t s_cursor;
 
+/* User-approved MD menu; preserve OptionId and all saved byte meanings.
+ * No placeholder/core switch is offered as an optional modifier. */
+unsigned int fs_options_id_for_row(uint8_t row)
+{
+    static const unsigned char ids[FS_OPTIONS_ROW_COUNT] = {
+        OPTION_ID_COUNT, OPTION_ID_AB_SWAP, OPTION_ID_NO_REDUCED_FLASHING,
+        OPTION_ID_SWORD_STYLE, OPTION_ID_LIKE_LIKE_BEHAVIOR,
+        OPTION_ID_ROOM_SCROLL, OPTION_ID_UW_MUSIC, OPTION_ID_COUNT
+    };
+    return row < FS_OPTIONS_ROW_COUNT ? ids[row] : OPTION_ID_COUNT;
+}
+
 #define PROBE  ((volatile unsigned char *)FS_OPTIONS_PROBE_BASE)
 
 void fs_options_probe_init(void)
@@ -64,6 +76,8 @@ static unsigned char enum_count_for_row(uint8_t row)
 
 static void apply_left(uint8_t row)
 {
+    row = (uint8_t)fs_options_id_for_row(row);
+    if (row >= OPTION_ID_COUNT) return;
     unsigned char v = options_get((unsigned int)row);
     unsigned char count;
     unsigned char nv;
@@ -86,6 +100,8 @@ static void apply_left(uint8_t row)
 
 static void apply_right(uint8_t row)
 {
+    row = (uint8_t)fs_options_id_for_row(row);
+    if (row >= OPTION_ID_COUNT) return;
     unsigned char v = options_get((unsigned int)row);
     unsigned char count;
     unsigned char nv;

@@ -6,6 +6,7 @@
 #include "../world/draw_dispatch.h"        /* draw_item_frame_tile */
 #include "../enemies/enemy_render.h"       /* enemy_render_item_sat */
 #include "../../state/inventory.h"
+#include "../../state/game_profile.h"
 
 /* T-116: Link's arrow as the NES object in slot $12.
  *
@@ -60,9 +61,18 @@ void roomrom_arrow_fire(link_face_t face, short link_x, short link_y)
     (void)face; (void)link_x; (void)link_y;
     if (nes_ram[NES_BOW] == 0u) return;
     if (st != 0u && (st & 0x80u) == 0u) return;   /* slot busy (ASL / BCC) */
-    if (nes_ram[NES_INV_RUPEES] == 0u) return;
+    /* NES source: Redux arrows.asm bank5:$8E80/$8E8A.
+     * Drained C: roomrom_arrow_fire (native WieldArrow).
+     * Coverage: FULL(success, empty ammo, no bow and busy weapon slot).
+     * Stance: EXTEND shared weapon lifecycle with profile-owned payment. */
+    if (game_profile_is_remix()) {
+        if (RAM(0x0677u) == 0u) return;
+        --RAM(0x0677u);
+    } else {
+        if (nes_ram[NES_INV_RUPEES] == 0u) return;
+        inventory_rupee_debit(1u);
+    }
     nes_ram[0x0603u] |= 0x02u;                    /* PlayEffect $02 (arrow) */
-    inventory_rupee_debit(1u);                    /* INC RupeesToSubtract */
     /* WieldWeapon($10). */
     AR_STATE = 0x10u;
     AR_QSPEED = 0xC0u;

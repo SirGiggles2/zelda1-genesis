@@ -41,6 +41,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 AGG_PATH = ROOT / "engine" / "out" / "nes_uw_aggregate.json"
 OUT_C = ROOT / "engine" / "src" / "uw_room_blob.c"
+ALIASES_PATH = ROOT / "data" / "graphics" / "verified_uw_layout_aliases.json"
 
 PLAY_NT_TOP = 8
 PLAY_ROWS = 22
@@ -72,6 +73,28 @@ def emit_c(entries: list[dict], out_path: Path) -> None:
         lvl = e["level"]
         rid = e["room_id"]
         if mid < 2 and q < 3 and lvl < 10 and rid < 128:
+            lookup[mid][q][lvl][rid] = idx + 1
+    # Only reuse a layout authenticated against a live target-ROM capture.
+    # The hash pins the source play-area bytes; a later art/layout extraction
+    # change must be investigated rather than silently retaining this binding.
+    for alias in json.loads(ALIASES_PATH.read_text(encoding="utf-8")):
+        source = alias["source"]
+        target = alias["target"]
+        matches = [i for i, e in enumerate(entries) if
+                   [e["map_id"], e["quest"], e["level"], e["room_id"]] == source]
+        if len(matches) != 1:
+            raise ValueError(f"layout alias source missing/ambiguous: {source}")
+        idx = matches[0]
+        play = bytes(b for row in entries[idx]["nt"][PLAY_NT_TOP:] for b in row)
+        if hashlib.sha256(play).hexdigest() != alias["play_nt_sha256"]:
+            raise ValueError(f"layout alias source changed: {source}")
+        mid, q, lvl, rid = target
+        existing = lookup[mid][q][lvl][rid]
+        if existing:
+            other = bytes(b for row in entries[existing-1]["nt"][PLAY_NT_TOP:] for b in row)
+            if other != play:
+                raise ValueError(f"layout alias conflicts with target capture: {target}")
+        else:
             lookup[mid][q][lvl][rid] = idx + 1
     lines.append("const unsigned short g_uw_room_lookup[2][3][10][128] = {")
     for mid in range(2):

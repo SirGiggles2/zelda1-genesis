@@ -93,6 +93,7 @@ src/frontend/fs/fs_render.c
 src/frontend/fs/fs_render.h
 src/frontend/intro/intro_phase.c
 src/frontend/intro/intro_phase.h
+src/frontend/intro/intro_redux_assets.h
 src/frontend/intro/intro_punct_chr.c
 src/frontend/intro/intro_story.c
 src/frontend/intro/intro_story.h
@@ -285,6 +286,7 @@ src/game/world/render/ow_render.c
 src/game/world/render/ow_render.h
 src/game/world/render/sprite_render.c
 src/game/world/render/sprite_render.h
+src/game/world/render/redux_chr.h
 src/game/world/render/sprite_slots.h
 src/game/world/render/subpal_routing.h
 src/game/world/scene_load.c
@@ -363,6 +365,8 @@ src/state/rng_state.c
 src/state/rng_state.h
 src/state/room_state.h
 src/state/save_game.c
+src/state/game_profile.c
+src/state/game_profile.h
 src/game/world/startup_triangle.c
 src/game/world/startup_triangle.h
 src/game/world/startup_triangle_masks.inc
@@ -386,6 +390,7 @@ tools/atlas/gen_sprite_catalog.py
 tools/audio/synth_noise_sfx.py
 tools/audio/synth_square_sfx.py
 tools/converter/build.py
+tools/converter/redux_graphics.py
 tools/converter/disasm_template.py
 tools/converter/extract_uw_collision.py
 tools/converter/gen_uw_collision_c.py

@@ -8,6 +8,7 @@
 #include "uw_person_dispatch.h"
 #include <stdint.h>
 #include "platform_abi.h"
+#include "../../state/game_profile.h"
 #include "cave_state.h"        /* CAVE_DELAY_TIMER, CAVE_TEXT_SELECTOR,
                                 * CAVE_TEXT_LINE_ADDR_LO, CAVE_ROOM_TYPE */
 #include "object_state.h"      /* OBJ_STATE, OBJ_TILE_Y, OBJ_TYPE */
@@ -234,8 +235,12 @@ void uw_person_update_complex_state_sense_link(void)
     CAVE_DOOR_REPAIR_RUPEE_DELTA =
         (uint8_t)(100u + (unsigned char)CAVE_DOOR_REPAIR_RUPEE_DELTA);
     ROOM_SFX_MAIN = 8u;
-    const unsigned char max_bombs =
-        (unsigned char)((unsigned char)LINK_MAX_HEARTS + 4u);
+    /* NES source: Redux bombs.asm bank1:$8B8A (upgrade adds10).
+     * Drained C: uw_person_update_complex_state_sense_link.
+     * Coverage: FULL(native paid upgrades,10->20->30 and refill).
+     * Stance: EXTEND the existing one-shot person/room-flag lifecycle. */
+    const unsigned char max_bombs = (unsigned char)(
+        (unsigned char)LINK_MAX_HEARTS + (game_profile_is_remix() ? 10u : 4u));
     LINK_MAX_HEARTS = max_bombs;
     LINK_BOMB_COUNT = max_bombs;
     uw_person_flag_item_taken_and_advance_state();

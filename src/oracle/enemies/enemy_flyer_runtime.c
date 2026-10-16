@@ -210,7 +210,8 @@ void enrt_move_flyer(unsigned int slot) {
     enrt_bound_flyer(slot);
 }
 
-void enrt_bound_flyer(unsigned int slot) {
+/* T-172: inlined into its per-object callers (call overhead). */
+__attribute__((always_inline)) void enrt_bound_flyer(unsigned int slot) {
     /* Drain Rule D1 (NES asm wins ties): per Z_04.asm:11649 BoundFlyer
      * the post-bounds check is `LDA $0F; BNE Exit` — NOT BLOCKED ($0F
      * != 0) exits without reversing direction. BLOCKED ($0F == 0)

@@ -177,6 +177,8 @@ extern inventory_t g_inventory;
 void inventory_hud_mark_dirty(void);
 /* Pull native ownership/counts for legacy readers; preserve selection/layout. */
 void inventory_sync_from_native(void);
+/* Authoritative native currency: Redux decimal cells, Original byte. */
+unsigned short inventory_rupees_current(void);
 unsigned char inventory_hud_consume_dirty(void);
 
 /* Native NES currency owns count/queues; this tick synchronizes the

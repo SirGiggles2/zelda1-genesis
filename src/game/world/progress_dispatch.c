@@ -9,6 +9,7 @@
  */
 
 #include "progress_dispatch.h"
+#include "../../state/game_profile.h"
 #include "platform_abi.h"      /* RAM, nes_ram[], NES_SRAM_*, OBJ */
 #include "save_state.h"        /* SAVE_ROOM_FLAGS_PTR_LO/HI */
 #include "progress_state.h"    /* SAVEFILE_PTR_LO/HI, SAVEFILE_MASK_LO/HI, ROOM_TILE_OBJ_*, CUR_INV_TILE, POWER_TRIFORCE_FANFARE_FLAG, CURTAIN_TIMER, LAST_BOSS_DEFEATED */
@@ -71,6 +72,19 @@ static const unsigned char k_ganon_color_triples[9] = {
     0x07u, 0x17u, 0x30u, 0x16u, 0x2Cu, 0x3Cu, 0x27u, 0x06u, 0x16u
 };
 
+/* NES source: gfx/palettes.asm / Z_04:GanonColorTriples.
+ * Drained C: progress_runtime.c:progrt_replace_palette_row_common;
+ * enemy_ganon_runtime.c:ganon_append_palette_row_transfer_record.
+ * Coverage: PARTIAL (Original triples adopted; Redux blue missing).
+ * Stance: EXTEND both native transfer consumers with one profile owner. */
+unsigned char progress_ganon_palette_color(unsigned char index)
+{
+    static const unsigned char redux_blue[3] = {0x06u,0x22u,0x30u};
+    if (game_profile_is_remix() && index >= 3u && index <= 5u)
+        return redux_blue[index - 3u];
+    return index < 9u ? k_ganon_color_triples[index] : 0u;
+}
+
 /* Common helper for the 3 ganon-palette-replace variants. */
 static void progress_replace_palette_row_common(unsigned char color_index)
 {
@@ -84,7 +98,7 @@ static void progress_replace_palette_row_common(unsigned char color_index)
 
     /* Stash 3 color triple bytes at RAM($0306..$0308). */
     for (int j = 0; j < 3; j++) {
-        RAM(0x0306 + j) = k_ganon_color_triples[color_index - 2 + j];
+        RAM(0x0306 + j) = progress_ganon_palette_color((unsigned char)(color_index - 2 + j));
     }
 }
 

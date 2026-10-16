@@ -72,6 +72,7 @@ GEN_SPECS: list[dict] = [
         # (tools/nesemu), aggregated by uw_aggregate.py. Track those
         # producers and the room lists, not the untracked aggregate.
         "inputs": [
+            "data/graphics/verified_uw_layout_aliases.json",
             "tools/nesemu/nes.py",
             "tools/nesemu/zelda_uw_dump.py",
             "engine/tools/uw_aggregate.py",
@@ -90,8 +91,15 @@ GEN_SPECS: list[dict] = [
             "engine/out/prg_blocks/orig/**/*",
         ],
         "outputs": [
-            "engine/src/atlas/*.c",
-            "engine/src/atlas/*.h",
+            # The DMA runtime level_chr_swap is handwritten, not an
+            # output of gen_atlas. Runtime edits must not bless assets.
+            "engine/src/atlas/*_chr.c",
+            "engine/src/atlas/*_chr.h",
+            "engine/src/atlas/items_chr_x4.c",
+            "engine/src/atlas/items_chr_x4.h",
+            "engine/src/atlas/roomrom_scene_vram_contracts.c",
+            "engine/src/atlas/roomrom_scene_vram_contracts.h",
+            "engine/src/atlas/atlas_dispatch.h",
         ],
     },
     {
@@ -141,6 +149,8 @@ GEN_SPECS: list[dict] = [
         "name": "bg_sparse",
         "script": "engine/tools/gen_bg_sparse.py",
         "inputs": [
+            "build/generated/core_redux_chr.c",
+            "tools/converter/redux_graphics.py",
             "data/chr/common.c",
             "data/chr/overworld_bg.c",
             "data/chr/underworld_bg.c",

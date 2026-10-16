@@ -5,6 +5,7 @@
  */
 
 #include "collision_dispatch.h"
+#include "../../state/game_profile.h"
 #include <stdint.h>
 #include "platform_abi.h"
 #include "combat_state.h"      /* COMBAT_*, COMBAT_HITBOX_X/Y, COMBAT_THRESHOLD_X/Y, COMBAT_COLLIDED, COMBAT_ABS_DX/DY, COMBAT_PART_INDEX */
@@ -179,13 +180,26 @@ unsigned char collision_get_collidable_tile_still(unsigned int slot)
 
 /* NES GetCollidingTileMoving: hotspot -8 (Link) / -$10 for up, left or no
  * direction in [0F], 8 for down, $10 for right. */
-unsigned char collision_get_colliding_tile_moving(unsigned int slot)
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) unsigned char collision_get_colliding_tile_moving(unsigned int slot)
 {
     /* drain at collision_runtime.c:315-330. */
     unsigned char hotspot = (slot == 0u) ? 0xF8u : 0xF0u;
     const unsigned char dir = COMBAT_PART_INDEX;
     if (dir & 0x05u) hotspot = (dir & 0x04u) ? 8u : 16u;
     return collidable_tile(hotspot, slot);
+}
+
+/* NES source: Redux gameplay/visible_secrets.asm:collision_tiles_sub.
+ * Drained C: collision_dispatch.c collidable_tile; enemy_walker_bridge.c
+ *            c_obj_shove / walker_check_tile_collision; main Link mover.
+ * Coverage: PARTIAL (Original threshold; core secret obstacle range added).
+ * Stance: EXTEND the comparison used by CheckTiles and CheckHitTiles. */
+unsigned char collision_moving_tile_is_obstacle(unsigned char tile)
+{
+    if (tile >= 0x54u && tile < 0x60u && game_profile_is_remix())
+        return 1u;
+    return (unsigned char)(tile >= RAM(0x034Au));
 }
 
 /* --------------------------------------------------------------- */
@@ -225,7 +239,8 @@ void collision_handle_monster_weapon_collision(unsigned int monster_slot,
     combat_deal_damage(monster_slot);
 }
 
-void collision_check_monster_weapon_collision(unsigned int monster_slot,
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) void collision_check_monster_weapon_collision(unsigned int monster_slot,
                                               unsigned int weapon_y_mid)
 {
     /* drain at collision_runtime.c:65-89. */
@@ -255,12 +270,19 @@ void collision_check_monster_weapon_collision(unsigned int monster_slot,
     collision_handle_monster_weapon_collision(monster_slot, weapon_slot);
 }
 
+/* NES source: Redux sword_swing.asm:weapon_position/weapon_collide_check.
+ * Drained C: collision_runtime.c:colrt_check_monster_slender_weapon_collision2
+ * and colrt_check_monster_stabbing_collision.
+ * Coverage: PARTIAL(live contact boundaries; broader weapon lifecycle pending).
+ * Stance: EXTEND native collision owner; Original retains drained rules. */
 /* T-125: inlined into CheckMonsterCollisions (per-monster, per-frame). */
 __attribute__((always_inline)) void collision_check_monster_slender_weapon_collision2(unsigned int monster_slot)
 {
     /* drain at collision_runtime.c:91-105. */
     const unsigned int weapon_slot = (unsigned int)COMBAT_WEAPON_SLOT;
-    const unsigned char dir = (unsigned char)((unsigned char)LINK_DIR & 0x0Cu);
+    const unsigned char remix = game_profile_is_remix();
+    const unsigned char dir = (unsigned char)((remix ?
+        (unsigned char)OBJ_DIR(weapon_slot) : (unsigned char)LINK_DIR) & 0x0Cu);
     unsigned char wx;
     unsigned char wy;
     if (dir != 0u) {
@@ -268,13 +290,14 @@ __attribute__((always_inline)) void collision_check_monster_slender_weapon_colli
         wy = (unsigned char)((unsigned char)OBJ_Y(weapon_slot) + 8u);
     } else {
         wx = (unsigned char)((unsigned char)OBJ_X(weapon_slot) + 8u);
-        wy = (unsigned char)((unsigned char)OBJ_Y(weapon_slot) + 6u);
+        wy = (unsigned char)((unsigned char)OBJ_Y(weapon_slot) + (remix ? 9u : 6u));
     }
     COMBAT_HITBOX_X = wx;
     collision_check_monster_weapon_collision(monster_slot, (unsigned int)wy);
 }
 
-void collision_check_monster_slender_weapon_collision(unsigned int monster_slot,
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) void collision_check_monster_slender_weapon_collision(unsigned int monster_slot,
                                                       unsigned int damage_points)
 {
     /* drain at collision_runtime.c:107-111. */
@@ -307,7 +330,9 @@ void collision_check_monster_stabbing_collision(unsigned int monster_slot,
     COMBAT_DAMAGE_AMOUNT = (uint8_t)damage_points;
     {
         const unsigned char dir =
-            (unsigned char)((unsigned char)LINK_DIR & 0x0Cu);
+            (unsigned char)((game_profile_is_remix() ?
+                (unsigned char)OBJ_DIR((unsigned int)COMBAT_WEAPON_SLOT) :
+                (unsigned char)LINK_DIR) & 0x0Cu);
         if (dir != 0u) {
             COMBAT_THRESHOLD_X = 12u;
             COMBAT_THRESHOLD_Y = 16u;
@@ -340,7 +365,8 @@ __attribute__((always_inline)) void collision_check_monster_sword_collision(unsi
         monster_slot, (unsigned int)k_sword_damage_points[idx]);
 }
 
-void collision_check_monster_shot_collision(unsigned int monster_slot,
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) void collision_check_monster_shot_collision(unsigned int monster_slot,
                                             unsigned int weapon_slot,
                                             unsigned int damage_points)
 {

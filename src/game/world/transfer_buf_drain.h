@@ -62,6 +62,11 @@ void transfer_buf_note_native_record(void);
 unsigned char transfer_buf_dyn_busy(void);
 void transfer_buf_drain(void);
 
+/* Main-owned text fallback patterns. Reserved between the protected
+ * extra BG range and pause sprites; verified by verify_vram_budget.py. */
+#define ROOMROM_TEXT_EXTRA_TILE_BASE 1182u
+#define ROOMROM_TEXT_EXTRA_TILE_COUNT 48u
+
 /* T-097: forget attribute writes (a new room was laid out). */
 void transfer_buf_attr_shadow_reset(void);
 /* NES TurnOffVideoAndClearArtifacts: the name table is blank (then holds

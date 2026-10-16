@@ -43,6 +43,10 @@ typedef enum {
 
 /* Init: must be called once at boot before any request/tick. */
 void level_chr_swap_init(void);
+/* Asset identity is independent of the scene bank. Requests latch it
+ * for both DMA halves and READY cache comparisons. */
+void level_chr_swap_set_variant(unsigned char variant);
+unsigned char level_chr_swap_active_variant(void);
 
 /* Enqueue a swap to scene's enemy/NPC bank. Idempotent: requesting the
  * same scene that is already READY is a no-op. */

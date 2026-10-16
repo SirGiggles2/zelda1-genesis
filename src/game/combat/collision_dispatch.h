@@ -33,6 +33,10 @@ unsigned char collision_get_collidable_tile_still(unsigned int slot);
  * NES GetCollidingTileMoving; leaves the column address in [00:01]. */
 unsigned char collision_get_colliding_tile_moving(unsigned int slot);
 
+/* Redux CheckTiles/CheckHitTiles: secret $54..$5F tiles are solid.
+ * Leaves the original collided tile and RAM scratch values intact. */
+unsigned char collision_moving_tile_is_obstacle(unsigned char tile);
+
 /* Dispatch monster-vs-weapon collision response: gohma special path,
  * direction-based parry for $0B/$0C, dirward-flip for $12/$13, deal
  * damage. NES HandleMonsterWeaponCollision (collision_runtime.c:36-63). */

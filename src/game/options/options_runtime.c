@@ -45,7 +45,8 @@ static void load_defaults_into(OptionsState *s)
     s->magic[1] = OPTIONS_MAGIC1;
     s->version = OPTIONS_VERSION_CURRENT;
 
-    /* All Redux toggles default OFF (vanilla NES feel). */
+    /* Optional modifiers default OFF. Core Redux behavior belongs to the
+     * active GameProfile and must never consult these historical bits. */
     s->bool_bits[0] = 0u;
     s->bool_bits[1] = 0u;
 

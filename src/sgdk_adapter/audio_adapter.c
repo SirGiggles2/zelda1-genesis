@@ -48,6 +48,7 @@ static u8 xgm_initialized = 0;
 static u8 s_current_xgm_song = 0;
 static u8 s_resume_xgm_song = 0;
 static u16 s_nes_song_frames = 0;
+static u32 s_music_loop_target = 0;
 static u8 sfx_next_channel = 0;  /* round-robin index 0..2 → CH2..CH4 */
 static u8 s_pcm_ids[4];          /* latest requested sample on each PCM channel */
 
@@ -173,6 +174,37 @@ void audio_pcm_stop(unsigned char id, unsigned char ch)
     s_pcm_ids[ch - 1u] = 0u;
 }
 
+/* T-294 D1: NES source Z_02.asm:InitDemoSubphasePlayTitleSong / SongScriptDemo0;
+ * drained C audio_music_play/audio_tick_vblank; coverage PARTIAL(driver bridge),
+ * stance EXTEND. The generated NES title loops at frame4800, loop_frame0.
+ * XGM owns its clock; the legacy signal is in linker-owned state, never SRAM. */
+void audio_music_loop_arm(void)
+{
+    audio_music_state[0x2Bu] = 0u;
+    s_music_loop_target = 0u;
+#ifdef ZELDA_NES_MUSIC
+    if (*xgm_owns_chip_ptr) {
+        const local_song_t *entry = nes_song(s_current_xgm_song);
+        /* A custom local track must not inherit the generated title's timing. */
+        if (entry && entry->looping && entry->frames &&
+            entry->xgm == xgm_blob_for_song(s_current_xgm_song)) {
+            u32 elapsed = XGM_getElapsed();
+            s_music_loop_target = (elapsed / entry->frames + 1u) * entry->frames;
+        }
+    }
+#endif
+}
+
+unsigned char audio_music_loop_pending(void)
+{
+    if (*xgm_owns_chip_ptr && s_music_loop_target &&
+        XGM_getElapsed() >= s_music_loop_target) {
+        s_music_loop_target = 0u;
+        audio_music_state[0x2Bu] = 1u;
+    }
+    return audio_music_state[0x2Bu] != 0u;
+}
+
 void audio_music_play(unsigned char song)
 {
     const u8 *xgm_song = xgm_blob_for_song(song);
@@ -180,6 +212,8 @@ void audio_music_play(unsigned char song)
     /* NES Tune0Request bit 7 silences the song. Stopping XGM releases
      * the chip for cave event tunes; key-off also clears legacy voices. */
     if (song == 0u) {
+        s_music_loop_target = 0u;
+        audio_music_state[0x2Bu] = 0u;
         if (*xgm_owns_chip_ptr) XGM_stopPlay();
         *xgm_owns_chip_ptr = 0u;
         s_current_xgm_song = 0u;
@@ -203,6 +237,8 @@ void audio_music_play(unsigned char song)
         *music_song_req_ptr = 0;
 
         if (!*xgm_owns_chip_ptr || s_current_xgm_song != song) {
+            s_music_loop_target = 0u;
+            audio_music_state[0x2Bu] = 0u;
             /* XGM_startPlay
              * replaces the playing track itself; a stop right before it
              * made the next track silent (first switch after the OW). */
@@ -236,6 +272,8 @@ void audio_music_play(unsigned char song)
     }
     s_resume_xgm_song = 0u;
     s_nes_song_frames = 0u;
+    s_music_loop_target = 0u;
+    audio_music_state[0x2Bu] = 0u;
     music_play(song);
 }
 

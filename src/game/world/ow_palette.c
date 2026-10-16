@@ -1,5 +1,7 @@
 /* Promoted overworld palette data and per-room background palette loader. */
 #include "ow_palette.h"
+#include "render/redux_chr.h"
+#include "../../state/game_profile.h"
 
 #include "render_abi.h"    /* render_load_palette */
 #include "bg_palette.h"    /* nes_to_cram */
@@ -23,13 +25,20 @@ const unsigned char g_roomrom_ow_palram[2][32] = {
  * (Lost Hills brown for some, default green-OW for others).
  * Called by ow_render after roomrom_bg_palette_load_palram_full to
  * override the static defaults. */
+/* NES source: Redux hud_and_subscreen.asm bank6:$9307; original per-room PALRAM.
+ * Drained C: ow_palette.c:roomrom_ow_palette_patch_bg_per_room.
+ * Coverage: PARTIAL (OW heart-outline palette; complete HUD separate).
+ * Stance: EXTEND per-room palette with authenticated profile row1.
+ */
 void roomrom_ow_palette_patch_bg_per_room(unsigned char room_id)
 {
     const unsigned char *bg = k_ow_bg_palram_per_room[room_id & 0x7Fu];
     unsigned short pal0[16] = {0};
     unsigned char i;
     for (i = 0u; i < 16u; ++i) {
-        pal0[i] = roomrom_bg_palette_nes_to_cram(bg[i]);
+        const unsigned char color = game_profile_is_remix() && i >= 4u && i < 8u ?
+            core_redux_ow_heart_palette[i - 4u] : bg[i];
+        pal0[i] = roomrom_bg_palette_nes_to_cram(color);
     }
     render_load_palette(0u, pal0);
 }

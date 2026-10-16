@@ -26,6 +26,9 @@
 #include "render_abi.h"                /* render_plane_defer */
 #include "mode_continue_question.h"
 #include "../core/core_dispatch.h"
+#include "../../state/game_profile.h"
+#include "render/redux_chr.h"
+#include "../hud/hud_runtime.h"
 #include "../room/room_dispatch.h"   /* room_patch_and_cue_level_palettes_transfer,
                                         room_clear_room_history */
 
@@ -47,6 +50,11 @@
 
 #define M8_BTN_SELECT 0x20u
 #define M8_BTN_START  0x10u
+#define M8_BTN_UP     0x08u
+#define M8_BTN_DOWN   0x04u
+#define CAUTION_CHR_BASE 1320u
+typedef char caution_chr_stays_before_lift[
+    CAUTION_CHR_BASE + sizeof(core_redux_caution_chr)/32u <= 1376u ? 1 : -1];
 
 static const unsigned char k_base_sprite_values[3] = { 0xF3u, 0x02u, 0x40u };
 static const unsigned char k_sprite_ys[3]          = { 0x4Fu, 0x67u, 0x7Fu };
@@ -76,7 +84,32 @@ extern void roomrom_mode8_show(void);     /* display on */
  * the attribute bytes of its 4x4-tile blocks between $00 and $55). */
 static void draw_selection(unsigned char sel, unsigned char subpal)
 {
+    if (game_profile_is_remix()) {
+        const unsigned char *glyphs = core_redux_caution_select + sel*16u + (subpal ? 8u : 0u);
+        for (unsigned char i=0u;i<8u;++i)
+            render_set_plane_a_word((unsigned short)(12u+i),(unsigned short)(4u+sel*2u),
+                                    (unsigned short)(CAUTION_CHR_BASE+glyphs[i]));
+        return;
+    }
     roomrom_mode8_text(k_text_row[sel], M8_TEXT_COL, k_text[sel], k_text_len[sel], subpal);
+}
+
+/* NES source: Redux caution_screen.asm:save_text and live ROM parameters.
+ * Drained C: init_mode8 / draw_selection existing mode owner.
+ * Coverage: FULL(layout/cursor/flash); save lifecycle remains shared.
+ * Stance: EXTEND. This exclusive screen borrows map tiles; invalidate
+ * their HUD owner so Continue restores map/dash patterns before drawing. */
+static void draw_redux_caution(void)
+{
+    unsigned short row[32];
+    render_display_enable(0u);
+    render_chr_upload(CAUTION_CHR_BASE*32u,core_redux_caution_chr,sizeof(core_redux_caution_chr));
+    for (unsigned char r=1u;r<30u;++r) {
+        for (unsigned char c=0u;c<32u;++c)
+            row[c]=(unsigned short)(CAUTION_CHR_BASE+core_redux_caution_map[r*32u+c]);
+        render_plane_a_write_row((unsigned short)(r-1u),row,32u);
+    }
+    roomrom_hud_invalidate();
 }
 
 static void init_mode8(void)
@@ -92,7 +125,8 @@ static void init_mode8(void)
     }
     /* Sub1: cue Mode8TextTileBuffer, BeginUpdateMode. */
     M8_TILE_BUF_SELECTOR = 0x04u;
-    for (i = 0u; i < 3u; ++i) draw_selection(i, 0u);
+    if (game_profile_is_remix()) draw_redux_caution();
+    else for (i = 0u; i < 3u; ++i) draw_selection(i, 0u);
     roomrom_mode8_show();                        /* video back on */
     M8_GAME_SUBMODE = 0u;
     M8_IS_UPDATING_MODE = (unsigned char)(M8_IS_UPDATING_MODE + 1u);
@@ -102,8 +136,8 @@ static void draw_cursor(void)
 {
     RAM(M8_SPRITES + 1u) = k_base_sprite_values[0];
     RAM(M8_SPRITES + 2u) = k_base_sprite_values[1];
-    RAM(M8_SPRITES + 3u) = k_base_sprite_values[2];
-    RAM(M8_SPRITES + 0u) = k_sprite_ys[M8_GAME_SUBMODE];
+    RAM(M8_SPRITES + 3u) = game_profile_is_remix() ? core_redux_caution_params[0] : k_base_sprite_values[2];
+    RAM(M8_SPRITES + 0u) = game_profile_is_remix() ? core_redux_caution_params[1u+M8_GAME_SUBMODE] : k_sprite_ys[M8_GAME_SUBMODE];
     roomrom_mode8_cursor();
 }
 
@@ -114,8 +148,12 @@ static void handle_activated(void)
     M8_OBJ_STATE = 0u;                           /* ResetPlayerState */
     M8_INV_CLOCK = 0u;
     M8_GAME_MODE = k_selection_to_mode[sel];
-    /* Start again with 3 full hearts. */
-    M8_HEART_VALUES = (unsigned char)((M8_HEART_VALUES & 0xF0u) | 0x02u);
+    /* NES source: Redux menus/save_hearts.asm:save_hearts.
+     * Drained C: handle_activated native Continue/Save/Retry exit.
+     * Coverage: FULL(whole-heart preservation, three-heart minimum).
+     * Stance: EXTEND profile-selected recovery; Original keeps its reset. */
+    if (!game_profile_is_remix() || (M8_HEART_VALUES & 0x0Fu) < 2u)
+        M8_HEART_VALUES = (unsigned char)((M8_HEART_VALUES & 0xF0u) | 0x02u);
     M8_HEART_PARTIAL = 0xFFu;
     M8_IS_UPDATING_MODE = 0u;                    /* EndGameMode */
     M8_GAME_SUBMODE = 0u;
@@ -135,8 +173,8 @@ static void animate_selection(void)
     }
     for (i = 0u; i < 5u; ++i) RAM(M8_DYN_TILE_BUF + i) = k_flash_record[i];
     sel = (unsigned char)(M8_GAME_SUBMODE & 0x03u);
-    RAM(M8_DYN_TILE_BUF + 1u) = k_flash_attrs_lo[sel];
-    attr = (M8_OBJ_TIMER_1 & 0x04u) ? 0x55u : 0x00u;
+    RAM(M8_DYN_TILE_BUF + 1u) = game_profile_is_remix() ? core_redux_caution_params[4u+sel] : k_flash_attrs_lo[sel];
+    attr = (M8_OBJ_TIMER_1 & 0x04u) ? (game_profile_is_remix() ? core_redux_caution_params[7u+sel] : 0x55u) : 0x00u;
     RAM(M8_DYN_TILE_BUF + 3u) = attr;
     /* The NES transfers the record at the next NMI: recolour then. */
     render_plane_defer(1u);
@@ -159,10 +197,20 @@ void mode8_continue_question_update(void)
         M8_OBJ_TIMER_1 = 0x40u;                  /* flash $40 frames */
         return;
     }
-    if (M8_BUTTONS_PRESSED & M8_BTN_SELECT) {
+    /* NES source: live Redux Mode8 Up/Down/Select edge sequence.
+     * Drained C: mode8_continue_question_update selection owner.
+     * Coverage: FULL(cursor selection); Stance: EXTEND for Remix.
+     * Start retains priority; opposite directions cancel each other. */
+    unsigned char directions = game_profile_is_remix()
+        ? (unsigned char)(M8_BUTTONS_PRESSED & (M8_BTN_UP | M8_BTN_DOWN)) : 0u;
+    if ((M8_BUTTONS_PRESSED & M8_BTN_SELECT) || directions == M8_BTN_DOWN) {
         M8_TUNE0_REQUEST = 0x01u;                /* rupee-taken blip */
         M8_GAME_SUBMODE = (unsigned char)(M8_GAME_SUBMODE + 1u);
         if (M8_GAME_SUBMODE == 0x03u) M8_GAME_SUBMODE = 0u;
+    } else if (directions == M8_BTN_UP) {
+        M8_TUNE0_REQUEST = 0x01u;
+        M8_GAME_SUBMODE = M8_GAME_SUBMODE == 0u
+            ? 2u : (unsigned char)(M8_GAME_SUBMODE - 1u);
     }
     draw_cursor();
 }

@@ -25,6 +25,8 @@ void roomrom_hud_preset_counts_hidden(void);
 void roomrom_hud_play_flush(void);
 /* NES FormatStatusBarText ran this tick (World_ChangeRupees). */
 void roomrom_hud_status_bar_formatted(void);
+/* Fixed Window owns these status-bar cells; native formatter still runs. */
+unsigned char roomrom_hud_owns_status_bar(void);
 /* Selector $44 (status bar map transfer) drained: show the map. */
 void roomrom_hud_status_bar_map_cue(void);
 
@@ -41,5 +43,17 @@ void roomrom_hud_refresh_marker(unsigned char room_id,
  * Switches Window plane position via VDP + repositions HUD tile writes
  * via HUD_WIN_ROW_BASE + re-issues full HUD redraw at new row offset. */
 void roomrom_hud_set_bottom_mode(unsigned char bottom);
+
+/* Native NT0 HUD writes retain the installed HUD cell attributes. */
+void roomrom_hud_transfer_tile(unsigned char col, unsigned char row, unsigned char tile);
+/* Whole NT0 HUD record (rows 1..7, cols 0..31, count pre-clamped). */
+void roomrom_hud_transfer_record(unsigned char col, unsigned char row,
+                                 unsigned char count, unsigned char vertical,
+                                 unsigned char repeat, const unsigned char *tiles);
+/* T-172: HUD display epoch (changes with any HUD word/palette/force/clear)
+ * and whether the word cache is authoritative (no forced redraw pending). */
+unsigned char roomrom_hud_cache_epoch(void);
+unsigned char roomrom_hud_cache_clean(void);
+
 
 #endif

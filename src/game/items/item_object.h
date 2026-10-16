@@ -11,6 +11,9 @@ extern "C" {
 #endif
 
 void item_object_update(unsigned int slot);
+#ifdef ZELDA_DROP_TEST
+void item_object_spawn_test_drops(void);
+#endif
 
 #ifdef __cplusplus
 }

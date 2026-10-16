@@ -44,11 +44,9 @@ unsigned char link_item_use_blocks_move(void);
  * are applied for it. 0 = OW, 1 = UW. */
 void roomrom_combat_set_uw(unsigned char in_uw);
 
-/* Redux mode toggle (per docs/audit/redux_touchpoints.md, diagonal
- * sword + ALttP-style sword arc are out-of-scope IPS extensions of
- * NES Z1). v11 hooks the flag so future patches can vary timing or
- * dispatch alternate animation paths without touching the cardinal
- * combat state machine. Currently a no-op flag — reserved for v11+. */
+/* Active profile selects mandatory Redux state-2 sweep and UW draw bias.
+ * Native Link/weapon state timing remains authoritative in both profiles.
+ * Optional ALttP arc is a separate modifier, pending its own verification. */
 void roomrom_combat_set_redux(unsigned char redux);
 
 /* Plan v5 sword/enemy collision sync. NES weapon slot 13 holds the

@@ -21,6 +21,7 @@
  * src/game/ + src/frontend/ are forbidden from direct SGDK. Used by
  * the Window-plane HUD wrappers below. */
 #include <genesis.h>
+#include "platform_abi.h"  /* function-like RAM replaces SGDK's RAM constant */
 
 /* VDP MMIO addresses used by all helpers below. */
 #define VDP_DATA_WORD (*(volatile unsigned short *)0x00C00000)
@@ -777,7 +778,10 @@ void render_circle_frame(const unsigned long *patterns, const unsigned short *ma
     s_tri_map = map;
     s_tri_count = count;
     s_mask_stride = 64u;
-    s_tri_pending = 1u;
+    /* Keep first activation queued when BeginWorld starts an iris and
+     * advances its animation before the next VBlank. Activation owns
+     * layer setup, sprite priorities and display enable (T-297). */
+    if (s_tri_pending != 3u) s_tri_pending = 1u;
 }
 
 void render_circle_begin(short horizontal, short vertical, const unsigned long *patterns,
@@ -1177,4 +1181,12 @@ void render_dma_stats_frame_end(void)
         s_dma_peak_frame_bytes = s_dma_current_frame_bytes;
     }
     s_dma_current_frame_bytes = 0UL;
+}
+
+/* T172: read through the pinned SGDK VDP primitive, not debugger bus peeks.
+ * $01FC is unused probe scratch beside the existing $01FD..$01FF samples;
+ * no new .bss, heap or gameplay state. Called after mandatory blank work. */
+void render_vblank_work_end(void)
+{
+    RAM(0x01FCu) = (unsigned char)GET_VCOUNTER;
 }

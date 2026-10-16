@@ -384,6 +384,8 @@ typedef struct {
 void render_dma_stats_get(render_dma_stats_t *out);
 void render_dma_stats_reset(void);   /* zero peak + total + current */
 void render_dma_stats_frame_end(void); /* roll current into peak, reset current */
+/* Native VDP completion sample in existing unused probe stack cell $01FC. */
+void render_vblank_work_end(void);
 
 /* T-284: ROM-resident H32 masks, Window above a frozen BG_B snapshot.
  * The adapter reserves pattern slots 1440..1535 only during file startup. */

@@ -288,7 +288,8 @@ void roomrom_uw_room_render_upload_chr(void)
         ? bg_sparse_chr_redux_uw
         : bg_sparse_chr_orig_uw;
     render_chr_upload((unsigned short)(ROOMROM_BG_TILE_BASE * 32u),
-                      blob, BG_SPARSE_BLOB_BYTES);
+                      blob, s_uw_map_id == ROOMROM_MAP_REDUX
+                        ? BG_SPARSE_BLOB_BYTES : BG_SPARSE_ORIGINAL_BLOB_BYTES);
 }
 
 /* Stub renderer.

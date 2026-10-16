@@ -49,6 +49,8 @@
 #include "enemy_state.h"     /* ENEMY_* macros (re-export of state/enemy_state.h) */
 #include "enemy_render.h"            /* Phase D: enemy_render_publish_meta */
 #include "enemy_loop.h"              /* enemy_init_fn, ENEMY_LOOP_TYPE_MAX */
+#include "../../state/game_profile.h"
+#include "../world/render/redux_chr.h"
 #include "../../../engine/src/engine_state.h" /* Link story-pose owner */
 
 /* NES non-Link offsets (cell-level; OBJ macro adds slot index).
@@ -73,7 +75,8 @@ extern void enrt_try_shooting(unsigned char qspeed, unsigned char shot_type,
 /* Forward decl — defined after c_obj_shove block in this file (step 18). */
 void c_walker_check_tile_collision(unsigned int slot);
 
-void c_walker_move(unsigned int slot)
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) void c_walker_move(unsigned int slot)
 {
     /* NES Walker_Move (Z_07.asm:2555). Non-Link path only — slot 0
      * (Link) movement still runs through the engine debug runtime so
@@ -333,7 +336,7 @@ void c_obj_shove(unsigned int slot)
             unsigned char dir = (unsigned char)(OBJ(NES_OBJ_SHOVE_DIR, slot) & 0x0Fu);
             RAM(NES_LINK_MOVING_DIR) = dir;
             unsigned char tile = collision_get_colliding_tile_moving(slot);
-            if (tile >= RAM(0x034Au)) {
+            if (collision_moving_tile_is_obstacle(tile)) {
                 /* ObjectFirstUnwalkableTile -> blocked. */
                 OBJ(NES_OBJ_SHOVE_DIR, slot)       = 0u;
                 OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) = 0u;
@@ -543,7 +546,7 @@ void c_walker_check_tile_collision(unsigned int slot)
     /* CheckTiles loop. */
     for (unsigned int guard = 0u; guard < 8u; guard++) {
         unsigned char tile = collision_get_colliding_tile_moving(slot);
-        if (tile < (unsigned char)RAM(0x034Au)) {
+        if (!collision_moving_tile_is_obstacle(tile)) {
             /* GoWalkableDir non-Link path -> CheckBoundary (Z_07.asm:3005).
              * BoundByRoom returns post-test dir; non-zero -> store as
              * facing dir and return. Zero -> TryNextDir loop. */
@@ -896,7 +899,11 @@ static unsigned char native_set_up_dropped_item(unsigned int slot)
         unsigned char cycle  = (unsigned char)META_WORLD_KILL_CYCLE;
         unsigned char idx    = (unsigned char)(base + cycle);
         if (idx >= 40u) idx = (unsigned char)(idx % 40u);
-        item_id = k_drop_item_table[idx];
+        /* NES source: Redux arrows.asm:DropList, bank4:$B042.
+         * Drained C: native_set_up_dropped_item native row/cycle owner.
+         * Coverage: FULL(authenticated40-entry profile table).
+         * Stance: EXTEND lookup only; kill/help/random gates retained. */
+        item_id = game_profile_is_remix() ? core_redux_drop_items[idx] : k_drop_item_table[idx];
     }
 
     /* Fairy-on-$10-kills gate. */
@@ -1164,6 +1171,15 @@ static const unsigned char k_secret_armos_xs[7] = {
     0xE0u, 0xB0u, 0xB0u, 0x30u, 0x40u, 0x90u, 0xA0u
 };
 
+/* NES source: Redux 3.3.3 misc.asm:$8CBA / Z_04.asm:SecretArmosXs.
+ * Drained C: enemy_walker_bridge.c:enrt_init_armos_or_flying_ghini.
+ * Coverage: PARTIAL (trigger table; connected entrance lifecycle separate).
+ * Stance: EXTEND. Pinned PRG $10CB9: indices 1/3 use the primary stairs X.
+ */
+static const unsigned char k_redux_secret_armos_xs[7] = {
+    0xE0u, 0x70u, 0xB0u, 0x70u, 0x40u, 0x90u, 0xA0u
+};
+
 /* NES Z_04.asm:3150 InitArmosOrFlyingGhini. Phase 7 Task 7.4 step 6c
  * native drain. Stance: EXTEND — no oracle drain in src/oracle/enemies/.
  *
@@ -1220,11 +1236,13 @@ void enrt_init_armos_or_flying_ghini(unsigned int slot)
         const unsigned char room_id = (unsigned char)RAM(NES_CUR_ROOM_ID);
         const unsigned char obj_x = (unsigned char)ENEMY_X(slot);
         const unsigned char obj_y = (unsigned char)ENEMY_Y(slot);
+        const unsigned char *secret_xs = game_profile_is_remix()
+            ? k_redux_secret_armos_xs : k_secret_armos_xs;
 
         signed char y = 6;
         while (y >= 0) {
             if (k_secret_armos_room_ids[y] == room_id &&
-                k_secret_armos_xs[y] == obj_x &&
+                secret_xs[y] == obj_x &&
                 obj_y == 0x80u) {
                 matched = 1u;
                 if (y == 0) {

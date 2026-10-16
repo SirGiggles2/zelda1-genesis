@@ -111,8 +111,8 @@ This port stands on a lot of other people's work. Thank you, all of you.
   All the other songs are extracted and converted from your NES ROM (but tbh
   they don't sound as good as what Inglebard did).
 
-  **Cyberdeous** They (they're a duo) graciously made their own version of underworld, "Dungeon Jungle". Pick it in
-  Options > UW MUSIC (Inglebard's stays the default).
+  **Cyberdeous** — the duo graciously made their own version of the Underworld
+  theme. Select **Cyberdeous** in Options > Music (Inglebard stays the default).
 
 **The original game**
 

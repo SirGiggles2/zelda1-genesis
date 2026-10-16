@@ -24,9 +24,40 @@
 #include "combat_state.h"         /* OBJ_STATE alias */
 #include "item_dispatch.h"        /* item_take_item */
 #include "world/draw_dispatch.h"   /* draw_animate_item_object */
+#ifdef ZELDA_DROP_TEST
+#include "../enemies/enemy_loop.h"
+#include "../../state/game_profile.h"
+#endif
 
 extern void c_control_fairy_flight(unsigned int slot);
 extern void c_move_flyer(unsigned int slot);
+
+#ifdef ZELDA_DROP_TEST
+/* NES source: Z_04.asm:SetUpDroppedItem; Redux arrows.asm:DropList.
+ * Drained C: enemy_loop_force_spawn_typed / item_object_update /
+ *            enrt_set_up_fairy_object.
+ * Coverage: PARTIAL (explicit playtest fixture; natural drop odds unchanged).
+ * Stance: EXTEND existing constructors and pickup owners. Slots1..4 remain
+ * active for clock freeze/contact testing; only slots5..11 are replaced. */
+void item_object_spawn_test_drops(void)
+{
+    static const unsigned char ids[7] = {
+        0x00u, 0x0Fu, 0x18u, 0x21u, 0x22u, 0x23u, 0x55u
+    };
+    unsigned char i;
+    unsigned char count = game_profile_is_remix() ? 7u : 6u;
+    extern void enrt_set_up_fairy_object(unsigned int slot);
+    for (i = 0u; i < count; ++i) {
+        unsigned int slot = 5u + i;
+        enemy_loop_force_spawn_typed(slot, 0x60u,
+            (unsigned char)(56u + (i & 3u) * 48u),
+            (unsigned char)(136u + (i >> 2) * 32u), 0u);
+        OBJ(0x00ACu, slot) = ids[i];
+        OBJ(0x03A8u, slot) = 0xFFu;
+        if (ids[i] == 0x23u) enrt_set_up_fairy_object(slot);
+    }
+}
+#endif
 
 /* META_ITEM_LIFETIME = Item_ObjItemLifetime ($03A8+slot).
  * META_ITEM_ID       = Item_ObjItemId      ($00AC+slot, aliases OBJ_STATE).

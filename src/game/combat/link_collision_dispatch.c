@@ -242,7 +242,8 @@ void link_collision_check_link_collision_preinit(unsigned int monster_slot)
     COMBAT_COLLIDED = 0u;
 }
 
-void link_collision_check_link_collision(unsigned int monster_slot)
+/* T-172 option A: inlined into its per-enemy callers (call overhead). */
+__attribute__((always_inline)) void link_collision_check_link_collision(unsigned int monster_slot)
 {
     /* drain at link_collision_runtime.c:89-98. */
     world_get_object_middle(monster_slot);
@@ -260,7 +261,8 @@ void link_collision_check_link_collision(unsigned int monster_slot)
     link_collision_check_link_collision_preinit(monster_slot);
 }
 
-void link_collision_check_monster_collisions(unsigned int monster_slot)
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) void link_collision_check_monster_collisions(unsigned int monster_slot)
 {
     /* drain at link_collision_runtime.c:100-128. */
     world_get_object_middle(monster_slot);

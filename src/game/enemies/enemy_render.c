@@ -22,6 +22,7 @@
 #include "render_abi.h"
 #include "world/render/sprite_slots.h"
 #include "world/render/sprite_render.h"  /* roomrom_sprites_item_chr_variant */
+#include "world/render/redux_chr.h"
 #include "world/render/subpal_routing.h"  /* Phase AA centralized sub-pal -> OAM pal API */
 #include "enemy_loop.h"   /* ENEMY_LOOP_SLOT_FIRST/LAST */
 #include "enemy_state.h"  /* ENEMY_X, ENEMY_Y, ENEMY_ALIVE_FLAG, ENEMY_THROWER_SLOT */
@@ -344,6 +345,11 @@ static unsigned char s_spark_chr_uploaded = 0u;
 extern const unsigned char common_chr[];
 static unsigned char s_compass_chr_uploaded;
 
+static const unsigned char *active_common_chr(void)
+{
+    return roomrom_sprites_item_chr_variant() ? core_redux_common_chr : common_chr;
+}
+
 /* NES source: Z_01.asm:Anim_ItemFrameOffsets/Anim_ItemFrameTiles (slot $10).
  * Drained C: draw_dispatch.c item tables + translate_tile.
  * Coverage: FULL compass item publication; its common copy was overwritten.
@@ -354,7 +360,7 @@ static void ensure_compass_chr(void)
 {
     if (!s_compass_chr_uploaded) {
         render_chr_upload((unsigned short)(ROOMROM_COMPASS_TILE_BASE * 32u),
-                          common_chr + 0x6Au * 32u,
+                          active_common_chr() + 0x6Au * 32u,
                           ROOMROM_COMPASS_TILE_COUNT * 32u);
         s_compass_chr_uploaded = 1u;
     }
@@ -389,10 +395,10 @@ static void spark_chr_ensure_uploaded(void)
 {
     if (s_spark_chr_uploaded) return;
     render_chr_upload((unsigned short)(ROOMROM_SPARK_TILE_BASE * 32u),
-                      common_chr + 0x62u * 32u,
+                      active_common_chr() + 0x62u * 32u,
                       ROOMROM_SPARK_TILE_COUNT * 32u);
     upload_sprite_subpal3(ROOMROM_SPARK_SUBPAL3_TILE_BASE,
-                          common_chr + 0x62u * 32u,
+                          active_common_chr() + 0x62u * 32u,
                           ROOMROM_SPARK_SUBPAL3_TILE_COUNT);
     s_spark_chr_uploaded = 1u;
 }
@@ -704,10 +710,10 @@ static void ensure_fireball_chr(void)
 {
     if (s_fireball_chr_uploaded) return;
     render_chr_upload((unsigned short)(ROOMROM_FIREBALL_TILE_BASE * 32u),
-                      common_chr + 0x44u * 32u,
+                      active_common_chr() + 0x44u * 32u,
                       ROOMROM_FIREBALL_TILE_COUNT * 32u);
     upload_sprite_subpal3(ROOMROM_FIREBALL_SUBPAL3_TILE_BASE,
-                          common_chr + 0x44u * 32u,
+                          active_common_chr() + 0x44u * 32u,
                           ROOMROM_FIREBALL_SUBPAL3_TILE_COUNT);
     s_fireball_chr_uploaded = 1u;
 }
@@ -727,6 +733,7 @@ extern const unsigned short bg_sparse_tile_lut[256][4];
 static unsigned char s_pt1_tile[PT1_PAIR_SLOTS];
 static unsigned char s_pt1_pal[PT1_PAIR_SLOTS];
 static unsigned char s_pt1_lvl[PT1_PAIR_SLOTS];
+static unsigned char s_pt1_variant[PT1_PAIR_SLOTS];
 static unsigned char s_pt1_used[PT1_PAIR_SLOTS];
 static unsigned char s_pt1_next;
 
@@ -775,10 +782,11 @@ static unsigned short pt1_pair(unsigned char nes_tile, unsigned char sub_pal)
 {
     const unsigned char top = (unsigned char)(nes_tile & 0xFEu);
     const unsigned char lvl = nes_ram[0x0010u];
+    const unsigned char variant = roomrom_sprites_item_chr_variant();
     unsigned char i, k;
     for (i = 0u; i < PT1_PAIR_SLOTS; ++i) {
         if (s_pt1_used[i] && s_pt1_tile[i] == top && s_pt1_pal[i] == sub_pal &&
-            s_pt1_lvl[i] == lvl)
+            s_pt1_lvl[i] == lvl && s_pt1_variant[i] == variant)
             return (unsigned short)(ROOMROM_PT1_PAIR_TILE_BASE + 2u * i);
     }
     i = (unsigned char)(s_pt1_next++ % PT1_PAIR_SLOTS);
@@ -835,6 +843,7 @@ filled:
     s_pt1_tile[i] = top;
     s_pt1_pal[i] = sub_pal;
     s_pt1_lvl[i] = lvl;
+    s_pt1_variant[i] = variant;
     s_pt1_used[i] = 1u;
     return (unsigned short)(ROOMROM_PT1_PAIR_TILE_BASE + 2u * i);
 }
@@ -890,6 +899,20 @@ static const unsigned char k_sp3_lut[256] = {
 static unsigned short s_sp3_stamp = 0xFFFFu;   /* FrameCounter of the last check */
 static unsigned char s_sp3_item_variant = 0xFFu;
 
+/* File menus can replace VRAM between two otherwise identical scene
+ * identities. Reset the native copies before each persistent upload. */
+void enemy_render_invalidate_chr_cache(void)
+{
+    unsigned char i;
+    s_cloud_chr_uploaded = s_spark_chr_uploaded = 0u;
+    s_compass_chr_uploaded = s_fireball_chr_uploaded = 0u;
+    for (i = 0u; i < PT1_PAIR_SLOTS; ++i) s_pt1_used[i] = 0u;
+    s_pt1_next = 0u;
+    for (i = 0u; i < SP3_PAIRS; ++i) s_sp3_src[i] = 0u;
+    s_sp3_key = 0xFFFFu;
+    s_sp3_item_variant = 0xFFu;
+}
+
 /* The ITEM atlas (sword, beam, drop heart, ...) is resident for the whole
  * game and never touched by the scene/boss CHR swaps. */
 #define SP3_IS_ITEM_SRC(src) ((src) >= ROOMROM_ITEM_TILE_BASE &&     (src) + 1u < ROOMROM_ITEM_TILE_BASE + ROOMROM_ITEM_TILE_COUNT_PER_PAL)
@@ -936,8 +959,8 @@ static unsigned char sp3_fill_item(unsigned short src, unsigned char i)
         s_sp3_dma_used = 0u;
     }
     if (s_sp3_dma_used >= SP3_QUEUE_BUFS) return 0u;
-    p = &roomrom_atlas_items_x4[roomrom_sprites_item_chr_variant()]
-                               [(unsigned short)(src - ROOMROM_ITEM_TILE_BASE) * 32u];
+    p = (roomrom_sprites_item_chr_variant() ? core_redux_items_chr :
+         &roomrom_atlas_items_x4[0][0]) + (unsigned short)(src - ROOMROM_ITEM_TILE_BASE) * 32u;
     if ((unsigned long)p & 1u) return 0u;
     s = (const unsigned long *)(const void *)p;
     d = s_sp3_dma_buf[s_sp3_dma_used];
@@ -1199,7 +1222,45 @@ static inline unsigned short translate_attrs(unsigned char nes_attrs,
  * matters for the boss sub-pal 3 range, patched in xlat_sat. */
 #define XLAT_SLOW 0xFFFFu
 static unsigned short s_xlat_tile[256];
-static unsigned short s_xlat_attr[256];
+/* NES source: OAM attribute bits; drained C: translate_attrs(a, 0).
+ * Coverage: FULL all 256 attribute values; stance EXTEND.
+ * Exact 512 bytes captured from the initialized native table in the paired
+ * T172 baseline. These values depend only on attributes, not scene/bank/mode.
+ * Keep the lookup in ROM and release its redundant RAM initialization. */
+static const unsigned short s_xlat_attr[256] = {
+    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
+    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
+    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
+    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
+    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
+    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
+    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
+    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
+    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
+    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
+    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
+    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
+    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
+    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
+    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
+    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
+    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
+    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
+    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
+    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
+    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
+    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
+    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
+    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
+    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
+    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
+    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
+    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
+    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
+    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
+    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
+    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
+};
 static unsigned char s_xlat_key = 0xFFu;
 
 /* Tiles whose copy already holds the colors: drawn with sprite PAL1
@@ -1229,10 +1290,7 @@ static void xlat_refresh(void)
                                         (nes_ram[0x0010u] ? 2u : 0u));
     unsigned int t, first = 0u;
     if (key == s_xlat_key) return;
-    if (s_xlat_key == 0xFFu) {
-        for (t = 0u; t < 256u; ++t)
-            s_xlat_attr[t] = translate_attrs((unsigned char)t, 0u);
-    } else if ((unsigned char)(key ^ s_xlat_key) == 1u) {
+    if (s_xlat_key != 0xFFu && (unsigned char)(key ^ s_xlat_key) == 1u) {
         /* T-172: the boss bank only remaps tiles $C0..$FF (translate_tile);
          * the full rebuild on a boss room's first ready tick cost a lag
          * frame (t013_route t7728, Aquamentus room entry). */
@@ -1414,6 +1472,76 @@ static unsigned short emit_native_entries(unsigned short sat_slot, unsigned char
     return sat_slot;
 }
 
+/* NES source: Z_01.asm:Anim_WriteSprite / Anim_WriteSpritePair submissions.
+ * Drained C: emit_native_entries(NATIVE_PASS_ALL) above (same entries,
+ * order, flash palette, translation, link chain and cursor).
+ * Coverage: FULL for the single-pass native sweep; Stance: EXTEND.
+ * T-172 room $38: one pass with a walking SAT pointer; the per-slot
+ * invincibility timer is read once (nothing writes it during the sweep).
+ * End-of-tick SAT/RAM parity vs the generic emitter: 300/300 ticks in both
+ * Remix and Original (tools/build/t172_tick_parity.py). */
+static unsigned short emit_native_entries_all(unsigned short sat_slot,
+                                              unsigned char *captured_hand_sat)
+{
+    render_sprite_entry_t *sat = &g_render_sat_cache[sat_slot];
+    unsigned short slot;
+    xlat_refresh();
+    for (slot = ENEMY_LOOP_SLOT_FIRST; slot <= ENEMY_LOOP_SLOT_LAST; ++slot) {
+        const unsigned char n = s_enemy_count[slot];
+        const enemy_render_entry_t *e;
+        unsigned char ei, inv_timer, capture_hand;
+        if (n == 0u) continue;
+        if (sat_slot > ENEMY_RENDER_SLOT_LAST) break;
+        capture_hand = (unsigned char)(*captured_hand_sat == 0u && n >= 2u &&
+            ENEMY_TYPE(slot) == 0x27u && RAM(0x042Cu + slot) != 0u);
+        inv_timer = ENEMY_RENDER_INV_TIMER(slot);
+        e = &s_enemy_entries[slot][0];
+        for (ei = 0u; ei < n; ++ei, ++e) {
+            const unsigned char y = e->y;
+            const unsigned char attrs = e->attrs;
+            unsigned char render_attrs;
+            if (y == 0xF0u) continue;
+            if (sat_slot > ENEMY_RENDER_SLOT_LAST) break;
+            if (capture_hand && ei == 0u)
+                *captured_hand_sat = (unsigned char)sat_slot;
+            render_attrs = (unsigned char)(attrs & ~ANIM_WRITE_SPRITE_MARKER);
+            if ((attrs & (ANIM_WRITE_SPRITE_MARKER | META_ATTR_MARKER)) && inv_timer != 0u) {
+                unsigned char flash_pal = (unsigned char)(RAM(NES_FRAME_COUNTER) & 3u);
+                if ((attrs & META_ATTR_MARKER) &&
+                    e->tile >= ENEMY_RENDER_META_SPARK_OFFSET &&
+                    e->tile < ENEMY_RENDER_META_SPARK_OFFSET + ROOMROM_SPARK_TILE_COUNT)
+                    flash_pal = (unsigned char)(inv_timer & 3u);
+                render_attrs = (unsigned char)((render_attrs & 0xFCu) | flash_pal);
+            }
+            sat->y = (signed short)(y + ROOMROM_PLAY_SPRITE_DY + 0x80);
+            sat->size = (unsigned char)RENDER_SPRITE_SIZE(1, 2);
+            sat->link = (sat_slot < ENEMY_RENDER_SLOT_LAST) ? (unsigned char)(sat_slot + 1u) : 0u;
+            sat->attribut = xlat_sat(e->tile, render_attrs);
+            sat->x = (signed short)(e->x + 0x80);
+            ++sat;
+            ++sat_slot;
+        }
+    }
+    {
+        unsigned char wi, ei;
+        for (wi = 0u; wi < ENEMY_RENDER_WEAPON_SLOTS; ++wi) {
+            const enemy_render_entry_t *e = &s_weapon_entries[wi][0];
+            for (ei = 0u; ei < s_weapon_count[wi]; ++ei, ++e) {
+                if (sat_slot > ENEMY_RENDER_SLOT_LAST) break;
+                if (e->y == 0xF0u) continue;
+                sat->y = (signed short)(e->y + ROOMROM_PLAY_SPRITE_DY + 0x80);
+                sat->size = (unsigned char)RENDER_SPRITE_SIZE(1, 2);
+                sat->link = (sat_slot < ENEMY_RENDER_SLOT_LAST) ? (unsigned char)(sat_slot + 1u) : 0u;
+                sat->attribut = xlat_sat(e->tile, e->attrs);
+                sat->x = (signed short)(e->x + 0x80);
+                ++sat;
+                ++sat_slot;
+            }
+        }
+    }
+    return sat_slot;
+}
+
 /* NES source: Z_04 UpdatePatra/UpdatePatraChild and Ganon draw routines.
  * Drained C: boss_patra, enemy_ganon_runtime and native pair publishers.
  * Coverage: PARTIAL (T-183 Ganon pairs previously swept twice).
@@ -1452,24 +1580,28 @@ void enemy_render_sweep_oam_to_sat(void)
     xlat_refresh();   /* T-125: table lookups, as the native path */
     sat_slot = emit_native_entries(sat_slot, NATIVE_PASS_FIREBALLS, 0);
     {
-    /* T-172: one long read per OAM record (Y, tile, attrs, X). */
-    const unsigned long *oam =
-        (const unsigned long *)(unsigned long)&nes_ram[NES_SPRITES_BASE];
-    for (i = 0u; i < NES_OAM_SLOT_COUNT; ++i) {
-        const unsigned long rec = oam[i];
-        unsigned char y = (unsigned char)(rec >> 24);
+    /* T-172: byte reads per OAM record (Y, tile, attrs, X). The previous
+     * long read paid 68000 long shifts (swap / lsr.l #8) on every one of the
+     * 64 records, mostly hidden ones (Manhandla room: ~65k master clocks
+     * per tick). Same three skip tests on the same bytes. */
+    const unsigned char *oam = (const unsigned char *)&nes_ram[NES_SPRITES_BASE];
+    for (i = 0u; i < NES_OAM_SLOT_COUNT; ++i, oam += 4) {
+        const unsigned char y = oam[0];
 
         /* Y == $F0 = NES hide-sprite convention. Skip. All-zero record =
          * unused OAM slot (NES Z1 leaves untouched OAM bytes at 0). */
-        if (y == 0xF0u || rec == 0u) {
+        if (y == 0xF0u) {
             continue;
         }
-        unsigned char tile  = (unsigned char)(rec >> 16);
-        unsigned char attrs = (unsigned char)(rec >> 8);
-        unsigned char x     = (unsigned char)rec;
+        unsigned char tile  = oam[1];
+        unsigned char attrs = oam[2];
+        unsigned char x     = oam[3];
+        if ((y | tile | attrs | x) == 0u) {
+            continue;
+        }
 
-        if ((rec & 0x00FFFFFFUL) == 0x001C2000UL) {
-            continue;                    /* blank priority sprite */
+        if (tile == 0x1Cu && attrs == 0x20u && x == 0x00u) {
+            continue;                    /* blank priority sprite $xx1C2000 */
         }
 
         unsigned short sat_attrs  = xlat_sat(tile, attrs);
@@ -1603,8 +1735,7 @@ void enemy_render_native_sweep(void)
     }
 
 
-    sat_slot = emit_native_entries(sat_slot, NATIVE_PASS_ALL,
-                                   &captured_hand_sat);
+    sat_slot = emit_native_entries_all(sat_slot, &captured_hand_sat);
 
     /* Terminator: hide remaining SAT slots via chain break (link=0). */
     if (sat_slot <= ENEMY_RENDER_SLOT_LAST) {

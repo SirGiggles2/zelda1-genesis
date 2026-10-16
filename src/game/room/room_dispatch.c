@@ -4,6 +4,7 @@
  */
 
 #include "room_dispatch.h"
+#include "../../state/game_profile.h"
 #include <stdint.h>
 #include "platform_abi.h"
 #include "world_state.h"       /* CUR_ROOM_ID */
@@ -19,6 +20,8 @@
 #include "core/core_dispatch.h" /* core_get_opposite_dir,
                                   * core_compare_hearts_to_containers */
 #include "hud/hud_dispatch.h"   /* hud_world_change_rupees */
+#include "hud/hud_runtime.h"    /* visited dungeon map refresh cue */
+#include "world/transfer_buf_drain.h" /* new room owns fresh NT/attribute state */
 #include "world/level_info_install.h" /* level_info_apply_q2_patch */
 #include "world/progress_dispatch.h" /* progress_update_world_curtain_effect,
                                       * progress_reset_room_tile_obj_info */
@@ -194,6 +197,20 @@ void room_mark_room_visited(void)
         (unsigned short)(((unsigned short)(unsigned char)SAVEFILE_PTR_HI << 8) |
                          (unsigned char)SAVEFILE_PTR_LO);
     nes_ram[ptr + CUR_ROOM_ID] = (uint8_t)(flags | 0x20u);
+    /* NES source: Z_07 MarkRoomVisited; Redux dungeon_automap checkmap.
+     * Drained C: room_mark_room_visited / HUD map cue consumer.
+     * Coverage: FULL first-visit map invalidation; Stance: EXTEND.
+     * The host draws before native entry publishes this bit. Queue the
+     * normal HUD refresh after publication, so an unchanged inventory
+     * cannot leave the newly entered room absent from the automap. */
+    if (game_profile_is_remix() && CUR_LEVEL) {
+        /* NES source: room NT/attributes precede the new person script.
+         * Drained C: this native entry and transfer decoder.
+         * Coverage: FULL dungeon room-entry text state; Stance: EXTEND.
+         * A scroll must forget the preceding room's attribute shadow. */
+        transfer_buf_attr_shadow_reset();
+        if (!(flags & 0x20u)) roomrom_hud_status_bar_map_cue();
+    }
 }
 
 void room_go_to_next_mode(void)
@@ -437,13 +454,24 @@ void room_update_mode3_unfurl(void)
  * $29). The row is LinkColors[InvRing] of the current profile. Also run
  * after every LevelInfo install (level_info_install.c): the Genesis load
  * paths that skip InitMode3 would otherwise keep the ROM's $29. */
-void room_patch_level_palette_link_color(void)
+/* NES source: Redux gfx/palettes.asm / Z_01:LinkColors_CommonCode.
+ * Drained C: item_runtime.c:itemrt_handle_class2; room_mode_runtime.c:roommd_patch_and_cue_level_palettes_transfer.
+ * Coverage: PARTIAL (Original patch adopted; Redux blue value missing).
+ * Stance: EXTEND shared palette selection for level load and pickup. */
+unsigned char room_link_tunic_color(unsigned char ring)
 {
     static const unsigned char k_link_colors[3] = { 0x29u, 0x32u, 0x16u }; /* LinkColors_CommonCode */
+    if (ring >= 3u) ring = 0u;
+    if (game_profile_is_remix() && ring == 1u) return 0x22u;
+    return k_link_colors[ring];
+}
+
+void room_patch_level_palette_link_color(void)
+{
     const unsigned char slot = (unsigned char)SAVE_SLOT_INDEX;
     const unsigned char row_off = SaveSlotToPaletteRowOffset[slot & 3u];
     const unsigned char ring = nes_ram[0x0662u];
-    if (ring < 3u) MenuPalettesTransferBuf[20u + row_off] = k_link_colors[ring];
+    if (ring < 3u) MenuPalettesTransferBuf[20u + row_off] = room_link_tunic_color(ring);
     nes_ram[NES_SRAM_BASE + 0x0B92u] = MenuPalettesTransferBuf[20u + row_off];
 }
 
@@ -1670,7 +1698,11 @@ void room_animate_pond(void)
     room_cue_pond_palette_row((unsigned char)RAM(0x051Au));
 }
 
-/* UpdateRockWall ($63, $67): a detonating bomb reveals a cave. */
+/* NES source: Z_04:UpdateRockWall; Redux visible_secrets.asm:$8F08.
+ * Drained C: room_dispatch.c:room_update_rock_wall.
+ * Coverage: PARTIAL (native reveal; connected cave lifecycle separate).
+ * Stance: EXTEND. Redux publishes arch art while collision remains $24.
+ */
 void room_update_rock_wall(unsigned int slot)
 {
     unsigned char w;
@@ -1681,7 +1713,7 @@ void room_update_rock_wall(unsigned int slot)
         if ((unsigned char)TO_OBJ_STATE(w) != 0x13u) return;
     }
     if (!tile_obj_weapon_collides(slot, w)) return;
-    tile_obj_reveal_and_flag(0x24u, slot);
+    tile_obj_reveal_and_flag(game_profile_is_remix() ? 0x54u : 0x24u, slot);
 }
 
 /* UpdateTree ($64): a standing fire about to go out reveals stairs. */

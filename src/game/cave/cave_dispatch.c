@@ -33,6 +33,7 @@
 #include "core/core_dispatch.h"         /* core_cue_transfer_buf_and_advance_state,
                                          * core_abs, core_unhalt_link */
 #include "items/item_dispatch.h"        /* item_take_item */
+#include "../../state/game_profile.h"
 
 /* Phase D3 (2026-05-24): correct PersonTextAddrs to its Genesis layout.
  * The data file (src/data/person_text_data.c) emits a 38-pointer array
@@ -40,6 +41,7 @@
  * table. NES selectors $00, $02, $04, ... index pairs; Genesis indexes
  * blobs by selector/2. */
 #include "../../data/person_text_data.h"
+#include "../world/render/redux_chr.h"
 
 /* LevelBlockAttrsE (cave ware ids + prices) lives in the extracted
  * rooms_overworld[] blob — the SAME source ow_meta uses for attr_b. The
@@ -182,6 +184,11 @@ void cave_init_person(unsigned int slot)
     RAM(0x0070u + slot) = 0x78u;          /* ObjX */
     RAM(0x0084u + slot) = 0x80u;          /* ObjY */
     RAM(0x0485u + slot) = 0x00u;          /* ObjHP */
+    /* NES source: Redux bugfixes/cave_room_timer.asm:$86A3.
+     * Drained C: cavert_init_cave / cave_init_person (Original inherits29).
+     * Coverage: FULL(profile-specific initialization); live lifecycle separate.
+     * Stance: EXTEND. Redux resets the shared cloud/text timer here. */
+    if (game_profile_is_remix()) RAM(0x0029u) = 0u;
     RAM(0x04BFu + slot) = 0x81u;          /* ObjAttr */
     RAM(0x00ACu) = 0x40u;                 /* ObjState (Link) = halted */
     RAM(0x034Fu + 2u) = 0x40u;            /* ObjType+2 = StandingFire */
@@ -214,7 +221,8 @@ void cave_init_person(unsigned int slot)
      * 4) CAVE_FLAGS = (tmp_flags>>6) | ware_flags[0] | (ware_flags[2]>>4) | (ware_flags[1]>>2). */
     {
         unsigned char cave_idx = (unsigned char)(cave_id - 0x6Au);
-        unsigned char sel = k_overworld_person_text_selectors[cave_idx];
+        unsigned char sel = game_profile_is_remix() ? core_redux_text_selectors[cave_idx] :
+                            k_overworld_person_text_selectors[cave_idx];
         CAVE_TEXT_SELECTOR = (unsigned char)(sel & 0x3Fu);
         unsigned char tmp_flags_top = (unsigned char)(sel & 0xC0u);
 
@@ -323,7 +331,13 @@ static inline unsigned char cave_abs_inline(unsigned char x)
 static inline void cave_prepend_sign_to_price_inline(unsigned char val,
                                                      unsigned char off)
 {
-    const unsigned char sign = (val == 0x14u || val == 0x32u) ? 100u : 98u;
+    /* NES source: Redux menus/file_select.asm $89E6/$89F0 sign patches.
+     * Drained C: cave_prepend_sign_to_price_inline.
+     * Coverage: FULL gamble signs; Stance: EXTEND selected glyph IDs.
+     * Redux reassigns $64 to infinity, moving plus/minus to $2B/$2F. */
+    const unsigned char gain = (val == 0x14u || val == 0x32u);
+    const unsigned char sign = game_profile_is_remix()
+        ? (gain ? 0x2Bu : 0x2Fu) : (gain ? 100u : 98u);
     CAVE_TRANSFER_BUF_PRICE_SIGN(off) = sign;
 }
 
@@ -479,6 +493,12 @@ void cave_update_talk_shop_or_door_charge(void)
          * cave-shop ware acquisition flash. NES TakeItem at
          * Z_05.asm:5040. */
         item_take_item(item);
+        /* NES source: Redux arrows.asm:ShopArrow, Y=arrow inventory slot2.
+         * Drained C: cave_update_talk_shop_or_door_charge purchase path.
+         * Coverage: FULL(wood/silver grants capped30/60 after acquisition).
+         * Stance: EXTEND successful wares only; dropped arrows grant5. */
+        if (game_profile_is_remix() && (item == 8u || item == 9u))
+            item_add_arrow_ammunition(30u);
         core_cue_transfer_buf_and_advance_state(30u);
         CAVE_DELAY_TIMER = 64u;
         cave_clear_prices_flag_inline();
@@ -540,7 +560,9 @@ void cave_write_prices_to_dynamic_transfer_buf(unsigned char price_char)
      *   - Write hundreds/tens/units (and the sign byte) into the
      *     dynamic transfer buffer at offset.
      * Bumps delay timer to 10 frames + cues advance-state. */
-    RAM(0x0305) = price_char;        /* DynTileBuf+3 = price char */
+    /* Live Redux price records use LOW_X ($62), also used by its HUD. */
+    RAM(0x0305) = (game_profile_is_remix() && price_char == 0x21u)
+        ? 0x62u : price_char;        /* DynTileBuf+3 = price char */
     CAVE_TRANSFER_PRICE_COUNT  = 0u; /* CaveCurPriceIndex  = $042E */
     CAVE_TRANSFER_PRICE_OFFSET = 0u; /* CaveCurPriceOffset = $042F */
     do {
@@ -558,7 +580,8 @@ void cave_write_prices_to_dynamic_transfer_buf(unsigned char price_char)
         }
 
         /* Cave flag $80 = negative-amount display → dash, else space. */
-        dash = (cave_flags_get() & 0x80u) ? 98u : 0x24u;
+        dash = (cave_flags_get() & 0x80u)
+            ? (game_profile_is_remix() ? 0x2Fu : 98u) : 0x24u;
         CAVE_TMP4 = dash;
 
         off = CAVE_TRANSFER_PRICE_OFFSET;
@@ -871,7 +894,8 @@ void cave_update_person_state_textbox(void)
     if ((unsigned char)CAVE_DELAY_TIMER != 0u) {
         return;
     }
-    CAVE_DELAY_TIMER = 6u;
+    /* Redux text/text_speed.asm:$881C sets four ticks per character. */
+    CAVE_DELAY_TIMER = game_profile_is_remix() ? 4u : 6u;
 
     /* Copy 5-byte textbox char transfer record template into
      * CAVE_TRANSFER_BUF_CHAR_BASE ($0302..$0306). */
@@ -896,8 +920,25 @@ void cave_update_person_state_textbox(void)
              * selectors are stored unmasked up to $4A (Z_01
              * UnderworldPersonTextSelectorsB/C), i.e. entries 32..37;
              * the selector tables hold no larger value. */
-            const unsigned char entry = (unsigned char)(selector >> 1);
-            text = PersonTextAddrs[entry < 38u ? entry : 0u];
+            unsigned char entry = (unsigned char)(selector >> 1);
+            /* NES source: Redux script.asm:TextRoutines/PutWhichPathText.
+             * Drained C: existing cave_update_person_state_textbox.
+             * Coverage: FULL(42 script entries and room-specific paths).
+             * Stance: EXTEND the pointer owner; preserve Original data. */
+            if (game_profile_is_remix()) {
+                if (selector == 4u) {
+                    const unsigned char room = RAM(0x00EBu);
+                    RAM(0x7F02u) = 0xFFu; /* native blank map scratch */
+                    entry = room == 0x23u ? 38u : room == 0x1Du ? 39u :
+                            room == 0x49u ? 40u : 41u;
+                }
+                if (entry >= 42u) entry = 0u;
+                const unsigned short off = (unsigned short)(core_redux_text_offsets[entry*2u] |
+                    ((unsigned short)core_redux_text_offsets[entry*2u+1u] << 8));
+                text = core_redux_text + off;
+            } else {
+                text = PersonTextAddrs[entry < 38u ? entry : 0u];
+            }
         }
         char_idx = (unsigned char)CAVE_TEXT_CHAR_INDEX;
         CAVE_TEXT_CHAR_INDEX =

@@ -23,6 +23,8 @@
 #include "platform_abi.h"
 #include "render_abi.h"                      /* render_plane_defer (T-172) */
 #include "../world/transfer_buf_drain.h"    /* transfer_buf_note_native_record */
+#include "../../state/game_profile.h"
+#include "../world/render/redux_chr.h"
 
 extern const unsigned char rooms_dungeons[];
 
@@ -318,6 +320,19 @@ static const unsigned char k_anim_face_idx[DOOR_DIR_COUNT][4] = {
     { 1u, 3u, 6u, 8u }, { 3u, 5u, 8u, 10u }, { 3u, 6u, 4u, 7u }, { 4u, 7u, 5u, 8u }
 };
 
+/* NES source: Redux visible_secrets.asm / Z_05:DoorFaceTilesE/W/S/N.
+ * Drained C: native layout_door and door_anim_step publishers.
+ * Coverage: PARTIAL (faces; connected bomb lifecycle separate).
+ * Stance: EXTEND. Both publishers share the authenticated five-state bank.
+ */
+static const unsigned char *door_face_tiles(unsigned char dir, unsigned char face)
+{
+    if (game_profile_is_remix())
+        return &core_redux_door_faces[(unsigned short)dir * 60u +
+                                      (unsigned short)(face - 1u) * 12u];
+    return &k_door_face_tiles[dir][(unsigned short)(face - 1u) * 12u];
+}
+
 static void door_anim_step(unsigned char dir, unsigned char open)
 {
     unsigned char t = s_door_types[dir];
@@ -339,7 +354,7 @@ static void door_anim_step(unsigned char dir, unsigned char open)
         face--;
     }
     if (face == 0u || face > 5u) return;
-    src = &k_door_face_tiles[dir][(unsigned short)(face - 1u) * 12u];
+    src = door_face_tiles(dir, face);
     render_plane_defer(1u);
     for (i = 0u; i < 4u; ++i) {
         unsigned char k = k_anim_face_idx[dir][i];
@@ -556,7 +571,7 @@ static void layout_door(unsigned char dir, unsigned char plane)
     const unsigned char *src;
     unsigned char half, c, r, k;
     if (face == 0u) return;
-    src = &k_door_face_tiles[dir][(unsigned short)(face - 1u) * 12u];
+    src = door_face_tiles(dir, face);
     k = 0u;
     for (half = 0u; half < 2u; ++half) {
         unsigned char cols = (dir == DOOR_DIR_E || dir == DOOR_DIR_W) ? 3u : 2u;

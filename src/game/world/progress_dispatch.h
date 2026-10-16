@@ -17,6 +17,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+unsigned char progress_ganon_palette_color(unsigned char index);
 
 /* Set bit $10 ("UW item taken / cave object destroyed") on the
  * current room's flag byte in the active save slot. Mirrors NES

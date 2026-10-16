@@ -1,3 +1,7 @@
+/* T-294 D1: NES source: Z_02.asm:InitDemoSubphasePlayTitleSong / Redux title_screen.asm, story.asm.
+ * Drained C: intro_title_setup, intro_story_load and intro_story_step below.
+ * Coverage: PARTIAL(shared native presentation; approved Genesis scroll/layout).
+ * Stance: EXTEND. One shared Redux intro explicitly selected by user. */
 /* src/intro_story.c
  *
  * Story + items runtime extracted verbatim from pre-phase-machine
@@ -14,34 +18,19 @@
  */
 #include "intro_story.h"
 #include "render_abi.h"
+#include "audio_abi.h"
 
-/* m_song_loop_pending in audio_driver.asm -- set to 1 by tick_sq1.song_ended
- * each time the song script reads its $00 loop opcode. End-of-scroll
- * hold polls this so the snap-back to title syncs with the music loop. */
-#define M_SONG_LOOP_PENDING (*(volatile unsigned char *)0x00FFE02B)
+#include "intro_redux_assets.h"
 
-extern const unsigned char  intro_common_bg_chr[];
-extern const unsigned long  intro_common_bg_chr_size;
-extern const unsigned char  intro_font_chr[];
-extern const unsigned long  intro_font_chr_size;
-extern const unsigned char  intro_sprite_chr[];
-extern const unsigned long  intro_sprite_chr_size;
-extern const unsigned char  intro_misc_chr[];
-extern const unsigned long  intro_misc_chr_size;
-extern const unsigned char  intro_punct_chr[];
-extern const unsigned long  intro_punct_chr_size;
-extern const unsigned char  intro_blink_chr[];
-extern const unsigned long  intro_blink_chr_size;
-extern const unsigned short intro_combined_palette[64];
-extern const unsigned short intro_story_tilemap_rows;
-extern const unsigned short intro_story_tilemap[];
-extern const unsigned short intro_treasures_tilemap_rows;
-extern const unsigned short intro_treasures_tilemap[];
+#define intro_story_tilemap_rows 30u
+#define intro_treasures_tilemap_rows 176u
+#define intro_story_tilemap core_redux_intro_story_map
+#define intro_treasures_tilemap core_redux_intro_items_map
 
 #define PRE_BLANK_ROWS       28u
 #define GAP_ROWS             6
 #define STORY_HOLD_FRAMES    260u
-#define STORY_SCROLL_TARGET  216u
+#define STORY_SCROLL_TARGET  232u
 #define PLANE_A_BASE         0xC000u
 #define PLANE_B_BASE         0xE000u
 
@@ -131,18 +120,12 @@ void intro_story_load(void) {
     render_vram_open_write(0x0000);
     for (unsigned long i = 0; i < 32768; i++) render_vram_write_word(0x0000);
 
-    render_chr_upload(0x0000, intro_common_bg_chr,
-                      (unsigned short)intro_common_bg_chr_size);
-    render_chr_upload(0x0E00, intro_font_chr,
-                      (unsigned short)intro_font_chr_size);
-    render_chr_upload(0x2000, intro_sprite_chr,
-                      (unsigned short)intro_sprite_chr_size);
-    render_chr_upload(0x1E40, intro_misc_chr,
-                      (unsigned short)intro_misc_chr_size);
-    render_chr_upload(0x4000, intro_punct_chr,
-                      (unsigned short)intro_punct_chr_size);
-    render_chr_upload(0x4040, intro_blink_chr,
-                      (unsigned short)intro_blink_chr_size);
+    /* Source common/demo banks share the native pattern-table seams. */
+    render_chr_upload(0x0000, core_redux_common_chr + 0x0E00, 0x0E00);
+    render_chr_upload(0x0E00, core_redux_demo_chr + 0x1200, 0x1040);
+    render_chr_upload(0x2000, core_redux_intro_sprite_chr, 8192);
+    render_chr_upload(0x1E40, core_redux_intro_misc_chr, 448);
+    render_chr_upload(0x4040, core_redux_intro_blink_chr, 256);
 
     /* Clear sprite list left over from title phase. Set sprite 0 to
      * Y=0 (off-screen) and link=0 (terminate). Genesis sprite table
@@ -155,7 +138,7 @@ void intro_story_load(void) {
 
     /* CRAM: combined palette + heart-flash slot restoration (title fade
      * clobbered all 64 slots so we must rewrite). */
-    render_cram_upload(intro_combined_palette, 64);
+    render_cram_upload(core_redux_intro_story_palette, 64);
     render_cram_write_color((unsigned short)(2*16 + 9),  0x0C02);
     render_cram_write_color((unsigned short)(2*16 + 10), 0x0E88);
     render_cram_write_color((unsigned short)(2*16 + 11), 0x0EEE);
@@ -273,15 +256,15 @@ void intro_story_step(void) {
 
     /* End-of-scroll hold: when the last 28 rows are visible (Link sprite +
      * Triforce + manual sign), pause indefinitely until the song completes
-     * a full loop, then snap back to title. Music engine sets
-     * m_song_loop_pending in tick_sq1.song_ended. */
+     * a full loop, then snap back to title. The audio adapter owns the
+     * current XGM clock or linker-owned legacy loop signal. */
     if (!s_end_pause_armed && s_pixel_count >= s_end_pause_threshold) {
         s_end_pause_armed = 1;
-        M_SONG_LOOP_PENDING = 0;   /* arm: clear flag, wait for next loop */
+        audio_music_loop_arm();
         return;
     }
     if (s_end_pause_armed) {
-        if (M_SONG_LOOP_PENDING) {
+        if (audio_music_loop_pending()) {
             s_at_end = 1;          /* song looped -- flip back to title */
         }
         return;                    /* hold viewport either way */

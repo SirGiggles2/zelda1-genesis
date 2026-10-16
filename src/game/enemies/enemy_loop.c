@@ -1437,7 +1437,8 @@ void enemy_loop_room_reenter(unsigned char room_id, unsigned char scene_id,
     enemy_loop_room_init_impl(room_id, scene_id, level, quest, 1u);
 }
 
-static void loop_object_wrapper(unsigned int slot)
+/* T-172 option A: inlined into its callers (call overhead). */
+__attribute__((always_inline)) static void loop_object_wrapper(unsigned int slot)
 {
     /* NES @LoopObject post-update wrapper (Z_07.asm:1928-1945).
      * After UpdateObject returns, NES runs:

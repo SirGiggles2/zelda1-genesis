@@ -17,6 +17,21 @@
 #include "room/room_dispatch.h"      /* room_end_game_mode,
                                       * room_patch_and_cue_level_palettes_transfer */
 #include "../../state/inventory.h"   /* T2.7: inventory_add_heart_container */
+#include "../../state/game_profile.h"
+
+/* NES source: Redux arrows.asm:ShopArrow / GiveArrowDrop.
+ * Drained C: item_take_item / existing native cave and dropped-item paths.
+ * Coverage: PARTIAL(ammunition grants; persistence migration separate).
+ * Stance: EXTEND saved0677, independent of currency and option switches. */
+void item_add_arrow_ammunition(unsigned char amount)
+{
+    unsigned char type, cap, sum;
+    if (!game_profile_is_remix()) return;
+    type = RAM(0x0659u);
+    cap = type == 2u ? 60u : type == 1u ? 30u : 0u;
+    sum = (unsigned char)(RAM(0x0677u) + amount);
+    RAM(0x0677u) = sum < cap ? sum : cap;
+}
 
 /* T5.2 Plan v5b — item pickup SFX. ID 7 = itempickup per
  * data/audio/MANIFEST.json (commit b25d549c). */
@@ -29,12 +44,6 @@ extern const unsigned char ItemIdToDescriptor[];
 extern const unsigned char LevelMasks[];
 extern const unsigned char SaveSlotToPaletteRowOffset[];
 extern unsigned char MenuPalettesTransferBuf[];
-
-/* LinkColors_CommonCode — Z_01.asm:1869. Inline-baked: tiny enough
- * + read-only, native ownership cleaner than asm extern. */
-static const unsigned char k_link_colors_common_code[3] = {
-    0x29u, 0x32u, 0x16u
-};
 
 /* class 0 + complex item slots (triforce, letter, clock, etc).
  * drain at item_runtime.c:4-31. */
@@ -82,7 +91,7 @@ static void item_handle_class2(unsigned char item_slot)
     }
     {
         const unsigned char ring_val = (unsigned char)LINK_RING_LEVEL;
-        const unsigned char color = k_link_colors_common_code[ring_val & 3u];
+        const unsigned char color = room_link_tunic_color(ring_val);
         const unsigned char save_slot = (unsigned char)SAVE_SLOT_INDEX;
         const unsigned char palette_off =
             SaveSlotToPaletteRowOffset[save_slot & 3u];
@@ -145,7 +154,13 @@ static void item_check_class1(unsigned char item_slot, unsigned char item_class)
         return;
     }
     {
-        const unsigned int sum = (unsigned int)(unsigned char)ITEM_VALUE_SCRATCH +
+        /* NES source: Redux bombs.asm:BombCheck (4 becomes5).
+         * Drained C: item_check_class1 native incremental owner.
+         * Coverage: FULL(bomb pickups and existing cap clamp).
+         * Stance: EXTEND only the Redux grant amount. */
+        unsigned char amount = (unsigned char)ITEM_VALUE_SCRATCH;
+        if (game_profile_is_remix() && item_slot == 1u && amount == 4u) amount = 5u;
+        const unsigned int sum = (unsigned int)amount +
                                  (unsigned int)(unsigned char)INVENTORY_VALUE(item_slot);
         unsigned char result = (sum > 0xFFu) ? 0xFFu : (unsigned char)sum;
         if (item_slot == 7u && result >= 3u) {
@@ -161,6 +176,14 @@ static void item_check_class1(unsigned char item_slot, unsigned char item_class)
 void item_take_item(unsigned char item_id)
 {
     /* drain at item_runtime.c:110-137. NES TakeItem. */
+    if (game_profile_is_remix() && item_id == 0x55u) {
+        /* GiveArrowDrop establishes wood ownership if absent, then grants
+         * five. Use the corresponding native graded item for pickup SFX
+         * and ownership; an extended drop ID is not a legacy table index. */
+        if (RAM(0x0659u) == 0u) RAM(0x0659u) = 1u;
+        item_add_arrow_ammunition(5u);
+        item_id = RAM(0x0659u) == 2u ? 9u : 8u;
+    }
     ITEM_SFX_PRIMARY = 8u;
     if (item_id == 0x0Eu) {
         ITEM_SFX_PRIMARY = 2u;

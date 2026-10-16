@@ -1,9 +1,11 @@
 #include "inventory.h"
+#include "game_profile.h"
 #include "../abi/platform_abi.h"
 #include "../game/hud/hud_dispatch.h"
 #include "../game/hud/heart_container_anim.h"
 extern void roomrom_hud_status_bar_formatted(void);   /* hud_runtime.c (T-172) */
 extern unsigned char transfer_buf_dyn_busy(void);       /* transfer_buf_drain.c */
+extern void roomrom_hud_prepare_items(void);            /* native HUD icon owner */
 
 /* Phase 6 Task 6.10.4 — singleton inventory storage.
  *
@@ -79,6 +81,19 @@ unsigned char inventory_hud_consume_dirty(void)
 static unsigned long s_inv_shadow[INV_SHADOW_LONGS];
 static unsigned char s_inv_shadow_valid;
 
+/* NES source: Redux rupee.asm:GenerateHexValue / Z_01:World_ChangeRupees.
+ * Drained C: inventory_sync_from_native / inventory_rupee_tick.
+ * Coverage: PARTIAL (readback; migration and full save lifecycle pending).
+ * Stance: EXTEND read-only legacy UI mirror of the native ledger. */
+unsigned short inventory_rupees_current(void)
+{
+    const unsigned char decimal = nes_ram[0x067Au];
+    return game_profile_is_remix() ?
+        (unsigned short)(nes_ram[0x067Bu] * 100u +
+                        (decimal >> 4) * 10u + (decimal & 15u)) :
+        (unsigned short)nes_ram[0x066Du];
+}
+
 void inventory_sync_from_native(void)
 {
     unsigned char changed = 0u;
@@ -117,7 +132,11 @@ void inventory_sync_from_native(void)
     PULL_FIELD(compass_l9, 0x0669u);
     PULL_FIELD(map_l9, 0x066Au);
     PULL_FIELD(clock, 0x066Cu);
-    PULL_FIELD(rupees, 0x066Du);
+    {
+        const unsigned short value = inventory_rupees_current();
+        if (g_inventory.rupees != value) changed = 1u;
+        g_inventory.rupees = value;
+    }
     PULL_FIELD(keys, 0x066Eu);
     PULL_FIELD(heart_values, 0x066Fu);
     PULL_FIELD(heart_partial, 0x0670u);
@@ -150,6 +169,12 @@ void inventory_sync_from_native(void)
 void inventory_rupee_tick(unsigned char frame_counter)
 {
     unsigned short previous = g_inventory.rupees;
+    /* NES source: Z_07:UpdateHeartsAndRupees.
+     * Drained C: HUD inventory descriptor + currency/heart owners.
+     * Coverage: PARTIAL (Redux play ordering); Stance: EXTEND.
+     * Icons precede heart/status formatting; cached SAT writes do not
+     * replace the native descriptor work performed every update. */
+    if (game_profile_is_remix()) roomrom_hud_prepare_items();
     /* UpdateHeartsAndRupees: World_FillHearts then World_ChangeRupees. */
     hud_world_fill_hearts();
     /* World_ChangeRupees returns while a static transfer buffer is chosen
@@ -159,9 +184,12 @@ void inventory_rupee_tick(unsigned char frame_counter)
      * t1061, a pending record delayed the hearts to t1063). */
     if (nes_ram[0x0014u] == 0u && !transfer_buf_dyn_busy()) {
         hud_tick_native_rupees(frame_counter);
-        if (!(frame_counter & 1u)) roomrom_hud_status_bar_formatted();
+        if (!(frame_counter & 1u)) {
+            if (game_profile_is_remix()) hud_format_status_bar_text();
+            roomrom_hud_status_bar_formatted();
+        }
     }
-    g_inventory.rupees = nes_ram[0x066Du];
+    g_inventory.rupees = inventory_rupees_current();
     g_inventory.rupees_to_add = nes_ram[0x067Du];
     g_inventory.rupees_to_sub = nes_ram[0x067Eu];
     if (previous != g_inventory.rupees) inventory_hud_mark_dirty();

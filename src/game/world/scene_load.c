@@ -1,5 +1,9 @@
-/* Phase 12.2 SGDK-1 cleanup: dropped unused <genesis.h>. */
+/* NES source: Z_03 TransferLevelPatternBlocks; Redux gfx/graphics.asm.
+ * Drained C: existing scene-load/residency owner (native DMA adapter).
+ * Coverage: PARTIAL (CHR selection; no gameplay timing claim).
+ * Stance: EXTEND, asset variant independent of scene identity. */
 #include "scene_load.h"
+#include "render/redux_chr.h"
 #include "../world/render/sprite_render.h"
 #include "../../../engine/src/atlas/level_chr_swap.h"
 #include "bg_palette.h"  /* Phase 12.2 promoted */
@@ -10,6 +14,7 @@ void roomrom_scene_load(roomrom_scene_id_t scene_id, unsigned char variant)
 {
     /* Variant flows through to each category's redux flag. */
     roomrom_sprites_set_redux(variant);
+    level_chr_swap_set_variant(variant);
 
     /* PR-4a: enqueue scene-bank DMA. Empty contracts (PR-4a default)
      * collapse REQUESTED → READY in one tick. PR-4b populates content. */
@@ -64,15 +69,17 @@ extern const unsigned char sprites_chr[];
 void roomrom_scene_uw_sprite_base_tick(void)
 {
     static unsigned short s_done_request = 0xFFFFu;
+    static unsigned char s_done_variant = 0xFFu;
     roomrom_scene_id_t active;
     unsigned short req;
     if (!level_chr_swap_is_ready()) return;
     req = level_chr_swap_request_count();
-    if (req == s_done_request) return;
+    if (req == s_done_request && s_done_variant == level_chr_swap_active_variant()) return;
     s_done_request = req;
+    s_done_variant = level_chr_swap_active_variant();
     active = level_chr_swap_active_scene();
     if (active < ROOMROM_SCENE_UW_L1 || active > ROOMROM_SCENE_UW_L9) return;
     render_chr_upload((unsigned short)((ROOMROM_SPR_TILE_BASE + 0x8Eu) * 32u),
-                      sprites_chr + UWSP_BASE_BLOB_OFFSET,
+                      s_done_variant ? core_redux_enemy_uwsp_base_chr : sprites_chr + UWSP_BASE_BLOB_OFFSET,
                       (unsigned short)(UWSP_BASE_TILES * 32u));
 }

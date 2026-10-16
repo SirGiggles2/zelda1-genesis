@@ -193,7 +193,7 @@ def get_nes_tile_bytes(tile_id, common_chr, scene_bg_chr, unified_source=False):
 
 
 def emit_sparse_blob(per_tile_usage, common_chr, scene_bg_chr, name_for_log,
-                     unified_source=False):
+                     unified_source=False, extra_pairs=()):
     """Returns (flat_bytes, lut_256x4). LUT[tile_id][sub_pal] = slot_index
     (0..N-1) into the flat tile array; 0xFFFF sentinel if combo unused.
 
@@ -214,6 +214,12 @@ def emit_sparse_blob(per_tile_usage, common_chr, scene_bg_chr, name_for_log,
                 fail(f"{name_for_log}: slot overflow at tile 0x{tile_id:02X} sub-pal {sub_pal}")
             lut[tile_id][sub_pal] = slot
             slot += 1
+    # Append new core combinations: existing Original tile identities stay fixed.
+    for tile_id,sub_pal in extra_pairs:
+        raw=get_nes_tile_bytes(tile_id,common_chr,scene_bg_chr,unified_source)
+        if len(raw)!=BYTES_PER_TILE: fail(f"{name_for_log}: short appended tile")
+        flat.extend(bias_byte(b,sub_pal) for b in raw)
+        lut[tile_id][sub_pal]=slot;slot+=1
     return bytes(flat), lut
 
 
@@ -241,6 +247,9 @@ def emit_lut(f, name, lut):
 def main():
     # Load source arrays
     common_chr = load_source("data/chr/common.c", "common_chr")
+    # T-269: authenticated complete Redux OW BG includes the common
+    # font/counter tiles and $54..$5F secret overlay, not Original common.
+    redux_bg_ow_chr = load_source("build/generated/core_redux_chr.c", "core_redux_bg_ow_chr")
     overworld_bg_chr = load_source("data/chr/overworld_bg.c", "overworld_bg_chr")
     underworld_bg_chr = load_source("data/chr/underworld_bg.c", "underworld_bg_chr")
     redux_overworld_bg_chr = load_source(
@@ -251,7 +260,7 @@ def main():
     # For redux UW, source IS Genesis 4bpp already; sparse emit treats it
     # differently — extract as-if-NES (pixel values 0..3 in the 4bpp
     # nibbles for sub-pal 0 already) and apply bias to other sub-pals.
-    redux_uw_bg_chr = load_source("engine/src/redux_uw_bg.c", "redux_uw_bg_chr")
+    redux_uw_bg_chr = load_source("build/generated/core_redux_chr.c", "core_redux_bg_uw_chr")
 
     # Run audits (deterministic per Phase J §36.1 MF4)
     uw_rooms = parse_uw_blob()
@@ -381,25 +390,47 @@ def main():
         combined[tid].update([0])
 
     # Emit per-variant blobs against COMBINED usage (so LUT is universal)
+    # Visible Redux OW arches and hints use sub-palette 3. Dungeon cracks
+    # use palette 2 already present. Live PPU census authenticates both.
+    # Keep Original's existing upload span and all allocated indices intact.
+    legacy_tiles=sum(len(s) for s in combined.values())
+    extra_pairs=[(t,3) for t in range(0x54,0x60) if 3 not in combined[t]]
+    # T-302: Redux file_select.asm:$89E6 writes '+' as $2B, not the
+    # Original $64 (now infinity). Live money-game PPU uses sub-pal 0.
+    # Append this runtime-only glyph; inserting it in combined would move
+    # every later Original slot and enlarge Original's upload span.
+    if 0 not in combined[0x2B]:
+        extra_pairs.append((0x2B,0))
     orig_ow_blob, orig_ow_lut = emit_sparse_blob(
-        combined, common_chr, overworld_bg_chr, "orig_ow")
+        combined, common_chr, overworld_bg_chr, "orig_ow",extra_pairs=extra_pairs)
     orig_uw_blob, orig_uw_lut = emit_sparse_blob(
-        combined, common_chr, underworld_bg_chr, "orig_uw")
+        combined, common_chr, underworld_bg_chr, "orig_uw",extra_pairs=extra_pairs)
     redux_ow_blob, redux_ow_lut = emit_sparse_blob(
-        combined, common_chr, redux_overworld_bg_chr, "redux_ow")
+        combined, common_chr, redux_bg_ow_chr, "redux_ow", unified_source=True,extra_pairs=extra_pairs)
     # Phase J.2 (2026-05-18): 4th variant for redux UW. Same combined
     # tile-usage manifest -> universal LUT. Source bytes from
     # redux_uw_bg_chr replace underworld_bg_chr in the scene-BG range
     # (0x70..0xF1); common_chr stays for 0x00..0x6F + 0xF2..0xFF.
     redux_uw_blob, redux_uw_lut = emit_sparse_blob(
         combined, common_chr, redux_uw_bg_chr, "redux_uw",
-        unified_source=True)
+        unified_source=True,extra_pairs=extra_pairs)
 
     # All four LUTs should be IDENTICAL (slot allocation is variant-invariant)
     assert orig_ow_lut == orig_uw_lut == redux_ow_lut == redux_uw_lut, \
         "LUT divergence - variant-invariant slot allocation expected"
+    # T-269 animation uses two DMA ranges emitted by redux_graphics.py.
+    # Refuse a changed usage contract rather than overwriting other tiles.
+    for first, last in ((0x78,0x83),(0x88,0x99)):
+        next_slot=redux_ow_lut[first][2]
+        for tile in range(first,last+1):
+            palettes=(2,) if tile==0x99 else (2,3)
+            expected=[0xFFFF]*4
+            for pal in palettes:
+                expected[pal]=next_slot;next_slot+=1
+            if redux_ow_lut[tile]!=expected:
+                fail(f"Redux animated tile 0x{tile:02X}: contiguous palette contract changed")
 
-    n_tiles = sum(len(s) for s in combined.values())
+    n_tiles = legacy_tiles+len(extra_pairs)
     bytes_per_variant = n_tiles * BYTES_PER_TILE
     print(f"  combined unique (tile_id, sub_pal) combos: {n_tiles}")
     print(f"  per-variant blob: {bytes_per_variant} bytes ({n_tiles} tiles)")
@@ -424,6 +455,7 @@ def main():
                 " * that replaces the entire BG bank, common+scene+misc included). */\n\n")
         f.write(f"#define BG_SPARSE_TILE_COUNT      {n_tiles}u\n")
         f.write(f"#define BG_SPARSE_BLOB_BYTES      {bytes_per_variant}u\n")
+        f.write(f"#define BG_SPARSE_ORIGINAL_BLOB_BYTES {legacy_tiles*BYTES_PER_TILE}u\n")
         f.write("\n")
         f.write(f"extern const unsigned char  bg_sparse_chr_orig_ow  [{bytes_per_variant}];\n")
         f.write(f"extern const unsigned char  bg_sparse_chr_orig_uw  [{bytes_per_variant}];\n")

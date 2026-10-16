@@ -25,6 +25,8 @@
 #include "inventory_tilemap.h"
 #include "inventory_uw_tilemap.h"
 #include "inventory_sprite_chr.h"
+#include "world/render/redux_chr.h"
+#include "world/render/sprite_render.h"
 #include "../../../engine/src/engine_state.h"  /* roomrom_main_current_scene */
 #include "../world/draw_dispatch.h"
 #include "../world/render/subpal_routing.h"
@@ -43,6 +45,7 @@ static unsigned char s_subscreen_uw = 0u;
 #include "../../../engine/src/vram_layout.h"
 #include "../../../engine/src/atlas/items_chr_x4.h"
 #include "../../state/inventory.h"
+#include "../../state/game_profile.h"
 
 /* Genesis VRAM tile for item N: ITEM_VRAM_TILE_BASE + ROOMROM_ITEM_TILE_<X>.
  * V2.4c (2026-05-25): derived from ROOMROM_ITEM_TILE_BASE macro instead of
@@ -281,14 +284,16 @@ static unsigned char s_icons_pending;
 static void menu_icons_upload(void)
 {
     unsigned char t, k;
+    const unsigned char *chr = roomrom_sprites_item_chr_variant()
+        ? core_redux_inventory_chr : &k_inventory_sprite_chr[0][0];
     if (!s_icons_pending) return;
     s_icons_pending = 0u;
     render_vram_open_write(0xA000u);
     for (t = 0u; t < 16u; ++t)
         for (k = 0u; k < 32u; k += 2u)
             *((volatile unsigned short *)0xC00000) =
-                (unsigned short)(((unsigned short)k_inventory_sprite_chr[t][k] << 8) |
-                                 k_inventory_sprite_chr[t][k + 1u]);
+                (unsigned short)(((unsigned short)chr[t*32u+k] << 8) |
+                                 chr[t*32u+k+1u]);
 }
 
 static void set_subscreen_vscroll(short v)
@@ -566,6 +571,22 @@ static void write_inventory_row(unsigned short gen_row)
     inventory_menu_cells_build();
     cells = s_menu_cells[s_subscreen_uw ? 1u : 0u][gen_row];
     render_vram_open_write(addr);
+    /* NES source: Redux menus/hud_and_subscreen.asm:b_button/blank.
+     * Drained C: write_inventory_row and immutable Original menu cache.
+     * Coverage: FULL(B-button label); other Redux menu changes separate.
+     * Stance: EXTEND at emission so cached Original rows cannot leak. */
+    if (game_profile_is_remix() && (nes_row == 18u || nes_row == 19u)) {
+        static const unsigned char label[8] = {0x0Bu,0x24u,0x0Bu,0x1Eu,0x1Du,0x1Du,0x18u,0x17u};
+        for (i = 0u; i < 32u; ++i) {
+            unsigned short word = cells[i];
+            if (nes_row == 18u && i >= 2u && i < 14u)
+                word = RENDER_TILE_ATTR_FULL(0u,0,0,0,tile_for(i >= 5u && i < 13u ? label[i-5u] : 0x24u,0u));
+            if (nes_row == 19u && i >= 4u && i < 12u)
+                word = RENDER_TILE_ATTR_FULL(0u,0,0,0,tile_for(0x24u,0u));
+            *((volatile unsigned short *)0xC00000) = word;
+        }
+        return;
+    }
     if (!s_subscreen_uw && nes_row >= 23u && nes_row < 27u) {
         for (i = 0u; i < 11u; ++i) *((volatile unsigned short *)0xC00000) = cells[i];
         for (i = 11u; i < 21u; ++i)

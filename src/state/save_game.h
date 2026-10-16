@@ -27,6 +27,14 @@ void save_game_complete_quest(void);
 void save_game_options_load(unsigned char slot);
 void save_game_options_store(unsigned char slot);
 unsigned char save_game_any_quest2_complete(void);
+/* Redux exploration: native16 columns, one bit per OW row. Active cache
+ * is loaded from the selected file/quest; independently checked records
+ * are committed on real room entry. Original never writes these records. */
+void save_game_discovery_clear(void);
+void save_game_discovery_load(unsigned char slot, unsigned char quest);
+void save_game_discover_room(unsigned char room);
+unsigned char save_game_room_discovered(unsigned char room);
+unsigned char save_game_discovery_gen(void);
 
 /* IsSaveSlotActive[slot] from the slot info (valid after boot). */
 unsigned char save_game_slot_active(unsigned char slot);
