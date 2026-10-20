@@ -17,8 +17,12 @@
 #include "../../data/audio_music/ow_theme_xgm.h"
 #include "../../data/audio_music/uw_theme_xgm.h"
 #include "../../data/audio_music/uw_theme_cyberdeous_xgm.h"
+extern const unsigned char post_ganon_lullaby_xgm[];
 #include "../game/options/options_consumer.h"
 #include "../game/options/options_state.h"
+#include "../game/options/options_runtime.h"
+#include "../state/game_profile.h"
+#include "redux_music.h"
 #include <z80_ctrl.h>
 #include <snd/sound.h>
 #include <snd/xgm.h>
@@ -46,6 +50,7 @@ volatile unsigned char audio_dmc_state[0x10] __attribute__((aligned(4)));
 
 static u8 xgm_initialized = 0;
 static u8 s_current_xgm_song = 0;
+static const u8 *s_current_xgm_blob;
 static u8 s_resume_xgm_song = 0;
 static u16 s_nes_song_frames = 0;
 static u32 s_music_loop_target = 0;
@@ -88,12 +93,48 @@ static const local_song_t *nes_song(unsigned char song)
 }
 #endif
 
+/* T-351: stable saved catalog IDs. Source event durations remain owned by
+ * NES request IDs even when a different melody plays. Original bypasses
+ * these per-file Remix preferences. */
+const char *audio_music_choice_name(unsigned char track)
+{
+    static const char *const names[OPTIONS_MUSIC_TRACK_COUNT] = {
+        "DEFAULT", "INGLEBARD OVERWORLD", "INGLEBARD DUNGEON", "CYBERDEOUS DUNGEON",
+        "REDUX OVERWORLD", "REDUX ZELDA DUNGEON", "REDUX A NEW LIGHT",
+        "REDUX PERILS", "REDUX TRIFORCE POWER", "REDUX LEVEL NINE",
+        "REDUX GANON", "REDUX TRIFORCE GET", "REDUX ZELDA RESCUED",
+        "REDUX ITEM GET", "REDUX ENDING", "REDUX TITLE", "ZELDAS LULLABY FINAL"
+    };
+    return names[track < OPTIONS_MUSIC_TRACK_COUNT ? track : 0u];
+}
+
+static unsigned char music_choice_for_song(unsigned char song)
+{
+    if (!game_profile_is_remix() || !song || song==0x80u) return 0u;
+    if (song==1u) {
+        unsigned char choice=options_music_get(1u);
+        return choice==4u ? 4u : 1u;
+    }
+    if (song==0x40u || song==0x20u)
+        return options_dungeon_music_track(nes_ram[0x0010u]);
+    return 0u;
+}
+
 static const u8 *xgm_blob_for_song(unsigned char song)
 {
     unsigned char resolved = song;
     /* A level-9 request has its own generated tune; a user can override
      * that tune specifically or override the requested dungeon song. */
     if (song == SONG_UW_BITMAP && nes_ram[0x0010u] == 9u) resolved = 0x20u;
+    {
+        unsigned char choice = music_choice_for_song(resolved);
+        if (choice == 1u) return ow_theme_xgm;
+        if (choice == 2u) return uw_theme_xgm;
+        if (choice == 3u) return uw_theme_cyberdeous_xgm;
+        if (choice >= 4u && choice <= 15u) return redux_music[choice-4u].xgm;
+        if (choice == 16u) return post_ganon_lullaby_xgm;
+    }
+    if (song == 0x03u) return post_ganon_lullaby_xgm;
 #ifdef ZELDA_LOCAL_MUSIC
     {
         const u8 *b;
@@ -207,6 +248,11 @@ unsigned char audio_music_loop_pending(void)
 
 void audio_music_play(unsigned char song)
 {
+    /* T-349: the post-Ganon arrangement spans room-entry area requests.
+     * Explicit silence, death and Zelda's $06 cue retain their owners. */
+    if (s_current_xgm_song == 0x03u &&
+        (song == SONG_OW_BITMAP || song == SONG_UW_BITMAP || song == 0x20u))
+        return;
     const u8 *xgm_song = xgm_blob_for_song(song);
 
     /* NES Tune0Request bit 7 silences the song. Stopping XGM releases
@@ -236,7 +282,7 @@ void audio_music_play(unsigned char song)
         *music_song_ptr = song;
         *music_song_req_ptr = 0;
 
-        if (!*xgm_owns_chip_ptr || s_current_xgm_song != song) {
+        if (!*xgm_owns_chip_ptr || s_current_xgm_song != song || s_current_xgm_blob != xgm_song) {
             s_music_loop_target = 0u;
             audio_music_state[0x2Bu] = 0u;
             /* XGM_startPlay
@@ -253,13 +299,14 @@ void audio_music_play(unsigned char song)
 #ifdef ZELDA_NES_MUSIC
             {
                 const local_song_t *entry = nes_song(song);
-                if (entry && !entry->looping) s_nes_song_frames = entry->frames;
+                if (song != 0x03u && entry && !entry->looping) s_nes_song_frames = entry->frames;
             }
 #endif
             if (audio_native_ram_base) audio_native_ram_base[0x0609u] = song;
             *xgm_owns_chip_ptr = 1;       /* gate legacy music_tick BEFORE Z80 starts */
             XGM_startPlay(xgm_song);
             s_current_xgm_song = song;
+            s_current_xgm_blob = xgm_song;
         }
         return;
     }
@@ -346,6 +393,7 @@ void audio_sound_test_play(unsigned char index) {
     s_current_xgm_song=song; s_nes_song_frames=0u; s_resume_xgm_song=0u;
     if (audio_native_ram_base) audio_native_ram_base[0x0609u]=song;
     XGM_startPlay(blob);
+    s_current_xgm_blob=blob;
 }
 
 void audio_sfx_play(unsigned char sfx)

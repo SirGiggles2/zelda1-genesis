@@ -243,6 +243,7 @@ def nes_stages(rom_path: Path, redux_path: Path | None) -> list[list[str]]:
             ["tools/converter/redux_graphics.py", "--redux", r],
             # Redux overworld layouts/heaps/CHR located by hash in the ROM.
             ["tools/converter/rom_blobs.py", "--redux", r],
+            ["tools/music_studio/extract_soundtrack.py", "--rom", r, "--out", "VGMS/Redux"],
             ["engine/tools/gen_redux_assets.py"],
             # Redux UW background patterns and file-select screen.
             ["tools/nesemu/zelda_chr_dump.py", "--rom", r,
@@ -255,6 +256,7 @@ def nes_stages(rom_path: Path, redux_path: Path | None) -> list[list[str]]:
     stages += [
         ["engine/tools/uw_aggregate.py"],
         ["engine/tools/gen_uw_blob.py"],
+        ["tools/audit/check_uw_room_coverage.py", "--captures", "engine/out"],
         ["engine/tools/gen_bg_sparse.py"],
     ]
     return stages

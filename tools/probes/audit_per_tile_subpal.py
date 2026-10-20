@@ -30,8 +30,32 @@ UW_BLOB_C = REPO / "engine" / "src" / "uw_room_blob.c"
 OW_C = REPO / "data" / "rooms" / "overworld.c"
 
 
-def parse_uw_blob():
-    """Returns list of (room_idx, nt_bytes[22*32=704], attr_bytes[64])."""
+def uw_runtime_attrs(key, blocks):
+    """Z_05 FillPlayAreaAttrs / uw_render.c:uw_room_attr, not captured AT.
+
+    Drained C: native uw_room_attr and level_info_uw_attributes.
+    Coverage: FULL(attribute usage input); Stance: EXTEND existing audit.
+    Both profiles use installed rooms_dungeons UW1/UW2 blocks per quest.
+    """
+    _map_id, quest, level, room = key
+    if quest not in (1, 2) or not 1 <= level <= 9 or not 0 <= room < 128:
+        raise ValueError(f"invalid room key: {key}")
+    start = (2 if quest == 2 else 0) * 768 + (768 if level > 6 else 0)
+    outer = (blocks[start + room] & 3) * 0x55
+    inner = (blocks[start + 128 + room] & 3) * 0x55
+    attr = [0] * 16 + [outer] * 48
+    for y in range(9, 0x27):
+        if (y & 7) not in (0, 7):
+            attr[16 + y] = ((inner & 15) | (attr[16 + y] & 240)) if y >= 0x21 else inner
+    return attr
+
+
+def parse_uw_blob(*, captured_attrs=False):
+    """Return room NT + native runtime attributes (raw captures opt-in).
+
+    Stored capture AT rows can be stale; the cartridge deliberately does
+    not link g_uw_room_attr. Retain raw access for diagnosing old captures.
+    """
     text = UW_BLOB_C.read_text(encoding="utf-8", errors="ignore")
 
     # g_uw_room_nt — flat array of (room_count * 704) bytes
@@ -56,10 +80,29 @@ def parse_uw_blob():
     n_attr = len(attr_bytes) // ATTR_PER_ROOM
     n_rooms = min(n_nt, n_attr)
 
+    keys = blocks = None
+    if not captured_attrs:
+        key_match = re.search(r"g_uw_room_index\[\d+\]\[4\] = \{(.+?)\n\};", text, re.S)
+        if not key_match:
+            raise ValueError("missing UW index metadata")
+        values = [int(v, 16) for v in re.findall(r"0x([0-9a-fA-F]{2})", key_match.group(1))]
+        if len(values) != n_rooms * 4:
+            raise ValueError("UW index/payload count differs")
+        keys = [values[i:i+4] for i in range(0, len(values), 4)]
+        table_text = (REPO / "data/rooms/dungeons.c").read_text(encoding="utf-8")
+        table = re.search(r"\brooms_dungeons\s*\[[^]]+\]\s*=\s*\{(.*?)\};", table_text, re.S)
+        if not table:
+            raise ValueError("installed UW block producer missing")
+        blocks = bytes(int(v, 16) for v in re.findall(r"0x([0-9a-fA-F]{2})", table.group(1)))
+        if len(blocks) < 4 * 768:
+            raise ValueError("installed UW blocks incomplete")
+
     rooms = []
     for r in range(n_rooms):
         nt = nt_bytes[r * CELLS_PER_ROOM:(r + 1) * CELLS_PER_ROOM]
         at = attr_bytes[r * ATTR_PER_ROOM:(r + 1) * ATTR_PER_ROOM]
+        if not captured_attrs:
+            at = uw_runtime_attrs(keys[r], blocks)
         rooms.append((r, nt, at))
     return rooms
 

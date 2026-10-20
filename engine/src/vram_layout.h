@@ -199,6 +199,15 @@
 #define ROOMROM_LINK_FLASH3_TILE_COUNT 32u
 #define ROOMROM_LINK_ATTACK_FLASH3_TILE_BASE 1410u
 #define ROOMROM_LINK_ATTACK_FLASH3_TILE_COUNT 16u
+
+/* T-251: per-player pose scratch for four-player mode. Three extra Links
+ * need their tunic recolored into PAL1[4]/[8]/[12]; each player owns four
+ * tiles (one 2x2 pose) that are re-uploaded when the pose changes. */
+#define ROOMROM_MP_LINK_TILE_BASE 1460u
+#define ROOMROM_MP_LINK_TILES_PER_PLAYER 4u
+#define ROOMROM_MP_LINK_PLAYER_COUNT 3u
+#define ROOMROM_MP_LINK_TILE_COUNT \
+    (ROOMROM_MP_LINK_TILES_PER_PLAYER * ROOMROM_MP_LINK_PLAYER_COUNT)
 /* T-160: NES fireball $44/$45 with OAM sub-pal 3 uses PAL1[13..15]. */
 #define ROOMROM_FIREBALL_SUBPAL3_TILE_BASE 1426u
 #define ROOMROM_FIREBALL_SUBPAL3_TILE_COUNT 2u

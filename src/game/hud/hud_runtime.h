@@ -9,8 +9,15 @@ void roomrom_hud_invalidate(void);
 void roomrom_hud_set_counts_hidden(unsigned char hidden);
 /* T-092: NES status-bar B selection; see hud_runtime.c. */
 unsigned char hud_status_bar_b_item(unsigned char *slot_out);
+/* T-255: Remix second item slot. b_has/b_slot are this frame's B result. */
+unsigned char hud_status_bar_c_item(unsigned char b_has, unsigned char b_slot,
+                                    unsigned char *slot_out);
 /* Shared NES occupied-slot search: 1 forward, 2 backward, 0 validate. */
 void hud_select_inventory_item(unsigned char direction);
+/* User-requested four-direction grid; direction uses SGDK D-pad bits.
+ * Zero validates the existing selection. Letter shares potion cell7. */
+void hud_move_inventory_item(unsigned char direction);
+unsigned char hud_inventory_item_selectable(unsigned char slot);
 void roomrom_hud_draw(unsigned char hud_id, unsigned char room_id,
                       unsigned char is_underworld);
 
@@ -29,6 +36,8 @@ void roomrom_hud_status_bar_formatted(void);
 unsigned char roomrom_hud_owns_status_bar(void);
 /* Selector $44 (status bar map transfer) drained: show the map. */
 void roomrom_hud_status_bar_map_cue(void);
+/* A committed OW scroll reveals discovery on the following NMI. */
+void roomrom_hud_overworld_discovery_cue(void);
 
 /* Plan v5c T6.5 — per-frame mini-map position marker + palette flash.
  * NES Z_01.asm:4095-4146 renders flashing marker sprite at computed

@@ -121,7 +121,14 @@ static unsigned char resolve_song(unsigned char gm, unsigned char scene)
          * multi-phrase $10 Ending. */
         return SONG_END_LEVEL;
     case GM_WIN_GAME:
-        return SONG_ENDING;
+        /* NES source: Z_02 UpdateEndGameCurtainEffect waits for Song=0;
+         * UpdateMode13_Sub0 requests $10 only after the rescue curtain
+         * and flash. Drained C: mode_wingame.c owns those same requests.
+         * Coverage: PARTIAL(real-contact ending); Stance: EXTEND.
+         * Starting $10 on entry holds Song nonzero forever and prevents
+         * InitMode13 from advancing. Retain the event tune's owner, as
+         * for death mode, until the native mode requests its own music. */
+        return s_last_song;
 
     default:
         /* Unknown gamemode → no change. */

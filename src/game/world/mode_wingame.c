@@ -44,6 +44,7 @@
 #include "cave/cave_dispatch.h" /* existing FormatDecimalByte */
 #include "core/core_dispatch.h"
 #include "inventory.h"
+#include "../../state/game_profile.h"
 #include "../enemies/enemy_render.h"
 #include "../../../engine/src/engine_state.h"  /* quest selector */
 
@@ -115,6 +116,39 @@ static void mode13_draw_link_zelda_triforces(void)
 }
 static unsigned short s_credit_rows;
 
+/* NES source: Z_02 DrawCredits row cadence/border; user P11.1a staff names.
+ * Drained C: mode13_draw_credits existing text/transfer owner.
+ * Coverage: PARTIAL(Remix staff text only); Stance: EXTEND.
+ * Keep every source row/state transition and the Original text unchanged.
+ * Source NT rows30/31 are skipped, so the fourth programmer uses row32. */
+static void mode13_remix_staff_row(unsigned char row)
+{
+    static const struct { unsigned char row; const char *text; } lines[] = {
+        {5u,"EXECUTIVE PRODUCER"},{6u,"HIROSHI YAMAUCHI"},
+        {10u,"PRODUCER"},{11u,"SHIGERU MIYAMOTO"},
+        {15u,"DIRECTORS"},{16u,"SHIGERU MIYAMOTO"},{17u,"TAKASHI TEZUKA"},
+        {21u,"DESIGNER"},{22u,"TAKASHI TEZUKA"},
+        {26u,"PROGRAMMERS"},{27u,"TOSHIHIKO NAKAGO"},{28u,"YASUNARI SOEJIMA"},
+        {29u,"TATSUO NISHIYAMA"},{32u,"KAZUAKI MORITA"},
+        {37u,"SOUND COMPOSER"},{38u,"KOJI KONDO"}
+    };
+    unsigned char i;
+    if (row<2u || row>=46u) return;
+    for (i=4u; i<28u; ++i) M13_DYN_TILE_BUF(3u+i)=0x24u;
+    for (i=0u; i<sizeof(lines)/sizeof(lines[0]); ++i) {
+        if (lines[i].row==row) {
+            const char *text=lines[i].text;
+            unsigned char length=0u, col;
+            while (text[length]) ++length;
+            col=(unsigned char)(4u+(24u-length)/2u);
+            for (length=0u; text[length]; ++length)
+                M13_DYN_TILE_BUF(3u+col+length)=text[length]==' ' ? 0x24u :
+                    (unsigned char)(text[length]-'A'+0x0Au);
+            break;
+        }
+    }
+}
+
 /* Z_02:3601 DrawCredits. ROM pointers in the existing extracted input
  * are relocated relative to its first text record, not dereferenced as
  * Genesis addresses. The mode emits the source's terminated tile/attr
@@ -161,6 +195,7 @@ static void mode13_draw_credits(void)
         }
         ++RAM(0x050Eu);
     }
+    if (game_profile_is_remix()) mode13_remix_staff_row(row);
     ++RAM(0x050Du);
     if (RAM(0x050Du) == ((page & 3u) == 3u ? 6u : 8u)) {
         RAM(0x050Du) = 0u;

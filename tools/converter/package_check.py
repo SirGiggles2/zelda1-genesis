@@ -50,6 +50,7 @@ BANNED_PATHS = (
 # of these MUST NOT ship in public package.
 BANNED_PREFIXES = (
     "build/nes_music/",
+    "build/redux_music/",
     "build/nes_music_test/",
     "build/local_music/",
     "data/chr/",

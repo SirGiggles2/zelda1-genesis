@@ -126,6 +126,18 @@ def build(spec: dict) -> dict:
     for a, b in nes.items():
         gen[a - 0x6000] = b
     # Slots 1-2 left zero: both consoles format them at title Start.
+    # Optional per-file MD header (src/state/save_game.c: MD_BASE(0)=$900,
+    # 8 bytes M,D,version,mode,flags,players,reserved,xor). Needed for a
+    # Remix-profile lockstep card; without it the file loads as Original.
+    md = spec.get("md_header")
+    if md:
+        while len(gen) < 0x908:
+            gen.append(0)
+        header = [ord("M"), ord("D"), 2, int(md.get("mode", 1)),
+                  int(md.get("flags", 0)), int(md.get("players", 1)), 0, 0]
+        for i in range(7):
+            header[7] ^= header[i]
+        gen[0x900:0x908] = header
 
     return {"name": spec["name"], "nes_wram": nes, "gen_slot0": gen,
             "items": items, "script": spec.get("script", []),

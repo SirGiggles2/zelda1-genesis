@@ -26,6 +26,12 @@ unsigned int enemy_find_empty_monster_slot(void);
  * HideSpritesOverLink. drain at enemy_common_runtime.c:4-7. */
 void enemy_hide_sprites_over_link(void);
 
+/* Redux-only stolen shield provenance. Transient enemy-slot ownership;
+ * cleared by the existing room/object lifecycle, never serialized. */
+void enemy_like_like_shields_reset(void);
+void enemy_like_like_shield_forget(unsigned int slot);
+unsigned char enemy_like_like_shield_take(unsigned int slot);
+
 /* SFX trivials: play "secret found" tune (Z1 secret reveal),
  * boss death cry, gohma parry tune. drain at enemy_common_runtime.c:9-20. */
 void enemy_play_secret_found_tune(void);

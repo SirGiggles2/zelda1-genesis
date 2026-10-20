@@ -11,5 +11,13 @@ typedef struct GameProfile {
 const GameProfile *game_profile_current(void);
 unsigned char game_profile_activate(unsigned char slot);
 void game_profile_clear(void);
-unsigned char game_profile_is_remix(void);
+/* T-332/T-358: per-frame render selectors read the cached flag directly.
+ * g_profile_remix is cleared by game_profile_clear(), so it already carries
+ * the old `active && remix` result; keep the getter in the header so every
+ * call site inlines instead of paying a JSR/RTS per monster/frame. */
+extern unsigned char g_profile_remix;
+static inline unsigned char game_profile_is_remix(void)
+{
+    return g_profile_remix;
+}
 #endif

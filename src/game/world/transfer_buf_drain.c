@@ -159,9 +159,24 @@ static const unsigned char k_mode11_attrs_bottom_half[] = {       /* $62 */
 static const unsigned char k_bomb_capacity_price_text[] = {       /* $6C */
     0x22u, 0xCDu, 0x04u, 0x62u, 0x01u, 0x00u, 0x00u, 0xFFu
 };
+/* NES source: live Redux Q2 L5 room4E, NT22CD=2F (minus).
+ * Drained C: uw_person_runtime.c:uwrt_complex_state_begin selects6C;
+ * existing static record resolver below. Coverage: FULL(record6C).
+ * Stance: EXTEND by profile; Redux62 is low-X, not the Original dash. */
+static const unsigned char k_redux_bomb_capacity_price_text[] = {
+    0x22u, 0xCDu, 0x04u, 0x2Fu, 0x01u, 0x00u, 0x00u, 0xFFu
+};
 static const unsigned char k_life_or_money_cost_text[] = {        /* $76 */
     0x22u, 0xCBu, 0x0Au, 0x62u, 0x01u, 0x24u, 0x24u, 0x24u,
     0x24u, 0x24u, 0x62u, 0x05u, 0x00u, 0xFFu
+};
+/* NES source: live Redux Q2 internal8/display7 rooms3B/4C,
+ * NT22CB/22D2=2F; selector76 uses the same Redux minus as selector6C.
+ * Drained C: uw_person_runtime.c / this static record resolver.
+ * Coverage: FULL(record76); Stance: EXTEND profile-specific glyphs. */
+static const unsigned char k_redux_life_or_money_cost_text[] = {
+    0x22u, 0xCBu, 0x0Au, 0x2Fu, 0x01u, 0x24u, 0x24u, 0x24u,
+    0x24u, 0x24u, 0x2Fu, 0x05u, 0x00u, 0xFFu
 };
 static const unsigned char k_game_over[] = {                      /* $46 */
     0x23u, 0xE3u, 0x03u, 0x0Fu, 0x0Fu, 0xCFu, 0x22u, 0x4Cu,
@@ -205,10 +220,12 @@ static const unsigned char *resolve_static_buffer(unsigned char selector,
     case 0x6Au: *out_len = (unsigned char)sizeof k_ending_palette; return k_ending_palette;
     case 0x6Cu:
         *out_len = (unsigned char)sizeof k_bomb_capacity_price_text;
-        return k_bomb_capacity_price_text;
+        return game_profile_is_remix() ? k_redux_bomb_capacity_price_text
+                                       : k_bomb_capacity_price_text;
     case 0x76u:
         *out_len = (unsigned char)sizeof k_life_or_money_cost_text;
-        return k_life_or_money_cost_text;
+        return game_profile_is_remix() ? k_redux_life_or_money_cost_text
+                                       : k_life_or_money_cost_text;
     case 0x1Eu:
         *out_len = (unsigned char)sizeof k_blank_text_box_lines;
         return k_blank_text_box_lines;

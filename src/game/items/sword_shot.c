@@ -5,6 +5,7 @@
 #include "../world/object_dispatch.h"      /* object_move_shot (NES MoveShot) */
 #include "../world/draw_dispatch.h"        /* draw_item_frame_tile */
 #include "../enemies/enemy_render.h"       /* weapon sprite cache */
+#include "../combat/combat_runtime.h"      /* roomrom_combat_is_redux */
 
 /* T-116: Link's sword shot / magic shot as the NES object in slot $0E.
  *
@@ -96,6 +97,13 @@ static void set_up_weapon_with_state(unsigned char st)
     SS_DIR = d;
     SS_X = (unsigned char)(nes_ram[0x0070u] + ((d & 0x01u) ? 0x10u : (d & 0x02u) ? 0xF0u : 0u));
     SS_Y = (unsigned char)(nes_ram[0x0084u] + ((d & 0x04u) ? 0x10u : (d & 0x08u) ? 0xF0u : 0u));
+    /* Redux magic_beam_align.asm (magic_shot_align): a vertical shot is nudged
+     * sideways after PlaceWeapon: Up -1, Down +1 (rod shot, state $80) or +2
+     * (sword shot, state $10). Horizontal shots are not moved. The original
+     * game has no such patch. */
+    if (roomrom_combat_is_redux() && d >= 0x04u) {
+        SS_X = (unsigned char)(SS_X + ((d >= 0x08u) ? 0xFFu : (st & 0x80u) ? 0x01u : 0x02u));
+    }
     if ((d & 0x03u) && (SS_X < 0x14u || SS_X >= 0xECu)) {
         SS_STATE = 0u;                            /* ResetObjState */
         return;
@@ -128,6 +136,10 @@ static void draw_shot(void)
     unsigned char idx = rdir_index(d);
     unsigned char attr;
     if (d & 0x03u) y = (unsigned char)(y + 3u);
+    /* Redux dungeon_draw_beam.asm ($F397): the beam sprite sits two pixels higher in a
+     * dungeon. Original keeps the vanilla position. */
+    if (roomrom_combat_is_redux() && nes_ram[NES_CUR_LEVEL] != 0u)
+        y = (unsigned char)(y - 2u);
     attr = (unsigned char)((nes_ram[NES_FRAME_COUNTER] & 0x03u) | k_rdir_base_attr[idx]);
     write_item((SS_STATE & 0x80u) ? 0x23u : 0x22u, k_rdir_frame[idx],
                SS_X, y, attr, (unsigned char)(idx == 2u));

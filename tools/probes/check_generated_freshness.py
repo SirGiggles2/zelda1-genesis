@@ -156,6 +156,8 @@ GEN_SPECS: list[dict] = [
             "data/chr/underworld_bg.c",
             "engine/src/redux_overworld_bg.c",
             "tools/probes/audit_per_tile_subpal.py",
+            "data/rooms/dungeons.c",
+            "src/game/dungeon/uw_render.c",
             "engine/src/uw_room_blob.c",
             "data/rooms/overworld.c",
         ],

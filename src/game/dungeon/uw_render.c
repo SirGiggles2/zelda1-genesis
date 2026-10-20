@@ -1,4 +1,9 @@
-/* Phase 12.2 SGDK-1 cleanup: dropped <genesis.h>; route VRAM-read
+/* NES source: Z_05.asm:LayOutDoors; native type2/3 wall faces.
+ * Drained C: existing uw_render.c presentation owner.
+ * Coverage: PARTIAL (T350 is a user-authorized visual divergence only).
+ * Stance: EXTEND; collision, raw tiles, timers and saves stay native.
+ *
+ * Phase 12.2 SGDK-1 cleanup: dropped <genesis.h>; route VRAM-read
  * via render_vram_read_word adapter. */
 #include "uw_render.h"
 #include "../../../engine/src/uw_room_blob.h"
@@ -8,6 +13,8 @@
 #include "../world/bg_palette.h"  /* Phase 12.2 promoted */
 #include "../../../engine/src/bg_sparse_chr.h"  /* Phase J: sparse atlas + LUT */
 #include "../../../engine/src/uw_collision_data.h"
+#include "../../state/game_profile.h"
+#include "../world/transfer_buf_drain.h"
 
 extern const unsigned char rooms_dungeons[];
 
@@ -32,6 +39,96 @@ extern const unsigned char rooms_dungeons[];
 static unsigned char s_uw_map_id = ROOMROM_MAP_ORIGINAL;
 static unsigned char s_uw_level  = 1u;
 static unsigned char s_uw_quest  = 1u;
+
+_Static_assert(UW_DITHER_TILE_BASE >=
+               ROOMROM_TEXT_EXTRA_TILE_BASE + ROOMROM_TEXT_EXTRA_TILE_COUNT,
+               "dither patterns must follow text CHR");
+_Static_assert(UW_DITHER_TILE_BASE + UW_DITHER_TILE_COUNT <= ROOMROM_SUBSCREEN_SPRITE_TILE_BASE,
+               "dither patterns must precede pause CHR");
+
+static unsigned char dither_enabled(void)
+{
+    return s_uw_map_id == ROOMROM_MAP_REDUX && s_uw_quest == 2u &&
+           game_profile_is_remix();
+}
+
+/* Room dither mask cache. dither_flags runs once per rendered cell, and
+ * the two installed LevelBlockAttrs bytes only change on a load. Key the
+ * result by room + the state dither_enabled() reads; 3 bytes of state. */
+static unsigned char s_dither_key_room = 0xFFu;
+static unsigned char s_dither_key_ctx;
+static unsigned char s_dither_mask;
+
+static unsigned char dither_flags(unsigned char room)
+{
+    unsigned char a,b,mask=0u,t,ctx;
+    if (room>=128u) return 0u;
+    ctx=(unsigned char)((nes_ram[0x0010u]&0x0Fu) | ((s_uw_quest&0x03u)<<4) |
+                        ((s_uw_map_id==ROOMROM_MAP_REDUX ? 1u:0u)<<6) |
+                        ((g_profile_remix ? 1u:0u)<<7));
+    if (room==s_dither_key_room && ctx==s_dither_key_ctx) return s_dither_mask;
+    if (dither_enabled()) {
+        /* Installed level block is authoritative, including scroll prefetch. */
+        a=nes_ram[0x687Eu+room]; b=nes_ram[0x68FEu+room];
+        t=(b>>2)&7u; if (t==2u || t==3u) mask|=1u;
+        t=(b>>5)&7u; if (t==2u || t==3u) mask|=2u;
+        t=(a>>2)&7u; if (t==2u || t==3u) mask|=4u;
+        t=(a>>5)&7u; if (t==2u || t==3u) mask|=8u;
+    }
+    s_dither_key_room=room;
+    s_dither_key_ctx=ctx;
+    s_dither_mask=mask;
+    return mask;
+}
+
+unsigned char roomrom_uw_room_render_false_wall_mask(unsigned char room_id)
+{
+    if (!nes_ram[0x10u] || nes_ram[0x12u]==9u) return 0u;
+    return dither_flags(room_id);
+}
+
+/* Exactly the existing twelve-cell LayOutDoors face rectangles. */
+static unsigned char dither_cell(unsigned char mask,unsigned char col,unsigned char row)
+{
+    if (row>=9u && row<=12u) {
+        if ((mask&1u) && col>=28u && col<=30u) return 1u;
+        if ((mask&2u) && col>=1u && col<=3u) return 1u;
+    }
+    if (col>=14u && col<=17u) {
+        if ((mask&4u) && row>=18u && row<=20u) return 1u;
+        if ((mask&8u) && row>=1u && row<=3u) return 1u;
+    }
+    return 0u;
+}
+
+static unsigned short dither_word(unsigned char mask,unsigned char col,unsigned char row,
+                                   unsigned char raw,unsigned char pal,unsigned short word)
+{
+    unsigned char pattern;
+    if (!mask || !dither_cell(mask,col,row)) return word;
+    if (raw>=0xDCu && raw<=0xDFu) pattern=(unsigned char)(raw-0xDCu);
+    else if (raw==0xF5u) pattern=4u;
+    else return word;
+    return (unsigned short)((nes_ram[0x12u]==7u && (nes_ram[0x98u]&12u)?0u:0x8000u) |
+        (UW_DITHER_TILE_BASE+(pal&3u)*5u+pattern));
+}
+
+static void dither_upload(void)
+{
+    static const unsigned char raw[5]={0xDCu,0xDDu,0xDEu,0xDFu,0xF5u};
+    unsigned char p,k,j,buf[32];
+    for (p=0u;p<4u;++p) for (k=0u;k<5u;++k) {
+        unsigned short slot=bg_sparse_tile_lut[raw[k]][0];
+        const unsigned char *src=bg_sparse_chr_redux_uw+(unsigned long)slot*32u;
+        for (j=0u;j<32u;++j) {
+            unsigned char a=(src[j]>>4)&3u,b=src[j]&3u;
+            if (a) a=(unsigned char)(a+p*4u);
+            if (b) b=(unsigned char)(b+p*4u);
+            buf[j]=(unsigned char)(((a<<4)|b)&((j&4u)?0x0Fu:0xF0u));
+        }
+        render_chr_upload((unsigned short)((UW_DITHER_TILE_BASE+p*5u+k)*32u),buf,32u);
+    }
+}
 
 /* Cached AT pointer for the current room's blob; set by blit_blob,
  * cleared by draw_placeholder. Used by roomrom_uw_room_render_palette_at. */
@@ -290,6 +387,7 @@ void roomrom_uw_room_render_upload_chr(void)
     render_chr_upload((unsigned short)(ROOMROM_BG_TILE_BASE * 32u),
                       blob, s_uw_map_id == ROOMROM_MAP_REDUX
                         ? BG_SPARSE_BLOB_BYTES : BG_SPARSE_ORIGINAL_BLOB_BYTES);
+    if (dither_enabled()) dither_upload();
 }
 
 /* Stub renderer.
@@ -502,7 +600,8 @@ static void write_tile_raw(unsigned char col, unsigned char row,
     if (!s_uw_tables_built) uw_tables_build();   /* s_uw_word = tile_word */
     plane_write(dst, wrapped_plane_row((unsigned short)(s_live_row_base + row +
                                                         ROOMROM_ROOM_FIRST_ROW)),
-                (unsigned short)(s_uw_word[pal & 0x03u][raw_tile] | edge_priority(col)));
+                dither_word(dither_flags(nes_ram[0xEBu]),col,row,raw_tile,pal,
+                    (unsigned short)(s_uw_word[pal & 0x03u][raw_tile] | edge_priority(col))));
     s_target_plane = saved;
 }
 
@@ -613,21 +712,23 @@ static unsigned char uw_attr_sel(unsigned char room_id)
 /* Tile words of metatile column src_col: rows at col0[r * stride] and
  * col1[r * stride]. */
 static void uw_metacol_words(const unsigned char *nt, const unsigned char *attr,
-                             unsigned char src_col, unsigned short *col0,
+                             unsigned char room_id, unsigned char src_col, unsigned short *col0,
                              unsigned short *col1, unsigned char stride)
 {
     const unsigned char src_p0 = (unsigned char)(src_col << 1);
     const unsigned short ep = edge_priority(src_p0);   /* same for src_p0 + 1 */
     const unsigned char *n = nt + src_p0;
     const unsigned short *words = s_uw_word[0];
-    unsigned char row;
+    unsigned char row,pal=0u,mask=dither_flags(room_id);
     if (!s_uw_tables_built) uw_tables_build();
     for (row = 0; row < ROOMROM_UW_BLOB_ROWS; row++) {
         /* Play rows start at NT row 8: row pairs share an attribute quad. */
-        if ((row & 1u) == 0u)
-            words = s_uw_word[attr_palette_for(attr, src_p0, (unsigned char)(row + 8u))];
-        *col0 = (unsigned short)(words[n[0]] | ep);
-        *col1 = (unsigned short)(words[n[1]] | ep);
+        if ((row & 1u) == 0u) {
+            pal=attr_palette_for(attr,src_p0,(unsigned char)(row+8u));
+            words=s_uw_word[pal];
+        }
+        *col0 = dither_word(mask,src_p0,row,n[0],pal,(unsigned short)(words[n[0]] | ep));
+        *col1 = dither_word(mask,(unsigned char)(src_p0+1u),row,n[1],pal,(unsigned short)(words[n[1]] | ep));
         col0 += stride;
         col1 += stride;
         n += ROOMROM_UW_BLOB_COLS;
@@ -653,7 +754,7 @@ void roomrom_uw_room_render_prepare(unsigned char room_id, unsigned short *buf,
     if (idx < 0) return;
     while (max_cols-- && s_uwp_cols < 16u) {
         const unsigned char c = s_uwp_cols;
-        uw_metacol_words(g_uw_room_nt[idx], uw_room_attr(room_id), c,
+        uw_metacol_words(g_uw_room_nt[idx], uw_room_attr(room_id), room_id, c,
                          buf + 2u * c, buf + 2u * c + 1u, ROOMROM_UW_BLOB_COLS);
         ++s_uwp_cols;
     }
@@ -676,7 +777,7 @@ void roomrom_uw_room_render_prepare_drop(void)
  * probe samples source-room space whatever the plane slot, Task 5.5),
  * PlayAreaTiles (column-major, 22 rows), and the legacy 16x11 metatile
  * summary (top-left tile = even rows of plane column src_p0). */
-static void uw_metacol_classes(const unsigned char *nt, unsigned char src_col,
+static void uw_metacol_classes(const unsigned char *nt, unsigned char room_id,unsigned char src_col,
                                unsigned char dst_p0)
 {
     const unsigned char src_p0 = (unsigned char)(src_col << 1);
@@ -689,7 +790,7 @@ static void uw_metacol_classes(const unsigned char *nt, unsigned char src_col,
         &nes_ram[NES_PLAY_AREA_BASE + (unsigned short)src_p0 * NES_TILE_COL_STRIDE];
     unsigned char *pa1 = pa0 + NES_TILE_COL_STRIDE;
     unsigned char *mt = s_uw_walkable[src_col & 0x0Fu];
-    unsigned char row;
+    unsigned char row,mask=dither_flags(room_id);
     for (row = 0; row < ROOMROM_UW_BLOB_ROWS; row = (unsigned char)(row + 2u)) {
         const unsigned char a0 = n[0], a1 = n[1];
         const unsigned char b0 = n[ROOMROM_UW_BLOB_COLS];
@@ -701,6 +802,12 @@ static void uw_metacol_classes(const unsigned char *nt, unsigned char src_col,
             if (ca1 & UW_CLS_DOOR) door_priority_cache_record(dst_p1, row);
             if (cb0 & UW_CLS_DOOR) door_priority_cache_record(dst_p0, (unsigned char)(row + 1u));
             if (cb1 & UW_CLS_DOOR) door_priority_cache_record(dst_p1, (unsigned char)(row + 1u));
+        }
+        if (mask) {
+            if (dither_cell(mask,src_p0,row)) door_priority_cache_record(dst_p0,row);
+            if (dither_cell(mask,src_p1,row)) door_priority_cache_record(dst_p1,row);
+            if (dither_cell(mask,src_p0,row+1u)) door_priority_cache_record(dst_p0,row+1u);
+            if (dither_cell(mask,src_p1,row+1u)) door_priority_cache_record(dst_p1,row+1u);
         }
         w0[row] = (unsigned char)(ca0 >> 1);       /* UW_CLS_WALK */
         w1[row] = (unsigned char)(ca1 >> 1);
@@ -739,15 +846,16 @@ static void blit_blob_one_metacol_at(int idx, unsigned char room_id,
     const unsigned short *c1 = col1;
     unsigned char cstride = 1u;
     if (!s_uw_tables_built) uw_tables_build();
-    if (s_uwp_buf && (room_id & 0x7Fu) == s_uwp_room && idx == s_uwp_idx &&
+    if (!(nes_ram[0x12u]==7u && dither_enabled()) &&
+        s_uwp_buf && (room_id & 0x7Fu) == s_uwp_room && idx == s_uwp_idx &&
         src_col < s_uwp_cols && uw_attr_sel((unsigned char)(room_id & 0x7Fu)) == s_uwp_sel) {
         c0 = s_uwp_buf + src_p0;                 /* prepared on mode-3 Sub2-7 */
         c1 = c0 + 1;
         cstride = ROOMROM_UW_BLOB_COLS;
     } else {
-        uw_metacol_words(nt, attr, src_col, col0, col1, 1u);
+        uw_metacol_words(nt, attr, room_id, src_col, col0, col1, 1u);
     }
-    uw_metacol_classes(nt, src_col, dst_p0);
+    uw_metacol_classes(nt, room_id, src_col, dst_p0);
     {
         unsigned short first = wrapped_plane_row(
             (unsigned short)(dst_row_base + ROOMROM_ROOM_FIRST_ROW));
@@ -907,7 +1015,7 @@ unsigned char roomrom_uw_room_render_fill_room_prepared(unsigned char room_id,
     for (c = 0u; c < 16u; ++c) {
         const unsigned char dst = (unsigned char)((dst_col0 + c) & 0x1Fu);
         s_live_dst_col[c] = dst;
-        uw_metacol_classes(nt, c, (unsigned char)(dst << 1));
+        uw_metacol_classes(nt, room_id, c, (unsigned char)(dst << 1));
     }
     s_door_priority_cache_build = UW_DOOR_PRIORITY_CACHE_NONE;
     first = wrapped_plane_row((unsigned short)(dst_row_base + ROOMROM_ROOM_FIRST_ROW));
@@ -938,7 +1046,11 @@ void roomrom_uw_room_render_set_live_door_priority(unsigned char slot_x,
             unsigned short word = plane_read_live_word(plane_col, plane_row);
             unsigned short tile = (unsigned short)(word & 0x07FFu);
             unsigned char raw = (unsigned char)((tile - ROOMROM_BG_TILE_BASE) & 0x00FFu);
-            if (!uw_is_door_tile(raw))
+            /* Scroll staging starts in mode6, while Link is still walking.
+             * Retain mesh occlusion until the mode7 camera handoff. */
+            if (!enabled && nes_ram[0x12u]==6u && tile>=UW_DITHER_TILE_BASE &&
+                tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT) continue;
+            if (!uw_is_door_tile(raw) && !(tile>=UW_DITHER_TILE_BASE && tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT))
                 continue;
             word = (unsigned short)((word & 0x7FFFu) | pri_mask);
             plane_write_live_word(plane_col, plane_row, word);
@@ -955,7 +1067,9 @@ void roomrom_uw_room_render_set_live_door_priority(unsigned char slot_x,
             unsigned short word = plane_read_live_word(plane_col, plane_row);
             unsigned short tile = (unsigned short)(word & 0x07FFu);
             unsigned char raw = (unsigned char)((tile - ROOMROM_BG_TILE_BASE) & 0x00FFu);
-            if (!uw_is_door_tile(raw))
+            if (!enabled && nes_ram[0x12u]==6u && tile>=UW_DITHER_TILE_BASE &&
+                tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT) continue;
+            if (!uw_is_door_tile(raw) && !(tile>=UW_DITHER_TILE_BASE && tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT))
                 continue;
             word = (unsigned short)((word & 0x7FFFu) | pri_mask);
             plane_write_live_word(plane_col, plane_row, word);

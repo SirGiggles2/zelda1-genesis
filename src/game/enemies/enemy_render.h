@@ -36,6 +36,9 @@
 void anim_write_sprite_drained(unsigned int tile, unsigned int slot);
 /* Manual boss OAM producers need the OAM sweep; Patra uses native pairs. */
 unsigned char enemy_render_needs_oam_sweep(void);
+/* Call from any boss producer that writes the NES OAM shadow directly
+ * (Aquamentus, Gleeok). Native-cache bosses leave it unset. */
+void enemy_render_note_boss_oam(void);
 void enemy_render_sweep_oam_to_sat(void);
 void enemy_render_reset_oam(void);
 /* Prepare fixed spawn/death FX with other persistent sprite CHR. */

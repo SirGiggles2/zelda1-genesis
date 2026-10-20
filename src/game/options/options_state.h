@@ -23,7 +23,9 @@
  *   off 10     dark_room    u8      OPTIONS_DARK_*     radio
  *   off 11     room_scroll  u8      OPTIONS_SCROLL_*   radio   (v2)
  *   off 12     uw_music     u8      OPTIONS_UWMUSIC_*  radio   (v3)
- *   off 13..29 reserved     17 bytes — future growth
+ *   off 13..22 legacy cues v4 (v5 consumes only OW byte14)
+ *   off 23..25 dungeon music v5, nine packed two-bit choices
+ *   off 26..29 reserved     4 bytes — future growth
  *   off 30..31 checksum     be u16  add-all-bytes-mod-65536
  *
  * Bitfield assignments inside `bool_bits` (set = enabled):
@@ -52,7 +54,9 @@ extern "C" {
 #define OPTIONS_VERSION_V1      0x01u  /* initial schema */
 #define OPTIONS_VERSION_V2      0x02u  /* room_scroll option */
 #define OPTIONS_VERSION_V3      0x03u  /* uw_music option */
-#define OPTIONS_VERSION_CURRENT OPTIONS_VERSION_V3
+#define OPTIONS_VERSION_V4      0x04u  /* per-cue music in reserved bytes13..22 */
+#define OPTIONS_VERSION_V5      0x05u  /* per-dungeon 2-bit choices, bytes23..25 */
+#define OPTIONS_VERSION_CURRENT OPTIONS_VERSION_V5
 
 #define OPTIONS_STATE_SIZE      32u
 
@@ -130,6 +134,21 @@ typedef enum {
 #define OPTIONS_UWMUSIC_INGLEBARD  0u  /* default */
 #define OPTIONS_UWMUSIC_CYBERDEOUS 1u
 #define OPTIONS_UWMUSIC_COUNT      2u
+
+/* Stable legacy track IDs in reserved[0..9]. v4 slots were all, OW, UW,
+ * L9, Ganon, Triforce, Zelda, item, ending, post-Ganon. v5 playback reads
+ * only OW (slot1), with zero/one Inglebard and four Redux. It ignores the
+ * retired global/event overrides; migration preserves permitted choices.
+ * The shared pre-file title has no selected file's preferences. */
+#define OPTIONS_MUSIC_SLOTS 10u
+#define OPTIONS_MUSIC_TRACK_COUNT 17u
+
+/* Per-dungeon choices. Zero in the packed save retains the previous normal
+ * cue (the UW preference for1..8, Redux Level9); getters resolve that value.
+ * Public choice0 on ALL DUNGEONS means DEFAULT: individual dungeon choices. */
+#define OPTIONS_DUNGEON_MUSIC_INGLEBARD 1u
+#define OPTIONS_DUNGEON_MUSIC_CYBERDEOUS 2u
+#define OPTIONS_DUNGEON_MUSIC_REDUX 3u
 
 /* start_hearts numeric — clamp range. */
 #define OPTIONS_START_HEARTS_MIN   3u

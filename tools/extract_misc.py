@@ -563,7 +563,25 @@ def write_palettes_c(out_dir, z01_blocks, z02_blocks):
     payload = b"".join(chunks)
     content = bytes_to_c_array(payload, "misc_palettes")
     write_c_file(os.path.join(out_dir, "palettes.c"), content)
+    write_gray_table_c(out_dir, lookup_words)
     return meta
+
+
+def write_gray_table_c(out_dir, lookup_words):
+    """Emit the ROM lookup using the original runtime's first-index rule."""
+    table = [lookup_words[0]] * 512
+    for index in range(63, -1, -1):
+        word = lookup_words[index]
+        key = ((word >> 1) & 7) | ((word >> 2) & 0x38) | ((word >> 3) & 0x1C0)
+        table[key] = lookup_words[index & 0x30]
+    lines = ["/* Generated from misc_palettes; do not edit by hand. */",
+             "const unsigned short k_gray_by_word[512] = {"]
+    for offset in range(0, 512, 8):
+        values = ", ".join(f"0x{word:03X}u" for word in table[offset:offset + 8])
+        lines.append("    " + values + ("," if offset < 504 else ""))
+    lines.append("};")
+    with open(os.path.join(out_dir, "gray_table.c"), "w", encoding="utf-8", newline="\n") as output:
+        output.write("\n".join(lines) + "\n")
 
 
 def write_person_text_c(out_dir, z01_blocks, person_text_data):

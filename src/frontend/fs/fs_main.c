@@ -479,7 +479,8 @@ void fs_main(void) {
         render_wait_vblank();
         fs_phase_step();
         fs_input_dispatch(fs_input_pressed());
-        fs_render_tick(s_fs_cursor,s_fs_phase==FS_NAV);
+        fs_render_tick(s_fs_cursor,s_fs_phase==FS_NAV || s_fs_phase==FS_COPY_SRC ||
+                       s_fs_phase==FS_COPY_DST || s_fs_phase==FS_RENAME_PICK);
         if (g_fs_back_requested) return;
     }
 }
@@ -499,5 +500,6 @@ void fs_enter(void) {
 void fs_tick(void) {
     fs_phase_step();
     fs_input_dispatch(fs_input_pressed());
-    fs_render_tick(s_fs_cursor,s_fs_phase==FS_NAV);
+    fs_render_tick(s_fs_cursor,s_fs_phase==FS_NAV || s_fs_phase==FS_COPY_SRC ||
+                   s_fs_phase==FS_COPY_DST || s_fs_phase==FS_RENAME_PICK);
 }

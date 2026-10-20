@@ -49,6 +49,13 @@ unsigned int options_runtime_serialize(unsigned char *buf,
 
 /* Generic getter — returns 0 for unknown id. */
 unsigned char options_get(unsigned int id);
+unsigned char options_music_get(unsigned char slot);
+void options_music_set(unsigned char slot, unsigned char track);
+unsigned char options_dungeon_music_get(unsigned char level);
+void options_dungeon_music_set(unsigned char level, unsigned char choice);
+unsigned char options_dungeon_music_preset(void);
+void options_dungeon_music_set_all(unsigned char choice);
+unsigned char options_dungeon_music_track(unsigned char level);
 
 /* Generic setter — runs validation, no-op on failure. */
 void options_set(unsigned int id, unsigned char value);

@@ -30,6 +30,7 @@
                                          core_reset_obj_metastate */
 #include "world/draw_dispatch.h"      /* k_sprite_offsets */
 #include "world/sprite_dispatch.h"    /* sprite_cycle_cur_sprite_index */
+#include "enemy_render.h"             /* enemy_render_note_boss_oam */
 
 /* External drained primitives the bridge composes. */
 extern void enrt_gleeok_store_ref_seg_distance(unsigned int signed_ref_dist);
@@ -428,6 +429,7 @@ static void gleeok_anim_write_specific_sprite(unsigned char tile,
 {
     unsigned char gx = (unsigned char)OBJ(NES_OBJ_X, slot);
     unsigned char gy = (unsigned char)OBJ(NES_OBJ_Y, slot);
+    enemy_render_note_boss_oam();
     RAM(0x0003u) = attrs;               /* NES passes the attributes in [03] */
     OAM_BYTE((unsigned int)(sprite_off + 1u)) = tile;
     OAM_BYTE((unsigned int)(sprite_off + 3u)) = gx;
@@ -523,6 +525,7 @@ void c_gleeok_draw_body(void)
         const unsigned char frame = (unsigned char)ENEMY_GLEEOK_BODY_FRAME & 0x03u;
         unsigned char tile_idx = k_body_base_tile_offsets[frame];
         unsigned char row;
+        enemy_render_note_boss_oam();
         /* [06] row and [07] column counters live in NES RAM (T-171). */
         for (row = 0u; row < 2u; row++) {
             unsigned char col;

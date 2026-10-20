@@ -42,17 +42,22 @@ def labels(root=ROOT):
     return found
 
 
-def capture(rom: bytes, request: int):
+def capture(rom: bytes, request: int, *, level: int = 0):
     """One real driver call per frame, starting with an empty audio context.
 
     This is an offline JSR harness, not a CPU/PPU timing or audio renderer.
     Boot is real; clearing RAM isolates the audio context from title/gameplay.
     A bounded call fails loudly on runaway or unsupported driver signatures.
     """
+    if not isinstance(level, int) or not 0 <= level <= 9:
+        raise ValueError("music capture level must be 0..9")
     lab = labels()
     n = Nes(rom)
     n.run_frames(5)
     n.ram[:] = bytes(len(n.ram))
+    # Redux dungeon_music.asm indexes its four theme tables with CurLevel.
+    # Keep the default zero context unchanged for existing seven-song callers.
+    n.poke(lab["CurLevel"], level)
     n.mmc1_prg = 0
     n._map_prg()
     signature = bytes.fromhex("a5e0f00ca9008d1540")

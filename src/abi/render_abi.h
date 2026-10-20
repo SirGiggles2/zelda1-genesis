@@ -70,6 +70,9 @@ void render_vram_write_words(const unsigned short *src, unsigned short count);
  */
 void render_cram_open_write(unsigned short slot);
 void render_cram_write_color(unsigned short slot, unsigned short value);
+/* T-251: write only when the CRAM shadow differs (per-frame identity
+ * palette re-assert must not reopen the VDP port for five unchanged words). */
+void render_cram_write_color_if_changed(unsigned short slot, unsigned short value);
 void render_cram_upload(const unsigned short *src, unsigned short count);
 /* T-168: 1 = CRAM writes go out in the next VBlank (SGDK DMA queue, one
  * transfer per frame; gameplay), 0 = at once (front ends that wait for
@@ -104,8 +107,12 @@ void render_window_move_deferred(unsigned short src_row, unsigned short dst_row,
                                  unsigned short win_rows);
 void render_set_window_on_bottom(unsigned short rows);
 /* Stage the paused HUD and visible room beneath the menu at next VBlank. */
+#define RENDER_PAUSE_HUD_STRIP_TOP 176u
 void render_pause_scene_deferred(unsigned short menu_col,
                                  unsigned short room_col, unsigned short room_row);
+/* Publish the pause SAT cache and both scroll words at one VBlank boundary. */
+void render_pause_frame_deferred(unsigned short sat_base, short vertical,
+                                 unsigned short sprite_count);
 
 /* Phase 12.2 SGDK-1 cleanup: VRAM word read. Used by src/game/dungeon/
  * uw_render for plane-readback during scroll diffs. Wraps the

@@ -11,9 +11,11 @@
  *            X != 0 then an X = 0 sprite masks later sprites on its lines.
  *   4..5   — Link (two 8x16 halves, like NES OAM 18/19)
  *   6..14  — items, projectiles, weapons (named per-slot below)
- *   15..16 — HUD equipped-item sprites
+ *   15..16 — HUD equipped-item sprites (A/sword and B/item)
  *   17..18 — Original HUD player/compass position markers
- *   19..63 — enemy bridge (mirrors NES OAM scatter via enemy_render)
+ *   19     — HUD Remix C-item sprite
+ *   20..25 — T-251 extra Links P2..P4 (two 8x16 halves each)
+ *   26..63 — enemy bridge (mirrors NES OAM scatter via enemy_render)
  *   64+    — never used in H32
  *
  * The opaque black HUD underlay now comes from BG_A tile 0 (PAL0 color 0),
@@ -56,6 +58,20 @@
 #define ROOMROM_SPRITE_SLOT_HUD_B_ITEM_R   16u  /* HUD B-item RIGHT half (hflip) */
 #define ROOMROM_SPRITE_SLOT_HUD_PLAYER     17u  /* Original map player dot */
 #define ROOMROM_SPRITE_SLOT_HUD_COMPASS    18u  /* Original map Triforce dot */
+#define ROOMROM_SPRITE_SLOT_HUD_C_ITEM     19u  /* HUD Remix C-item (T-255) */
+#define ROOMROM_SPRITE_SLOT_MP_LINK2       20u  /* T-251 player 2 left half */
+#define ROOMROM_SPRITE_SLOT_MP_LINK2_R     21u  /* T-251 player 2 right half */
+#define ROOMROM_SPRITE_SLOT_MP_LINK3       22u  /* T-251 player 3 left half */
+#define ROOMROM_SPRITE_SLOT_MP_LINK3_R     23u  /* T-251 player 3 right half */
+#define ROOMROM_SPRITE_SLOT_MP_LINK4       24u  /* T-251 player 4 left half */
+#define ROOMROM_SPRITE_SLOT_MP_LINK4_R     25u  /* T-251 player 4 right half */
+#define ROOMROM_SPRITE_SLOT_MP_SWORD2      26u  /* T-251 player 2 sword */
+#define ROOMROM_SPRITE_SLOT_MP_SWORD3      27u  /* T-251 player 3 sword */
+#define ROOMROM_SPRITE_SLOT_MP_SWORD4      28u  /* T-251 player 4 sword */
+#define ROOMROM_MP_LINK_SLOT(p)   (20u + 2u * ((p) - 1u))
+#define ROOMROM_MP_SWORD_SLOT(p)  (26u + 3u * ((p) - 1u))
+#define ROOMROM_MP_SHOT_SLOT(p)   (27u + 3u * ((p) - 1u))
+#define ROOMROM_MP_FX_SLOT(p)     (28u + 3u * ((p) - 1u))
 
 /* Play-area sprite Y: NES shows an OAM sprite one line below its Y, and
  * the Genesis frame is the NES frame without its top eight lines (the BG
@@ -70,8 +86,8 @@
 
 /* --- Chain / range bounds --- */
 #define ROOMROM_SPRITE_SLOT_LINK_FIRST       ROOMROM_SPRITE_SLOT_MASK_N_LEAD
-#define ROOMROM_SPRITE_SLOT_GAMEPLAY_LAST    ROOMROM_SPRITE_SLOT_HUD_COMPASS
-#define ROOMROM_SPRITE_SLOT_ENEMY_FIRST     19u
+#define ROOMROM_SPRITE_SLOT_GAMEPLAY_LAST    ROOMROM_SPRITE_SLOT_MP_SWORD4
+#define ROOMROM_SPRITE_SLOT_ENEMY_FIRST      29u
 #define ROOMROM_SPRITE_SLOT_LAST_H32        63u
 #define ROOMROM_SPRITE_UPLOAD_COUNT_H32     64u
 

@@ -88,6 +88,11 @@ void roomrom_combat_set_uw(unsigned char in_uw)
 }
 
 static unsigned char s_redux = 0u;
+unsigned char roomrom_combat_is_redux(void) { return s_redux; }
+/* T-251: extra players run the same combat core but draw through the MP
+ * renderer; suppress the P1 attack-pose write during their context. */
+static unsigned char s_draw_enabled = 1u;
+void roomrom_combat_set_draw_enabled(unsigned char enabled) { s_draw_enabled = enabled; }
 void roomrom_combat_set_redux(unsigned char redux)
 {
     s_redux = redux ? 1u : 0u;
@@ -390,7 +395,8 @@ static unsigned char sword_style_allows_beam(void)
         unsigned char hv = g_inventory.heart_values;
         unsigned char cur = heart_values_cur(hv);
         unsigned char max = heart_values_max(hv);
-        return (cur == max && g_inventory.heart_partial >= 0x80u) ? 1u : 0u;
+        /* Redux misc.asm (bank 7 $F879): CMP #$C0 instead of CMP #$80. */
+        return (cur == max && g_inventory.heart_partial >= (s_redux ? 0xC0u : 0x80u)) ? 1u : 0u;
     }
 }
 
@@ -402,8 +408,13 @@ void roomrom_combat_update(short link_x, short link_y, link_face_t face)
     {
         unsigned char major = (unsigned char)(L_STATE & 0x30u);
         /* DrawLink faces ObjDir for every item use (sword, rod, ...). */
-        if (major == 0x10u || major == 0x20u)
-            roomrom_sprites_set_link_attack_pose(link_x, link_y, face);
+        if (s_draw_enabled && (major == 0x10u || major == 0x20u))
+            /* Vertical frames flip by ObjAnimFrame ([0F], SetUpWalkingSprites):
+             * 1 until the first AnimateLinkObjState roll (candle use, NES
+             * OAM $1A/$18 attr $40). */
+            roomrom_sprites_set_link_attack_pose(link_x, link_y, face,
+                (face == LINK_FACE_UP || face == LINK_FACE_DOWN) ?
+                    (unsigned char)(L_ANIMFRAME & 1u) : 0u);
     }
     update_sword_or_rod(SW_SLOT);
     sword_shot_update();          /* NES order: $0D then $0E */
@@ -423,6 +434,7 @@ static void update_sword_or_rod(unsigned char x)
     unsigned char st = (unsigned char)(RAM(0x00ACu + x) & 0x0Fu);
     unsigned char idx, dir, attr, tile, wide;
     short dx;
+    if (x == SW_SLOT) enemy_render_weapon_reset(SW_SLOT);   /* right piece, redrawn below */
     if (st == 0u) return;
     RAM(0x03D0u + x) = (unsigned char)(RAM(0x03D0u + x) - 1u);
     if (RAM(0x03D0u + x) == 0u) {
@@ -502,7 +514,16 @@ static void update_sword_or_rod(unsigned char x)
     tile = draw_item_frame_tile((x == SW_SLOT) ? 0u : 8u, k_rdir_frame[idx]);
     wide = k_rdir_frame[idx];
     dx = wide ? 0 : 4;
-    if (x == SW_SLOT)
+    if (x == SW_SLOT && wide) {
+        /* Anim_WriteSpecificItemSprites writes the pair as two 8x16 sprites;
+         * the second takes a late OAM index, so the shot's pieces (made at
+         * state 3, same tick) cover it. Left flips: right piece first. */
+        unsigned char l = tile, r = (unsigned char)(tile + 2u);
+        short sx = (short)RAM(0x0070u + x), sy = (short)RAM(0x0084u + x);
+        if (attr & 0x40u) { l = r; r = tile; }
+        roomrom_sprites_set_sword_nes(sx, sy, 0u, enemy_render_item_sat(l, attr));
+        enemy_render_weapon_add_item(SW_SLOT, r, attr, (unsigned char)(sx + 8), (unsigned char)sy);
+    } else if (x == SW_SLOT)
         roomrom_sprites_set_sword_nes((short)(RAM(0x0070u + x) + dx),
                                       (short)RAM(0x0084u + x), wide,
                                       enemy_render_item_sat(tile, attr));

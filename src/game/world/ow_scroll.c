@@ -30,6 +30,10 @@
 #include "render/sprite_render.h"         /* transition item presentation */
 #include "../options/options_consumer.h" /* options_consumer_get_room_scroll */
 #include "../options/options_state.h"    /* OPTIONS_SCROLL_SMOOTH */
+#include "../../state/game_profile.h"
+#include "../../state/save_game.h"
+#include "../hud/hud_runtime.h"
+#include "../enemies/enemy_dispatch.h" /* transient shield room lifetime */
 
 #define UPD nes_ram[0x11u]
 #define MODE nes_ram[0x12u]
@@ -75,6 +79,7 @@ unsigned char ow_scroll_edge(short x, short y, unsigned char dir,
 
 void ow_scroll_begin(unsigned char dir, unsigned char target)
 {
+    enemy_like_like_shields_reset();
     direction = dir;
     target_room = target;
     source_room = nes_ram[0xEBu];
@@ -157,6 +162,21 @@ static unsigned char opposite(unsigned char d)
 static unsigned char grid_at_limit(void)
 {
     return (GRID == 0u || GRID == 0x08u || GRID == 0xF8u) ? 1u : 0u;
+}
+
+/* NES source: Redux automap.asm:UpdateMapSpot at LayOutRoom; Z_05
+ * InitMode7_Sub1 (non-Up destination) / InitMode7_Sub5 (Up destination).
+ * Drained C: ow_scroll_tick and existing save/HUD discovery owners.
+ * Coverage: PARTIAL(OW scroll layout handoff); Stance: EXTEND.
+ * A rendered column alone is not a visit. Match the native destination
+ * layout handoff, then publish its pattern on the following NMI flush. */
+static void discover_scroll_destination(void)
+{
+    if (CUR_LEVEL == 0u && game_profile_is_remix() &&
+        !save_game_room_discovered(target_room)) {
+        save_game_discover_room(target_room);
+        roomrom_hud_overworld_discovery_cue();
+    }
 }
 
 void ow_scroll_enter_room_uw(short *x)
@@ -245,6 +265,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
             if (uw) link_hidden = 1u;
             ROW = 21u;
             SUB = 2u;
+            if (direction != 4u) discover_scroll_destination();
             break;
         case 2u:
             /* NES transfers all 22 rows before scrolling. Use that budget
@@ -273,6 +294,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
             nes_ram[0xEBu] = target_room;
             SUB = 0u;
             UPD = 1u;
+            if (direction == 4u) discover_scroll_destination();
             break;
         }
     } else if (MODE == 7u) {

@@ -134,6 +134,14 @@ static void item_check_class1(unsigned char item_slot, unsigned char item_class)
         (void)inventory_add_heart_container();
         return;
     }
+    if (item_slot == 0x20u) {
+        /* T-317 MD Remix red rupee ($24): 20 rupees. The class-1 amount
+         * nibble is only 4 bits, so add 1 (HUD trigger + sound) then the
+         * remaining 19 through the existing deferred credit accumulator. */
+        core_take_one_rupee();
+        core_post_credit(19u);
+        return;
+    }
     if (item_slot == 0x1Cu) {
         core_take_5_rupees();
         return;
@@ -194,10 +202,15 @@ void item_take_item(unsigned char item_id)
         ITEM_PICKUP_ID = item_id;
     }
     const unsigned char idx = (unsigned char)(item_id & 0x3Fu);
-    /* ItemIdToSlot/ItemIdToDescriptor have 36 entries; mask to safe range. */
-    const unsigned char item_slot = (idx < 36u) ? ItemIdToSlot[idx] : 0u;
+    /* ItemIdToSlot/ItemIdToDescriptor have 36 base entries; mask to safe
+     * range. T-317 extends the Remix drop set with $24 = red rupee
+     * (20) without changing the extracted NES tables. */
+    const unsigned char red_rupee =
+        (unsigned char)(game_profile_is_remix() && idx == 0x24u);
+    const unsigned char item_slot =
+        (idx < 36u) ? ItemIdToSlot[idx] : (red_rupee ? 0x20u : 0u);
     const unsigned char descriptor =
-        (idx < 36u) ? ItemIdToDescriptor[idx] : 0x01u;
+        (idx < 36u) ? ItemIdToDescriptor[idx] : (red_rupee ? 0x10u : 0x01u);
     ITEM_VALUE_SCRATCH = (uint8_t)(descriptor & 0x0Fu);
     {
         const unsigned char item_class =

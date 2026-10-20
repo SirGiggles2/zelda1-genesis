@@ -33,8 +33,8 @@ static const unsigned char k_status_bar_template[41] __attribute__((aligned(4)))
  * The installed ROM relocates hearts and swaps keys/arrows relative to
  * the source file's earlier preset. ROM bytes are the authority. */
 static const unsigned char k_redux_status_bar_template[62] __attribute__((aligned(4))) = {
-    0x20,0x82,0x08,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,
-    0x20,0xA2,0x08,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,
+    0x20,0xB8,0x08,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,
+    0x20,0xD8,0x08,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,
     0x20,0x6C,0x03,0x62,0x00,0x24,
     0x20,0x8C,0x03,0x62,0x64,0x24,
     0x20,0xCC,0x03,0x62,0x03,0x00,
@@ -387,8 +387,23 @@ void hud_tick_native_rupees(unsigned char frame_counter)
      * Stance: EXTEND the same pending-transaction owner per saved profile. */
     if (game_profile_is_remix()) {
         const unsigned char decimal = RAM(0x067Au);
-        unsigned short value = (unsigned short)(RAM(0x067Bu) * 100u +
-            (decimal >> 4) * 10u + (decimal & 15u));
+        const unsigned char tens = (unsigned char)(decimal >> 4);
+        const unsigned char ones = (unsigned char)(decimal & 0x0Fu);
+        const unsigned char hundreds = (unsigned char)RAM(0x067Bu);
+        /* No pending credit/debit: the full path would convert the BCD
+         * cells to binary, divide by 100/10, write the same cells back and
+         * project the same LINK_RUPEES. Project directly from valid BCD and
+         * skip two 68K divides per play tick. Invalid cells still take the
+         * normalising path below. */
+        if (RAM(0x067Du) == 0u && RAM(0x067Eu) == 0u &&
+            hundreds <= 9u && tens <= 9u && ones <= 9u) {
+            const unsigned short projection = (unsigned short)
+                (hundreds * 160u + tens * 10u + ones);
+            LINK_RUPEES = (unsigned char)(projection > 255u ? 255u : projection);
+            return;
+        }
+        unsigned short value = (unsigned short)(hundreds * 100u +
+            tens * 10u + ones);
         /* Both branches precede FrameCheck in the pinned source. */
         if (RAM(0x067Du)) {
             RAM(0x067Du)--;

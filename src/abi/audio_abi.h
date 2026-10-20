@@ -23,6 +23,8 @@ void audio_xgm_init(void);
 /* Request a song change. song is the song bitmap passed to music_play.
  * Call from any mode; music_tick in the VBlank handler picks it up. */
 void audio_music_play(unsigned char song);
+/* Saved Remix music catalog; zero is the cue's existing default. */
+const char *audio_music_choice_name(unsigned char track);
 /* Arm after reaching the intro's final hold; report the next actual music
  * loop. Storage and driver clocks remain owned by the audio adapter. */
 void audio_music_loop_arm(void);

@@ -68,9 +68,20 @@ void roomrom_sprites_set_link_hurt_pose(short x, short y,
                                        link_face_t face, unsigned char frame,
                                        unsigned char invincibility_timer);
 
+/* T-251: render player 2..4 (index 1..3) with its permanent Four Swords
+ * tunic color. Copies the current pose into that player's scratch tiles,
+ * remapping tunic pixels 1 -> the player's PAL1 slot (4/8/12). */
+void roomrom_sprites_set_mp_link_pose(unsigned char player,
+                                      short x, short y,
+                                      link_face_t face, unsigned char frame);
+void roomrom_sprites_set_mp_attack_pose(unsigned char player, short x, short y,
+                                        link_face_t face);
+
 
 /* S7 v4 combat. */
-void roomrom_sprites_set_link_attack_pose(short x, short y, link_face_t face);
+/* hflip: NES [0F] for a vertical facing (ObjAnimFrame at draw time). */
+void roomrom_sprites_set_link_attack_pose(short x, short y, link_face_t face,
+                                          unsigned char hflip);
 
 /* sub_pal: NES sprite sub-palette index (0-3).
  * NES @CalcSwordAttrs (Z_07.asm:4471): sub-pal = base_attr + Items - 1.
@@ -83,6 +94,12 @@ void roomrom_sprites_set_sword_horizontal(short x, short y, unsigned char hflip,
                                           unsigned char sub_pal);
 void roomrom_sprites_set_sword_nes(short x, short y, unsigned char wide,
                                    unsigned short sat_attr);
+/* T-251: extra-player sword in its own SAT slot. */
+void roomrom_sprites_set_mp_sword(unsigned char player, short x, short y,
+                                  unsigned char wide, unsigned short sat_attr);
+void roomrom_sprites_set_sword_slot(unsigned short slot);
+void roomrom_sprites_set_weapon_player(unsigned char player);
+void roomrom_sprites_mp_invalidate(void);
 void roomrom_sprites_set_arrow_nes(short x, short y, unsigned char wide,
                                    unsigned short sat_attr);
 void roomrom_sprites_set_boomerang_nes(short x, short y, unsigned short sat_attr);

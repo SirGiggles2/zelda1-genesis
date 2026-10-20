@@ -86,6 +86,14 @@ def parse_constants():
                 fail(f"missing {name} in {text_header}")
             consts[name] = int(m.group(1))
 
+    # T350: main-owned static false-wall patterns occupy a real reservation.
+    dither_header = ROOT.parent / "src/game/dungeon/uw_render.h"
+    for name in ("UW_DITHER_TILE_BASE", "UW_DITHER_TILE_COUNT"):
+        m = re.search(rf"#define\s+{name}\s+(\d+)u?", dither_header.read_text())
+        if not m:
+            fail(f"missing {name} in {dither_header}")
+        consts[name] = int(m.group(1))
+
     # --- BG and SPR banks (literal numeric defines in vram_layout.h) ---
     for name in ("ROOMROM_CORE_BG_EXTRA_TILE_BASE", "ROOMROM_CORE_BG_EXTRA_TILE_COUNT",
                  "ROOMROM_BG_TILE_BASE",
@@ -285,6 +293,13 @@ def main():
                 needed += sum(v == 0xFFFF for v in values[1:])
         if needed > c["ROOMROM_TEXT_EXTRA_TILE_COUNT"]:
             fail(f"TEXT_EXTRA needs {needed} tiles, reservation is too small")
+    region = tile_range_bytes(c["UW_DITHER_TILE_BASE"], c["UW_DITHER_TILE_COUNT"])
+    if region[1] > TILE_DATA_LIMIT_BYTES:
+        fail("UW_DITHER extends into VDP tables")
+    for other, occupied in banks.items():
+        if overlaps(region, occupied):
+            fail(f"UW_DITHER overlaps {other}")
+    banks["UW_DITHER"] = region
     headroom_tiles = TILE_DATA_LIMIT_TILES - max(end for _, end in banks.values()) // 32
     # Phase J.2 (2026-05-18 doc-only): BG bank reserves 1024 tiles for
     # legacy 4x layout (still used by redux UW per uw_render.c branch)
@@ -306,6 +321,7 @@ def main():
         f"BG slots free for direct-tile-id content)" if bg_free_zone > 0 else "")
     print(
         f"verify_vram_budget: OK  "
+        f"UW_DITHER=tiles {c['UW_DITHER_TILE_BASE']}..{c['UW_DITHER_TILE_BASE'] + c['UW_DITHER_TILE_COUNT'] - 1}  "
         f"BG=tiles {bg_base}..{bg_base + bg_count - 1}  "
         f"SPR=tiles {spr_base}..{spr_base + spr_count - 1}  "
         f"ITEM=tiles {item_base}..{item_end_tile - 1}  "

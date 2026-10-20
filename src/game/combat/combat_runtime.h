@@ -47,7 +47,8 @@ void roomrom_combat_set_uw(unsigned char in_uw);
 /* Active profile selects mandatory Redux state-2 sweep and UW draw bias.
  * Native Link/weapon state timing remains authoritative in both profiles.
  * Optional ALttP arc is a separate modifier, pending its own verification. */
-void roomrom_combat_set_redux(unsigned char redux);
+void roomrom_combat_set_redux(unsigned char redux);unsigned char roomrom_combat_is_redux(void);   /* MD Remix = the Redux ROM's rules */
+void roomrom_combat_set_draw_enabled(unsigned char enabled);
 
 /* Plan v5 sword/enemy collision sync. NES weapon slot 13 holds the
  * sword; collision_check_monster_sword_collision tests OBJ_STATE(13)

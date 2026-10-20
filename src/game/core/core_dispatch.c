@@ -15,6 +15,7 @@
 #include "progress_state.h"    /* SUBMODE_VALUE, PROG_ITEMS_BY_LEVEL */
 #include "combat_state.h"      /* LINK_HEARTS */
 #include "../items/candle_fire.h"  /* candle_fire_wield_from_shot (T-116) */
+#include "../enemies/enemy_dispatch.h" /* transient shield slot lifecycle */
 
 /* T5.2 plan v5b — DMC SFX dispatch from core tune writers. NES bitmap
  * → sample index per src/nes_io.asm:2547 DMC_SAMPLE_LOOKUP. */
@@ -109,6 +110,7 @@ void core_cue_transfer_blank_person_wares(void)
 void core_destroy_object_wram(unsigned int val, unsigned int slot)
 {
     /* drain at core_runtime.c:42-50. NES DestroyObjectWram. */
+    enemy_like_like_shield_forget(slot);
     OBJ_SHOVE_DIR(slot)  = (uint8_t)val;
     OBJ_SHOVE_DIST(slot) = (uint8_t)val;
     RAM(0x0028 + slot)   = (uint8_t)val;  /* ObjTimer+slot */

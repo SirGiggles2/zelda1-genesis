@@ -8,6 +8,7 @@
 #include "../../game/options/options_runtime.h"
 #include "../../game/options/options_state.h"
 #include "render_abi.h"
+#include "audio_abi.h"
 
 #define PLANE_A_BASE 0xC000u
 #define SAT_VRAM 0xF800u
@@ -31,7 +32,7 @@ static const char *const HELP[FS_OPTIONS_ROW_COUNT][3] = {
     {"STANDARD USES HEALTH", "NEVER DISABLES BEAMS", "ALWAYS IGNORES HEALTH"},
     {"NORMAL ALLOWS LIKE LIKES", "TO EAT YOUR MAGIC SHIELD", "PROTECT KEEPS THE SHIELD"},
     {"SMOOTH GLIDES BETWEEN", "ROOMS CLASSIC USES STEPS", "GAMEPLAY TIMING IS SAME"},
-    {"CHOOSE THE DUNGEON THEME", "INGLEBARD IS THE DEFAULT", "REMIX IS ANOTHER CHOICE"},
+    {"A OPENS MUSIC OPTIONS", "PICK EACH DUNGEON SONG", "OR SET ALL DUNGEONS"},
     {"A OR START SAVES CHANGES", "B OR C DISCARDS CHANGES", "SETTINGS BELONG TO FILE"}
 };
 
@@ -66,6 +67,7 @@ static const char *value(uint8_t row)
     unsigned int id=fs_options_id_for_row(row);
     unsigned char v;
     if (row==FS_OPTIONS_CORE_ROW) return "AUTOMATIC";
+    if (row==FS_OPTIONS_MUSIC_ROW) return "OPEN";
     if (id>=OPTION_ID_COUNT) return "";
     v=options_get(id);
     switch (id) {
@@ -130,4 +132,65 @@ void fs_options_render_leave(uint8_t cursor)
     fs_render_static_layout();
     fs_render_all_slots();
     fs_render_cursor(cursor);
+}
+
+/* Only meaningful alternatives appear. Navigation and editing preserve the
+ * existing page; only entry/exit performs a complete redraw. */
+static const char *music_value(uint8_t row)
+{
+    static const char *const modes[4]={"DEFAULT","INGLEBARD","CYBERDEOUS","REDUX"};
+    if (row==0u) return options_music_get(1u)==4u ? "REDUX" : "INGLEBARD";
+    if (row==1u) return modes[options_dungeon_music_preset()];
+    if (row<FS_MUSIC_BACK_ROW) return modes[options_dungeon_music_get((uint8_t)(row-1u))];
+    return "";
+}
+void fs_music_render_row(uint8_t row)
+{
+    unsigned short cells[32];
+    char label[]="DUNGEON 1";
+    clear_row(cells);
+    if (row==0u) text(cells,5u,"OVERWORLD");
+    else if (row==1u) text(cells,5u,"ALL DUNGEONS");
+    else if (row==FS_MUSIC_BACK_ROW) text(cells,5u,"BACK");
+    else { label[8]=(char)('0'+row-1u); text(cells,5u,label); }
+    text(cells,18u,music_value(row));
+    render_plane_write_row(PLANE_A_BASE,6u+row,cells,32u);
+}
+void fs_music_render_cursor(uint8_t cursor)
+{
+    unsigned short cells[32], i;
+    const char *description="LEFT RIGHT SELECT SONG";
+    if (cursor==1u) description="SET ALL NINE DUNGEONS";
+    else if (cursor==FS_MUSIC_BACK_ROW) description="RETURN TO OPTIONS";
+    for (i=0u; i<3u; ++i) {
+        clear_row(cells);
+        if (i==0u && cursor<FS_MUSIC_BACK_ROW) {
+            unsigned char track=cursor==0u ? (options_music_get(1u)==4u ? 4u : 1u) :
+                cursor==1u ? 0u : options_dungeon_music_track((uint8_t)(cursor-1u));
+            if (cursor==1u) text(cells,4u,music_value(cursor));
+            else text(cells,4u,audio_music_choice_name(track));
+        } else if (i==1u) text(cells,4u,description);
+        else if (i==2u) text(cells,4u,"DEFAULT USES EACH CHOICE");
+        render_plane_write_row(PLANE_A_BASE,21u+i,cells,32u);
+    }
+    render_sat_write(SAT_VRAM,0u,(6u+cursor)*8u+128u,0u,(1u<<13)|HEART_CHR_BASE,152u);
+}
+void fs_music_render_full(uint8_t cursor)
+{
+    unsigned short cells[32], i;
+    for (i=0u; i<32u; ++i) cells[i]=TILE_SPACE;
+    for (i=0u; i<30u; ++i) render_plane_write_row(PLANE_A_BASE,i,cells,32u);
+    text(cells,3u,"A NEXT START SAVE B BACK");
+    render_plane_write_row(PLANE_A_BASE,1u,cells,32u);
+    border(3u,0x69u,0x6Bu);
+    clear_row(cells); text(cells,8u,"REMIX MUSIC");
+    render_plane_write_row(PLANE_A_BASE,4u,cells,32u);
+    for (i=5u; i<27u; ++i) {
+        clear_row(cells);
+        render_plane_write_row(PLANE_A_BASE,i,cells,32u);
+    }
+    for (i=0u; i<FS_MUSIC_ROW_COUNT; ++i) fs_music_render_row((uint8_t)i);
+    border(20u,0x6Cu,0x6Cu);
+    border(27u,0x6Eu,0x6Du);
+    fs_music_render_cursor(cursor);
 }

@@ -11,6 +11,9 @@ extern "C" {
 
 /* Clear FS scene + paint OPTIONS title, all rows, and cursor. */
 void fs_options_render_full(uint8_t cursor_row);
+void fs_music_render_full(uint8_t cursor_row);
+void fs_music_render_row(uint8_t row);
+void fs_music_render_cursor(uint8_t cursor_row);
 
 /* Re-paint a single row's value cell after a toggle / cycle / clamp. */
 void fs_options_render_row_value(uint8_t row);

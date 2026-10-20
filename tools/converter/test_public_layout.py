@@ -37,6 +37,16 @@ def main():
     for line in manifest.splitlines():
         if line and not line.startswith('#'):
             assert line in files, f'missing converter dependency: {line}'
+    # Every explicitly compiled implementation must reach the public package.
+    from package_check import is_banned
+    script = export_repo.ROOT / ('tools/build/build_rom.py' if public_layout.is_public(export_repo.ROOT)
+                                 else 'tools/debug/build_debug.py')
+    for node in ast.walk(ast.parse(script.read_text(encoding='utf-8'))):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            source = node.value
+            if source.endswith(('.c', '.s', '.asm')) and '/' in source:
+                if not is_banned(source)[0] and not source.startswith('build/'):
+                    assert public_layout.rename(source) in files, f'missing build source: {source}'
     # The GUI and command-line paths must select the same converter build.
     core = export_repo.export_bytes(files['tools/converter/converter_core.py']).decode('utf-8')
     assert '"converter" / "build.py"' in core

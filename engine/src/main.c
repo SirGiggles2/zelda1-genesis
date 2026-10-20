@@ -38,6 +38,8 @@
 #include "../../src/state/pause_state.h"  /* Task 6.10.1: Paused flag (Phase 12.2 promoted) */
 #include "../../src/game/inventory/inventory_render.h"  /* P6.2: pause subscreen */
 #include "../../src/game/combat/link_damage.h"   /* Task 6.11.1 (Phase 12.2 promoted) */
+#include "../../src/game/combat/link_collision_dispatch.h"
+extern void core_destroy_monster(unsigned int slot);
 #include "../../src/state/inventory.h"                   /* Task 6.10.10: rupee tick */
 #include "../../src/state/nes_ram_sync.h"                /* Plan v5a Tier-1: $FA/$FB/$66F/$670/$008C */
 #include "../../src/game/audio/audio_dispatch.h"         /* Plan v5b Tier-5 T5.5: gamemode+scene music dispatcher */
@@ -60,6 +62,7 @@
 #include "probes/metadata_probe.h"     /* Task 5.4: Gate D in-ROM probe */
 #include "atlas/level_chr_swap.h"        /* PR-4a: scene-bank DMA state machine */
 #include "game_profile.h"
+#include "../../src/state/loadout.h"
 #include "player_state.h"                 /* Phase 6 Task 6.1: typed players[] */
 #include "enemy_loop.h"                   /* Phase 7 Task 7.2 step 2 (WT-5) */
 #include "enemy_loop_probe.h"             /* Phase 7 Task 7.2 step 2 probe */
@@ -200,67 +203,95 @@ void roomrom_set_b_item_from_inv_cursor(unsigned char cursor_slot)
  * SGDK adds +128 to (x, y) internally, pass NES pixel coords directly. */
 static unsigned long s_hud_b_key;
 static unsigned char s_hud_b_key_valid;
+static unsigned char s_hud_c_value_key;
 
 static void roomrom_hud_b_item_update(unsigned char native_descriptors)
 {
-    /* T-092: NES DrawStatusBarItemsAndEnsureItemSelected (Z_07.asm). B box
-     * at ($7C,$1F), A box (sword) at ($94,$1F); DrawItemBySlot tile/attr,
-     * narrow item tiles get X+4 (Anim_WriteSpecificItemSprites). Lockstep
-     * captures: no sword -> no A sprite; sword 1/2/3 -> $20/$00, $20/$01,
-     * $48/$02 at X $98; wooden boomerang -> $36/$00 at X $80. */
-    unsigned char slot, attr, tile;
-    s16 bx = (s16)-32, ax = (s16)-32;
-    unsigned short battr = 0u, aattr = 0u;
+    /* T-092: NES DrawStatusBarItemsAndEnsureItemSelected (Z_07.asm).
+     * T-252/T-255: Genesis order is A left, B middle, C right (Remix only).
+     * Original draws the selected item on A and the sword on B; Remix draws
+     * the sword on A and items on B/C. Sprite X follows that order:
+     *   left  $7C, middle $94, right $AC.
+     * DrawItemBySlot tile/attr; narrow item tiles get X+4
+     * (Anim_WriteSpecificItemSprites). Lockstep captures: no sword -> no A
+     * sprite; sword 1/2/3 -> $20/$00, $20/$01, $48/$02 at X $98; wooden
+     * boomerang -> $36/$00 at X $80. */
+    unsigned char slot = 0u, attr, tile;
+    const unsigned char remix = game_profile_is_remix();
+    s16 bx = (s16)-32, ax = (s16)-32, cx = (s16)-32;
+    unsigned short battr = 0u, aattr = 0u, cattr = 0u;
     const s16 hud_y = (s16)(0x1Fu - 7u);   /* -8 top-crop + 1 user nudge = -7 */
     const unsigned char has_b = hud_status_bar_b_item(&slot);
+    unsigned char cslot = 0u;
+    const unsigned char has_c = hud_status_bar_c_item(has_b, slot, &cslot);
+    const s16 item_x = (s16)(remix ? 0x94 : 0x7Cu);
+    const s16 sword_x = (s16)(remix ? 0x7Cu : 0x94u);
     unsigned char native_b_tile = 0u, native_b_attr = 0u;
     unsigned char native_a_tile = 0u, native_a_attr = 0u;
+    unsigned char native_c_tile = 0u, native_c_attr = 0u;
     /* NES source: Z_07:DrawStatusBarItemsAndEnsureItemSelected.
      * Drained C: draw_dispatch.c native inventory sprite chain.
      * Coverage: PARTIAL (mandatory Redux HUD descriptor ordering).
      * Stance: EXTEND. Only SAT publication is cached: native descriptors
      * still run B then A each frame, after the world object sweep. */
-    if (game_profile_is_remix() && native_descriptors) {
+    if (remix && native_descriptors) {
         if (has_b)
-            native_b_tile = draw_hud_inventory_item(slot, 0x7Cu, 0x1Fu,
+            native_b_tile = draw_hud_inventory_item(slot, 0x94u, 0x1Fu,
                                                     &native_b_attr);
         if (nes_ram[0x0657u])
-            native_a_tile = draw_hud_inventory_item(0u, 0x94u, 0x1Fu,
+            native_a_tile = draw_hud_inventory_item(0u, 0x7Cu, 0x1Fu,
                                                     &native_a_attr);
+        if (has_c)
+            native_c_tile = draw_hud_inventory_item(cslot, 0xACu, 0x1Fu,
+                                                    &native_c_attr);
     }
     {
-        /* T-172: the two sprites only change with the item, its value, the
+        /* T-172: the sprites only change with the item, its value, the
          * sword, the 8-frame flash phase or the pause edge; recomputing
          * them every frame cost busy rooms ~100 instructions. */
+        const unsigned char c_value = has_c ? nes_ram[0x0657u + cslot] : 0u;
         const unsigned long key = ((unsigned long)(has_b ? slot : 0xFFu) << 24) |
             ((unsigned long)(has_b ? nes_ram[0x0657u + slot] : 0u) << 16) |
             ((unsigned long)nes_ram[0x0657u] << 8) |
-            (unsigned long)(((nes_ram[0x0015u] >> 3) & 1u) |
-                            (roomrom_pause_is_active() ? 2u : 0u));
-        if (s_hud_b_key_valid && key == s_hud_b_key) return;
+            (unsigned long)((has_c ? cslot : 0xFu) |
+                            ((nes_ram[0x0015u] >> 3) & 1u) << 4 |
+                            (roomrom_pause_is_active() ? 2u : 0u) << 5);
+        if (s_hud_b_key_valid && key == s_hud_b_key &&
+            c_value == s_hud_c_value_key) return;
         s_hud_b_key = key;
+        s_hud_c_value_key = c_value;
         s_hud_b_key_valid = 1u;
     }
     if (has_b) {
-        if (game_profile_is_remix() && native_descriptors) {
+        if (remix && native_descriptors) {
             tile = native_b_tile;
             attr = native_b_attr;
         } else tile = draw_item_icon(slot, nes_ram[0x0657u + slot], &attr);
         battr = enemy_render_item_sat(tile, attr);
-        bx = (s16)(0x7Cu + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
+        bx = (s16)(item_x + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
     }
     if (nes_ram[0x0657u] != 0u) {
-        if (game_profile_is_remix() && native_descriptors) {
+        if (remix && native_descriptors) {
             tile = native_a_tile;
             attr = native_a_attr;
         } else tile = draw_item_icon(0u, nes_ram[0x0657u], &attr);
         aattr = enemy_render_item_sat(tile, attr);
-        ax = (s16)(0x94u + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
+        ax = (s16)(sword_x + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
+    }
+    if (has_c) {
+        if (remix && native_descriptors) {
+            tile = native_c_tile;
+            attr = native_c_attr;
+        } else tile = draw_item_icon(cslot, nes_ram[0x0657u + cslot], &attr);
+        cattr = enemy_render_item_sat(tile, attr);
+        cx = (s16)(0xACu + ((tile == 0xF3u || (tile >= 0x20u && tile < 0x62u)) ? 4u : 0u));
     }
     VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_HUD_B_ITEM, bx, (bx < 0) ? (s16)-32 : hud_y,
         RENDER_SPRITE_SIZE(1, 2), battr, ROOMROM_SPRITE_SLOT_HUD_B_ITEM_R);
     VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_HUD_B_ITEM_R, ax, (ax < 0) ? (s16)-32 : hud_y,
         RENDER_SPRITE_SIZE(1, 2), aattr, ROOMROM_SPRITE_SLOT_HUD_PLAYER);
+    VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_HUD_C_ITEM, cx, (cx < 0) ? (s16)-32 : hud_y,
+        RENDER_SPRITE_SIZE(1, 2), cattr, ROOMROM_SPRITE_SLOT_MP_LINK2);
     /* Phase 8 W0c safeguard: the pause subscreen writes the SAT directly,
      * so the gameplay sprite cache is stale when it opens or closes.
      * Invalidate on that edge only (T-131: invalidating every frame made
@@ -285,6 +316,38 @@ static unsigned char s_link_go_straight = 0u;    /* NES Link_GoStraight ($57) */
 static u8          s_link_pos_frac   = 0u;       /* NES single-axis sub-pixel */
 static u8          s_link_subx       = 0u;       /* ALTTP per-axis sub-pixel X */
 static u8          s_link_suby       = 0u;       /* ALTTP per-axis sub-pixel Y */
+
+/* T-251: extra-player state. P1 still runs the NES slot-0 path above;
+ * P2..P4 use their own PlayerState and a Genesis-native walker.
+ * Packed to keep .bss under the NES mirror: four bits of D-pad each for
+ * P2..P4 plus the respawn flag. */
+#define MP_RESPAWN_BIT 0x1000u
+#define MP_MULTITAP_BIT 0x2000u
+#define MP_PAD_SHIFT(pi) ((u16)(4u * ((pi) - 1u)))
+#define MP_PAD_GET(pi) ((u8)((s_mp_packed >> MP_PAD_SHIFT(pi)) & 0x0Fu))
+#define MP_PAD_SET(pi, v) \
+    (s_mp_packed = (u16)((s_mp_packed & ~(0x0Fu << MP_PAD_SHIFT(pi))) | \
+                         (((u16)(v) & 0x0Fu) << MP_PAD_SHIFT(pi))))
+static u16 s_mp_packed = MP_RESPAWN_BIT;
+/* T-251: nonzero while an extra player is executing the NES movement core.
+ * Suppresses room/cave/cellar transitions, which P1 still owns. */
+static u8 s_mp_extra = 0u;
+/* T-251 / T-311 test hook: when [0] == 0xA5, BlastEm AI writes pads for
+ * P2..P4 here (fixture.write). Zero effect otherwise. */
+static volatile unsigned char s_mp_test_input[6];
+/* T-251: when an extra player starts a room transition, the team follows. */
+static u8 s_mp_owner = 0u;
+static short s_mp_owner_x = 0, s_mp_owner_y = 0;
+/* Signature of the last pose written to each extra Link's SAT slots. */
+static unsigned long s_mp_draw_sig[3] = { ~0UL, ~0UL, ~0UL };
+static void mp_draw_invalidate(void)
+{
+    s_mp_draw_sig[0] = ~0UL;
+    s_mp_draw_sig[1] = ~0UL;
+    s_mp_draw_sig[2] = ~0UL;
+}
+/* Defined with the per-player weapon context below; called by load_room. */
+static void mp_clear_weapon_state(void);
 
 /* Task 5.4: NES `UndergroundExitType` analogue. Slice 1 wires this static
  * into the warp coordinator's rule-1 precondition but never writes it â€”
@@ -601,7 +664,17 @@ static u8 s_b_blank_col = 0xFFu;   /* slot column base plane B shows, or none */
  * so the rows are written a few per tick there and B points at them once
  * all are written; a camera move first writes all that remain. */
 #define B_BLANK_ROWS        28u
-#define B_BLANK_ROWS_STEP   4u
+/* NES source: Z_05 InitMode6/InitMode7_Sub0/Sub1; live Redux Q2 OW/UW
+ * HUD pixels stay black while LayOutRoom prepares the next room.
+ * Drained C: ow_scroll_tick and this existing shared-plane host owner.
+ * Coverage: PARTIAL(vertical HUD underlay preparation); Stance: EXTEND.
+ * There are four at-rest ticks before the first incoming column. Four
+ * rows/tick left B on the old surface for two visible preparation frames
+ * (native T323 pixel trace: frame1279/1280, planeB/color0880). Finish all
+ * 28 rows in that budget, before column0 can overwrite the old HUD zone.
+ * Same total writes, no edge-tick burst or per-frame HUD redraw. */
+#define B_BLANK_PREP_TICKS   4u
+#define B_BLANK_ROWS_STEP   ((B_BLANK_ROWS + B_BLANK_PREP_TICKS - 1u) / B_BLANK_PREP_TICKS)
 static u8 s_b_blank_next = B_BLANK_ROWS;   /* next row to blank; 28 = none */
 static u8 s_b_blank_pend_col;
 static u16 s_b_blank_pend_tick;           /* s_frame_counter of the edge tick */
@@ -1602,6 +1675,13 @@ static void load_room(u8 room_id)
     /* NES Z_01.asm:3967 UsedCandle clears on room transition â€” blue candle
      * regains its 1-shot per new room. Red candle ignores the flag. */
     roomrom_candle_fire_room_reset();
+    /* T-251: P2..P4 are re-placed beside P1 on the next play tick, once the
+     * caller has placed P1 for this room. Per-player projectiles do not
+     * survive a room load (NES ResetInvObjState). */
+    s_mp_packed |= MP_RESPAWN_BIT;
+    mp_clear_weapon_state();
+    mp_draw_invalidate();
+    roomrom_sprites_mp_invalidate();
 }
 
 /* Phase 8: request the per-level boss CHR bank when a boss object actually
@@ -2337,6 +2417,11 @@ static unsigned char link_walkable_at(short x, short y, link_dir_t dir)
      * UW blocks. */
     unsigned char sx = nes_ram[0x0070u], sy = nes_ram[0x0084u];
     unsigned char sdir = nes_ram[NES_OBJ_DIR];
+    /* T-251: the drained query writes scratch $00/$01 and ObjCollidedTile
+     * $49E. P2..P4 call this after P1 moved, so restore them or P1's OW
+     * warp tile / slow-tile q-speed reads the last extra player's probe. */
+    unsigned char s00 = nes_ram[0x0000u], s01 = nes_ram[0x0001u];
+    unsigned char s49e = nes_ram[0x049Eu];
     unsigned char tile;
     nes_ram[0x0070u] = (unsigned char)x;
     nes_ram[0x0084u] = (unsigned char)y;
@@ -2345,7 +2430,75 @@ static unsigned char link_walkable_at(short x, short y, link_dir_t dir)
     nes_ram[0x0070u] = sx;
     nes_ram[0x0084u] = sy;
     nes_ram[NES_OBJ_DIR] = sdir;
+    nes_ram[0x0000u] = s00;
+    nes_ram[0x0001u] = s01;
+    nes_ram[0x049Eu] = s49e;
     return collision_moving_tile_is_obstacle(tile) ? 0u : 1u;
+}
+
+/* T-251: place P2..P4 around P1 after a room load. No player-vs-player
+ * collision, so overlapping is legal when no offset tile is walkable. */
+static void mp_place_players(void)
+{
+    static const signed char k_ox[3] = { -16, 16, 0 };
+    static const signed char k_oy[3] = { 0, 0, 16 };
+    unsigned char i;
+    for (i = 1u; i < g_player_count; i++) {
+        short x = (short)(players[0].x + k_ox[i - 1u]);
+        short y = (short)(players[0].y + k_oy[i - 1u]);
+        if (x < 16) x = 16;
+        if (x > 224) x = 224;
+        if (y < 32) y = 32;
+        if (y > 208) y = 208;
+        /* Walker treats grid_offset 0 as tile-aligned; place on the 8-px
+         * lattice so a spawn beside a mid-cell P1 starts phase-correct. */
+        x = (short)((x + 4) & ~7);
+        y = (short)((y + 4) & ~7);
+        if (!link_walkable_at(x, y, LINK_DIR_DOWN)) {
+            x = (short)((players[0].x + 4) & ~7);
+            y = (short)((players[0].y + 4) & ~7);
+        }
+        players[i].x = x;
+        players[i].y = y;
+        players[i].pos_frac = 0u;
+        players[i].grid_offset = 0;
+        players[i].dir = LINK_DIR_NONE;
+        players[i].face = LINK_FACE_DOWN;
+        players[i].anim_frame = 0u;
+        players[i].anim_counter = 0u;
+    }
+    mp_draw_invalidate();
+}
+
+/* T-251: keep the three optional player slots in the SAT chain even when
+ * inactive. Slot 19 -> 20 -> ... -> 25 -> 26 (enemy bridge), so an
+ * unlinked or stale pair would hide every enemy sprite. */
+static void mp_hide_players_from(unsigned char first)
+{
+    unsigned char pi;
+    for (pi = first; pi <= 3u; pi++) {
+        unsigned short a = (unsigned short)(ROOMROM_SPRITE_SLOT_MP_LINK2 +
+                                            2u * (pi - 1u));
+        unsigned short b = (unsigned short)(a + 1u);
+        VDP_setSpriteFull(a, -32, -32, RENDER_SPRITE_SIZE(1, 2), 0u,
+                          ROOMROM_SPRITE_NEXT(a));
+        VDP_setSpriteFull(b, -32, -32, RENDER_SPRITE_SIZE(1, 2), 0u,
+                          ROOMROM_SPRITE_NEXT(b));
+        VDP_setSpriteFull((unsigned short)(ROOMROM_SPRITE_SLOT_MP_SWORD2 + pi - 1u),
+                          -32, -32, RENDER_SPRITE_SIZE(1, 2), 0u,
+                          ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_MP_SWORD2 + pi - 1u));
+    }
+}
+static void mp_hide_unused_players(void)
+{
+    mp_hide_players_from(g_player_count);
+}
+/* T-251: hide every extra Link outside normal play (death, scroll, cave
+ * fade, pause, ending) so a frozen pair cannot draw over the new scene. */
+static void mp_hide_all_players(void)
+{
+    mp_hide_players_from(1u);
+    mp_draw_invalidate();
 }
 
 /* S4: edge-triggered room transition. Both OW and UW use the same 16x8 grid
@@ -2784,10 +2937,15 @@ static void scroll_finalize_room(void)
         }
         /* T-119: scroll entry â€” the doorway Link came through
          * starts opened (SetEnteringDoorwayAsCurOpenedDoors). */
-        uw_door_state_set_entering(nes_ram[0x0098u]);
-        uw_door_state_room_init(roomrom_uw_room_render_get_level(),
-                                roomrom_uw_room_render_get_quest(),
-                                s_room_id);
+        {
+            u8 prelaid = uw_door_state_take_prelayout(s_room_id);
+            uw_door_state_set_defer_faces(prelaid);
+            uw_door_state_set_entering(nes_ram[0x0098u]);
+            uw_door_state_room_init(roomrom_uw_room_render_get_level(),
+                                    roomrom_uw_room_render_get_quest(),
+                                    s_room_id);
+            uw_door_state_set_defer_faces(0u);
+        }
     } else {
         roomrom_ow_room_render_load_palette(s_room_id);
         roomrom_hud_draw(roomrom_ow_room_render_get_map(), s_room_id, 0u);
@@ -2919,6 +3077,8 @@ static void level_hud_static_only(void)
         RENDER_SPRITE_SIZE(1, 2), 0u, ROOMROM_SPRITE_SLOT_HUD_B_ITEM_R);
     VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_HUD_B_ITEM_R, -32, -32,
         RENDER_SPRITE_SIZE(1, 2), 0u, ROOMROM_SPRITE_SLOT_HUD_PLAYER);
+    VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_HUD_C_ITEM, -32, -32,
+        RENDER_SPRITE_SIZE(1, 2), 0u, ROOMROM_SPRITE_SLOT_MP_LINK2);
 }
 
 /* NES ReadInputs runs in the NMI every frame, in every mode: ButtonsDown
@@ -2929,6 +3089,53 @@ static void level_hud_static_only(void)
 /* T-013: controller 2 -> ButtonsPressed+1 / ButtonsDown+1 ($F9/$FB), read
  * with pad 1 every tick (NES ReadInputs). No A/B swap option on pad 2. */
 static u16 s_joy2_prev = 0u;
+
+/* T-252: Genesis-default actions for Vanilla/Original. The NES pad has
+ * A = sword and B = item; the Genesis HUD shows the item on A (left) and
+ * the sword on B (right). Force the effective swap in Original without
+ * touching the saved Remix option bit. Remix keeps the option. */
+static unsigned char effective_ab_swap(void)
+{
+    return (unsigned char)(options_consumer_get_ab_swap() ||
+                           !game_profile_is_remix());
+}
+
+/* T-255: one WieldItem path shared by B and C. C presents its own slot in
+ * $0656 while the NES-derived item routines run, then restores B. */
+static void use_inventory_item(b_item_t item)
+{
+    switch (item) {
+    case B_ITEM_BOOMERANG:
+        roomrom_boomerang_throw(players[0].face, players[0].x, players[0].y);
+        break;
+    case B_ITEM_ARROW:
+        if (!roomrom_arrow_active())
+            roomrom_arrow_fire(players[0].face, players[0].x, players[0].y);
+        break;
+    case B_ITEM_BOMB:
+        if (!roomrom_bomb_active())
+            roomrom_bomb_place(players[0].face, players[0].x, players[0].y);
+        break;
+    case B_ITEM_CANDLE:
+        roomrom_candle_fire_spawn(players[0].face, players[0].x, players[0].y);
+        break;
+    case B_ITEM_ROD:
+        roomrom_combat_wield_rod();
+        break;
+    case B_ITEM_FLUTE:
+        weapon_wield_flute();
+        break;
+    case B_ITEM_FOOD:
+        roomrom_food_wield();
+        break;
+    case B_ITEM_POTION:
+        weapon_wield_potion();
+        break;
+    default:
+        break;
+    }
+}
+
 static void nes_pad2_read(void)
 {
     u16 joy = JOY_readJoypad(JOY_2);
@@ -2944,7 +3151,7 @@ static void nes_pad_read_between_modes(void)
     u16 pressed = joy & ~s_joy_prev;
     u8 input_dir = nes_ram[0x03F8u];
     s_joy_prev = joy;
-    if (options_consumer_get_ab_swap()) {
+    if (effective_ab_swap()) {
         u16 ab = (u16)(BUTTON_A | BUTTON_B);
         u16 j = (u16)(joy & ab), p = (u16)(pressed & ab);
         joy = (u16)((joy & ~ab) | ((j & BUTTON_A) ? BUTTON_B : 0u) | ((j & BUTTON_B) ? BUTTON_A : 0u));
@@ -3108,6 +3315,12 @@ void roomrom_mode8_blank(void)
     VDP_setHorizontalScrollVSync(BG_B, 0);
     VDP_setVerticalScrollVSync(BG_B, 0);
     for (i = 0u; i < 80u; ++i) vdpSpriteCache[i].y = 0;
+    /* NES source: TurnOffVideoAndClearArtifacts / WriteBlankPrioritySprites.
+     * Drained C: room_hide_all_sprites and sprite_render's cached SAT owner.
+     * Coverage: PARTIAL room entry; Stance: EXTEND cache invalidation.
+     * This bulk write also hides the N/S masks. Their cached enabled state
+     * must be forgotten so the next Link draw republishes the mask rows. */
+    roomrom_sprites_invalidate_cache();
     VDP_updateSprites(80u, DMA_QUEUE);
     enemy_render_reset_oam();                    /* HideAllSprites: caches too */
     enemy_render_weapon_reset_all();
@@ -3257,6 +3470,11 @@ static void mode3_init_tick(void)
         return;
     }
     /* InitMode3_Sub8: LayOutRoom, curtain columns, Link, BeginUpdateMode. */
+    /* InitMode_EnterRoom's ResetInvObjState: weapon objects of the room left (a candle
+     * flame, a bomb) are gone, also when the same room loads again (T-318: the flame
+     * stayed on screen after a reload). The reload starts at Sub2, so Sub0 is no place. */
+    room_reset_inv_obj_state();
+    enemy_render_weapon_reset_all();
     out.dest_scene = (nes_ram[0x0010u] != 0u) ? SCENE_UW : SCENE_OW;
     out.dest_level = nes_ram[0x0010u];
     out.dest_quest = roomrom_main_current_quest();
@@ -3564,9 +3782,21 @@ void roomrom_main_begin_level_entry(const rr_warp_outcome_t *out)
 {
     unsigned char tile;
     s_lvl_out = *out;
+    /* HandleWarpOW (Z_05.asm:7318) runs SaveKillCount before it picks a cave or
+     * a level, with CurLevel still 0: the OW room keeps its kill count in the
+     * low flag bits (T-318: Q2 room $00 left $80, NES $87). */
+    if (s_scene == SCENE_OW) room_save_kill_count_ow(s_room_id);
     /* Z_05.asm @LoadLevel: CaveSourceRoomId = the OW room of the entrance
      * (a Continue in the OW after the level starts there). */
-    if (s_scene == SCENE_OW) nes_ram[0x0526u] = s_room_id;
+    if (s_scene == SCENE_OW) {
+        nes_ram[0x0526u] = s_room_id;
+        /* NES source: Redux dungeon_front_room.asm:dungeon_front_room_reset.
+         * Drained C: roomrom_main_begin_level_entry (@LoadLevel owner).
+         * Coverage: FULL entrance door-bit reset; Stance: EXTEND.
+         * Preserve Original's entrance-door glitch; Remix clears stale bits
+         * at the same handoff as its CaveSourceRoomId store. */
+        if (game_profile_is_remix()) nes_ram[0x00EEu] = 0u;
+    }
     /* @LoadLevel: CurLevel from the cave index, TargetMode 2 (load a level),
      * when the stairs start (T-171: t054 t787 NES $10 = 1, $5B = 2). */
     if (s_scene == SCENE_OW) {
@@ -4372,87 +4602,10 @@ static void check_lift_item(void)
                                   (unsigned char)(nes_ram[0x0052u] != 0u));
 }
 
-static unsigned char play_update_objects(void)
+/* T-251: cave-entrance check for the player whose slot-0 context is
+ * loaded. Same gates and transition setup as the P1 path. */
+static unsigned char mp_try_cave_entry(void)
 {
-    roomrom_combat_update(players[0].x, players[0].y, players[0].face);
-    roomrom_boomerang_update(players[0].x, players[0].y);
-    roomrom_arrow_update();
-    roomrom_bomb_update();
-    roomrom_candle_fire_update();
-    roomrom_link_damage_tick((unsigned char)s_frame_counter);
-    /* Tier 2: drive Power Triforce fanfare. core_take_power_triforce
-     * (item_dispatch.c:48) sets POWER_TRIFORCE_FANFARE_FLAG +
-     * CURTAIN_TIMER on pickup; this check ticks the curtain +
-     * palette ash-replace + ITEM_SFX_SECONDARY each frame until
-     * the timer expires. Without this call the fanfare flag
-     * never clears and triforce pickup has no visible/audible
-     * effect. */
-    progress_check_power_triforce_fanfare();
-    /* Phase 7 substrate fix 2026-05-15 â€” clear NES OAM mirror
-     * + reset RollingSpriteIndex AT FRAME START. NES Z1 NMI
-     * resets RollingSpriteIndex per frame; without that
-     * reset, sprite writes accumulate across frames + the
-     * cumulative OAM eats SAT slot budget after 1-2 frames.
-     * Each enemy then renders as the LEFT half only (right
-     * halves bumped beyond SAT slot 79 by stale records).
-     * Clear-before-draw mirrors the NES NMI sentinel pass. */
-    enemy_render_reset_oam();
-    /* T-056: the ladder CheckLadder drew during UpdatePlayer (the cache
-     * clear above would have dropped it). */
-    link_ladder_draw();
-    /* Plan v5c T6.5 â€” mini-map position marker flash + room
-     * change refresh. Per NES Z_01.asm:4095-4146 the marker
-     * flashes every 16 frames keyed on FrameCounter ($0015). */
-    /* T-132: no map dot during the curtain (mode 3); mode 4 draws it. */
-    if (s_lvl_phase == LVL_NONE || s_lvl_phase == LVL_STEP_OUT ||
-        s_lvl_phase == LVL_PLAY_INIT)
-        roomrom_hud_refresh_marker(nes_ram[0x00EBu],   /* RoomId */
-                                   (unsigned char)(s_scene == SCENE_UW),
-                                   nes_ram[0x0015u]);
-    /* Phase 7 root-cause fix #6 2026-05-16 â€” sync C-side
-     * players[0] and s_room_id into NES_RAM cells before
-     * gameplay tick. NES Z1 native code reads these cells
-     * directly; without the sync collision detection thinks
-     * Link is at (0,0), enemy AI sees RoomId=0 (overworld
-     * starting room) regardless of where the player is, and
-     * room-specific behaviors all key off wrong room.
-     *
-     * NES Variables.inc: ObjX[0]=$0070, ObjY[0]=$0084 (Link
-     * is slot 0 in the per-slot arrays), RoomId=$00EB.
-     * CurLevel ($0010) and Link face ($008C ObjDir[0]) are
-     * already seeded by roomrom_debug_enter; refresh here
-     * each frame in case they get out-of-sync with the C
-     * source-of-truth. */
-    nes_ram[0x0070u] = (unsigned char)players[0].x;
-    nes_ram[0x0084u] = (unsigned char)players[0].y;
-    /* SENTINEL $07F9 = s_room_id at tick-start sync (each tick) */
-    DBG_SENTINEL(0x19u) = s_room_id;
-    nes_ram[0x00EBu] = s_room_id;
-
-    /* Tier 0 (plan v6) cave-entrance detection. Only fires in
-     * SCENE_OW. Looks up tile under Link via existing collision
-     * primitive (collision_get_collidable_tile_still slot 0 =
-     * Link). NES Z_05.asm:7320-7327 entrance tile set: $24
-     * armos warp, $88 rock-pile, $70-$73 stairs. On positive
-     * hit: save OW return state, transition to SCENE_CAVE,
-     * call cave_init. cave_exit (existing C+START chord)
-     * restores OW + return position. */
-    /* NES Z_05.asm:7240-7244 alignment gate: only check cave-
-     * entrance tile when (ObjY & $0F) == $0D. Link must be
-     * sub-tile-aligned (Y low nibble = $D = 13 px into a
-     * 16-px row) before warp-tile check runs. Without this
-     * gate, Genesis triggers at first row=3 frame (Y=$54,
-     * low nibble $4 = off-center, Link beside arch) instead
-     * of waiting until Y=$4D (low nibble $D = centered under
-     * arch entrance metatile). Verified via NES probe: NES
-     * triggers at Y=$4D, Genesis was triggering at Y=$54.
-     *
-     * APPENDIX C3 fix: ALTTP move-style (8.8 fixed-point,
-     * ~1.5 px/frame, diagonal allowed) can SKIP exact $0D
-     * value. Widen tolerance to $0C..$0E (3-px window) so
-     * ALTTP players still trigger cave entry. NES-style stays
-     * exact ($0D only) by virtue of 1-px/frame walk speed
-     * matching the gate. */
     unsigned char y_low = (unsigned char)((unsigned char)players[0].y & 0x0Fu);
     unsigned char gate_pass = (s_move_style == MOVE_STYLE_ALTTP)
         ? (unsigned char)(y_low >= 0x0Cu && y_low <= 0x0Eu)
@@ -4556,6 +4709,91 @@ static unsigned char play_update_objects(void)
             return 1u;
         }
     }
+    return 0u;
+}
+
+static unsigned char play_update_objects(void)
+{
+    roomrom_combat_update(players[0].x, players[0].y, players[0].face);
+    roomrom_boomerang_update(players[0].x, players[0].y);
+    roomrom_arrow_update();
+    roomrom_bomb_update();
+    roomrom_candle_fire_update();
+    roomrom_link_damage_tick((unsigned char)s_frame_counter);
+    /* Tier 2: drive Power Triforce fanfare. core_take_power_triforce
+     * (item_dispatch.c:48) sets POWER_TRIFORCE_FANFARE_FLAG +
+     * CURTAIN_TIMER on pickup; this check ticks the curtain +
+     * palette ash-replace + ITEM_SFX_SECONDARY each frame until
+     * the timer expires. Without this call the fanfare flag
+     * never clears and triforce pickup has no visible/audible
+     * effect. */
+    progress_check_power_triforce_fanfare();
+    /* Phase 7 substrate fix 2026-05-15 â€” clear NES OAM mirror
+     * + reset RollingSpriteIndex AT FRAME START. NES Z1 NMI
+     * resets RollingSpriteIndex per frame; without that
+     * reset, sprite writes accumulate across frames + the
+     * cumulative OAM eats SAT slot budget after 1-2 frames.
+     * Each enemy then renders as the LEFT half only (right
+     * halves bumped beyond SAT slot 79 by stale records).
+     * Clear-before-draw mirrors the NES NMI sentinel pass. */
+    enemy_render_reset_oam();
+    /* T-056: the ladder CheckLadder drew during UpdatePlayer (the cache
+     * clear above would have dropped it). */
+    link_ladder_draw();
+    /* Plan v5c T6.5 â€” mini-map position marker flash + room
+     * change refresh. Per NES Z_01.asm:4095-4146 the marker
+     * flashes every 16 frames keyed on FrameCounter ($0015). */
+    /* T-132: no map dot during the curtain (mode 3); mode 4 draws it. */
+    if (s_lvl_phase == LVL_NONE || s_lvl_phase == LVL_STEP_OUT ||
+        s_lvl_phase == LVL_PLAY_INIT)
+        roomrom_hud_refresh_marker(nes_ram[0x00EBu],   /* RoomId */
+                                   (unsigned char)(s_scene == SCENE_UW),
+                                   nes_ram[0x0015u]);
+    /* Phase 7 root-cause fix #6 2026-05-16 â€” sync C-side
+     * players[0] and s_room_id into NES_RAM cells before
+     * gameplay tick. NES Z1 native code reads these cells
+     * directly; without the sync collision detection thinks
+     * Link is at (0,0), enemy AI sees RoomId=0 (overworld
+     * starting room) regardless of where the player is, and
+     * room-specific behaviors all key off wrong room.
+     *
+     * NES Variables.inc: ObjX[0]=$0070, ObjY[0]=$0084 (Link
+     * is slot 0 in the per-slot arrays), RoomId=$00EB.
+     * CurLevel ($0010) and Link face ($008C ObjDir[0]) are
+     * already seeded by roomrom_debug_enter; refresh here
+     * each frame in case they get out-of-sync with the C
+     * source-of-truth. */
+    nes_ram[0x0070u] = (unsigned char)players[0].x;
+    nes_ram[0x0084u] = (unsigned char)players[0].y;
+    /* SENTINEL $07F9 = s_room_id at tick-start sync (each tick) */
+    DBG_SENTINEL(0x19u) = s_room_id;
+    nes_ram[0x00EBu] = s_room_id;
+
+    /* Tier 0 (plan v6) cave-entrance detection. Only fires in
+     * SCENE_OW. Looks up tile under Link via existing collision
+     * primitive (collision_get_collidable_tile_still slot 0 =
+     * Link). NES Z_05.asm:7320-7327 entrance tile set: $24
+     * armos warp, $88 rock-pile, $70-$73 stairs. On positive
+     * hit: save OW return state, transition to SCENE_CAVE,
+     * call cave_init. cave_exit (existing C+START chord)
+     * restores OW + return position. */
+    /* NES Z_05.asm:7240-7244 alignment gate: only check cave-
+     * entrance tile when (ObjY & $0F) == $0D. Link must be
+     * sub-tile-aligned (Y low nibble = $D = 13 px into a
+     * 16-px row) before warp-tile check runs. Without this
+     * gate, Genesis triggers at first row=3 frame (Y=$54,
+     * low nibble $4 = off-center, Link beside arch) instead
+     * of waiting until Y=$4D (low nibble $D = centered under
+     * arch entrance metatile). Verified via NES probe: NES
+     * triggers at Y=$4D, Genesis was triggering at Y=$54.
+     *
+     * APPENDIX C3 fix: ALTTP move-style (8.8 fixed-point,
+     * ~1.5 px/frame, diagonal allowed) can SKIP exact $0D
+     * value. Widen tolerance to $0C..$0E (3-px window) so
+     * ALTTP players still trigger cave entry. NES-style stays
+     * exact ($0D only) by virtue of 1-px/frame walk speed
+     * matching the gate. */
+    if (mp_try_cave_entry()) return 1u;
 
     /* Plan v5a T1.2 + T1.3 â€” refresh heart cells + Link face
      * each tick. ObjDir[0] was seeded once at debug-enter, but
@@ -4844,6 +5082,790 @@ static void circle_walk_tick(void)
     render_circle_clip_sprites();
 }
 
+/* T-251: NES UpdatePlayer movement core. P1 calls it directly; P2..P4
+ * call it through the slot-0 context switch so speed, grid alignment,
+ * terrain/doorway collision, ladder/water and shove are identical. */
+static void player_move_nes_core(u16 joy)
+{
+    if ((nes_ram[0x00ACu] & 0xC0u) == 0x40u) return;
+            /* NES Z_07 UpdatePlayer returns after the invincibility timer
+             * when halted. Skip the whole Walker_Move path, including shove;
+             * UpdateDock/Wallmaster own the carried position. T-056 raft
+             * tick468: input masking alone kept applying 4px knockback. */
+            /* NES-faithful Link movement, ported from
+             *   Z_05.asm Link_HandleInput / Link_ModifyDirAtGridPoint
+             *   Z_07.asm Walker_Move / MoveObject / AddQSpeedToPositionFraction
+             *
+             * Per-frame:
+             * 1. If on a grid intersection (offset == 0), pick a single-axis
+             *    direction from current input (no diagonal). H over V on tie.
+             * 2. If input released, stop instantly (even mid-grid). Walker_Move
+             *    @ChooseObjDirOrInputDir: input=0 -> moving_dir=0.
+             * 3. At grid offset 0, check the next tile before movement.
+             * 4. If moving, run 4 quarter-steps. Right/down add QSpeed, left/up
+             *    subtract QSpeed. Carry/borrow advances 1 px and changes signed
+             *    ObjGridOffset until it reaches +8 or -8, then returns to 0. */
+
+            u16 input = joy & (BUTTON_LEFT|BUTTON_RIGHT|BUTTON_UP|BUTTON_DOWN);
+            /* NES Walker_Move (Z_07.asm:2616) clears scratch [0E] (door
+             * block / doorway index) for Link every frame; MoveShot later in
+             * the frame reads it (T-102, t116_shot_hit grid offset). */
+            nes_ram[0x000Eu] = 0u;
+            u8 h_dir = (input & BUTTON_LEFT) ? 1u
+                     : ((input & BUTTON_RIGHT) ? 2u : 0u);
+            u8 v_dir = (input & BUTTON_UP)   ? 1u
+                     : ((input & BUTTON_DOWN) ? 2u : 0u);
+
+            {
+                link_dir_t input_dir = LINK_DIR_NONE;
+                link_dir_t moving_dir = LINK_DIR_NONE;
+
+                if (h_dir && v_dir) {
+                    /* NES Link_ModifyDirAtGridPoint with 2 inputs: in OW,
+                     * picks "last walkable" (h_dir last in bit-iteration).
+                     * H over V matches OW behavior. */
+                    input_dir = (h_dir == 1u) ? LINK_DIR_LEFT : LINK_DIR_RIGHT;
+                } else if (h_dir) {
+                    input_dir = (h_dir == 1u) ? LINK_DIR_LEFT : LINK_DIR_RIGHT;
+                } else if (v_dir) {
+                    input_dir = (v_dir == 1u) ? LINK_DIR_UP : LINK_DIR_DOWN;
+                }
+
+                /* T-131: ObjInputDir ($3F8, ButtonsDown & $0F, masked by
+                 * Link_FilterInput) after Link_ModifyDirInDoorway (UW). */
+                unsigned char in_bits = 0u;
+                /* Link_HandleInput @CheckMovement: while shoved (ObjShoveDir
+                 * $C0 != 0) Link does not turn (T-171 t171_aquamentus_sword
+                 * t702: knocked back mid-swing with Up held, NES kept
+                 * facing right). */
+                if (input != 0u && nes_ram[0x00C0u] == 0u) {
+                    nes_ram[0x0098u] = link_nes_bit_of(s_link_dir);
+                    link_modify_dir_in_doorway();
+                    in_bits = (unsigned char)(nes_ram[0x03F8u] & 0x0Fu);
+                    input_dir = link_dir_of_lowest_bit(in_bits);
+                }
+                if (in_bits != 0u) {
+                    if (s_link_grid_offset == 0 || s_link_dir == LINK_DIR_NONE) {
+                        /* T-122: NES Link_ModifyDirAtGridPoint. */
+                        link_nes_modify_dir_at_grid_point(in_bits, &moving_dir);
+                    } else {
+                        link_nes_modify_dir_on_grid_line(input_dir);
+                        moving_dir = s_link_dir;
+                    }
+                }
+
+                /* NES Walker_Move (Z_07.asm:2612): Link in state $1x/$2x
+                 * keeps the facing Link_HandleInput chose, [0F] = 0. */
+                const u8 item_use_hold = link_item_use_blocks_move();
+                if (moving_dir != LINK_DIR_NONE) {
+                    /* NES draws Link facing ObjDir (s_link_dir), which the
+                     * no-walkable grid-point case leaves unchanged (T-122). */
+                    switch (s_link_dir) {
+                    case LINK_DIR_LEFT:  players[0].face = LINK_FACE_LEFT;  break;
+                    case LINK_DIR_RIGHT: players[0].face = LINK_FACE_RIGHT; break;
+                    case LINK_DIR_UP:    players[0].face = LINK_FACE_UP;    break;
+                    case LINK_DIR_DOWN:  players[0].face = LINK_FACE_DOWN;  break;
+                    default: break;
+                    }
+                }
+                if (item_use_hold) moving_dir = LINK_DIR_NONE;
+
+                /* T-120: Walker_Move for Link (Z_07.asm:2632): tile objects
+                 * (block/rock/gravestone/armos in state 1) within $10 px
+                 * and, with a person or grumble moblin in slot 1, the
+                 * person line reset the movement direction [0F]. */
+                if (moving_dir != LINK_DIR_NONE) {
+                    unsigned char t1 = nes_ram[0x0350u];
+                    nes_ram[0x000Fu] = link_nes_bit_of(moving_dir);
+                    progress_check_tile_objects_blocking();
+                    if (t1 == 0x36u || (t1 >= 0x4Bu && t1 < 0x53u))
+                        uw_person_check_person_blocking();
+                    /* Caves (modes $B/$C): CheckSubroom always runs
+                     * CheckPersonBlocking (Z_05.asm:3113), so Link stops
+                     * below the cave person's row. */
+                    if (s_scene == SCENE_CAVE)
+                        uw_person_check_person_blocking();
+                    if (nes_ram[0x000Fu] == 0u) moving_dir = LINK_DIR_NONE;
+                }
+
+                if (moving_dir != LINK_DIR_NONE &&
+                    shortcut_cave_exit_if_stair())
+                    moving_dir = LINK_DIR_NONE;
+
+                s_ow_edge = 0u;
+                /* GoWalkableDir returns before CheckScreenEdge while the
+                 * ladder is out (LadderSlot $64, T-056). */
+                if (s_scene == SCENE_OW && moving_dir != LINK_DIR_NONE &&
+                    nes_ram[0x0064u] == 0u) {
+                    u8 d = moving_dir == LINK_DIR_RIGHT ? 1u :
+                           moving_dir == LINK_DIR_LEFT ? 2u :
+                           moving_dir == LINK_DIR_DOWN ? 4u : 8u;
+                    s_ow_edge = ow_scroll_edge(players[0].x, players[0].y,
+                                               d, s_link_grid_offset, s_room_id);
+                    if (s_ow_edge) moving_dir = LINK_DIR_NONE;
+                    if (s_ow_edge == 0x80u) s_ow_edge = 0u;
+                }
+
+                if (s_scene == SCENE_UW && nes_ram[0x00C0u] == 0u) {
+                    /* T-131: NES Walker_Move for Link in the UW:
+                     * BoundByRoom outside doorways, CheckDoorway, then
+                     * Walker_CheckTileCollision (in a doorway the tile test
+                     * is skipped; CheckScreenEdge starts the next room). */
+                    unsigned char edge;
+                    nes_ram[0x0070u] = (unsigned char)players[0].x;
+                    nes_ram[0x0084u] = (unsigned char)players[0].y;
+                    nes_ram[0x0394u] = (unsigned char)s_link_grid_offset;
+                    if (s_link_dir != LINK_DIR_NONE)
+                        nes_ram[0x0098u] = link_nes_bit_of(s_link_dir);
+                    nes_ram[0x000Fu] = link_nes_bit_of(moving_dir);
+                    if (cellar_check_exit()) {
+                        /* CheckSubroom changes RoomId before this tick's
+                         * host-to-NES publication in play_update_objects. */
+                        s_room_id = nes_ram[0x00EBu];
+                        roomrom_main_link_sync_from_nes();
+                        edge = 0u;
+                    } else if (link_uw_walker_checks())
+                        edge = nes_ram[0x0098u];
+                    else
+                        edge = link_walker_check_tile_collision(s_link_grid_offset);
+                    if (nes_ram[0x0098u] != link_nes_bit_of(s_link_dir)) {
+                        s_link_dir = link_dir_of_lowest_bit(nes_ram[0x0098u]);
+                        switch (s_link_dir) {
+                        case LINK_DIR_LEFT:  players[0].face = LINK_FACE_LEFT;  break;
+                        case LINK_DIR_RIGHT: players[0].face = LINK_FACE_RIGHT; break;
+                        case LINK_DIR_UP:    players[0].face = LINK_FACE_UP;    break;
+                        case LINK_DIR_DOWN:  players[0].face = LINK_FACE_DOWN;  break;
+                        default: break;
+                        }
+                    }
+                    moving_dir = link_dir_of_lowest_bit(nes_ram[0x000Fu]);
+                    if (edge) {
+                        s_uw_edge = edge;
+                        moving_dir = LINK_DIR_NONE;
+                    }
+                } else if (moving_dir != LINK_DIR_NONE && s_link_grid_offset == 0) {
+                    if (!link_walkable_at(players[0].x, players[0].y, moving_dir)) {
+                        /* NES PlayerUnwalkable checks passive OW statues
+                         * before stopping Link. The drained checker creates
+                         * Armos/Flying Ghini from collided $BC..$C3 tiles. */
+                        if (s_scene == SCENE_OW) {
+                            nes_ram[0x0070u] = (unsigned char)players[0].x;
+                            nes_ram[0x0084u] = (unsigned char)players[0].y;
+                            nes_ram[0x0098u] = link_nes_bit_of(moving_dir);
+                            nes_ram[0x0394u] = 0u;
+                            trap_check_passive_tile_objects();
+                        }
+                        moving_dir = LINK_DIR_NONE;
+                    }
+                }
+
+                /* T-056: Walker_Move runs CheckLadder for Link after
+                 * Walker_CheckTileCollision, before MoveObject (Z_07.asm).
+                 * Not while shoved (Walker_Move takes Obj_Shove instead) or
+                 * halted (UpdatePlayer returns first). [0F] in and out. */
+                if (nes_ram[0x0064u] != 0u && nes_ram[0x00C0u] == 0u &&
+                    (nes_ram[0x00ACu] & 0xC0u) != 0x40u) {
+                    nes_ram[0x0070u] = (unsigned char)players[0].x;
+                    nes_ram[0x0084u] = (unsigned char)players[0].y;
+                    nes_ram[0x0394u] = (unsigned char)s_link_grid_offset;
+                    if (s_link_dir != LINK_DIR_NONE)
+                        nes_ram[0x0098u] = link_nes_bit_of(s_link_dir);
+                    nes_ram[0x000Fu] = link_nes_bit_of(moving_dir);
+                    {
+                        const unsigned char moved_slot = link_ladder_check();
+                        if (moved_slot != 0u) {
+                            object_move_object(moved_slot);
+                            moving_dir = LINK_DIR_NONE;
+                        } else {
+                            moving_dir = link_dir_of_lowest_bit(nes_ram[0x000Fu]);
+                        }
+                    }
+                }
+
+                /* Link knockback shove â€” NES Z1 Obj_Shove runs every frame
+                 * for slot 0 reading ObjShoveDir ($00C0) + ObjShoveDistance
+                 * ($00D3). link_collision_link_be_harmed (drained NES path)
+                 * sets these on monster contact. While shove is active,
+                 * player input is suppressed (NES stun semantics) and
+                 * Link is shifted in the shove direction. */
+                {
+                    extern void c_obj_shove(unsigned int slot);
+                    unsigned char shove_dir = nes_ram[0x00C0u];
+                    if (shove_dir != 0u) {
+                        /* Mirror C-side players[0] into nes_ram so
+                         * c_obj_shove starts from the live position. */
+                        nes_ram[0x0070u] = (unsigned char)players[0].x;
+                        nes_ram[0x0084u] = (unsigned char)players[0].y;
+                        /* T-113: Obj_Shove reads and advances Link's
+                         * ObjGridOffset ($394); it must see the live
+                         * offset and its edits must survive the
+                         * end-of-tick publish below. */
+                        nes_ram[0x0394u] = (unsigned char)s_link_grid_offset;
+                        c_obj_shove(0u);
+                        players[0].x = (short)nes_ram[0x0070u];
+                        players[0].y = (short)nes_ram[0x0084u];
+                        s_link_grid_offset = (signed char)nes_ram[0x0394u];
+                        /* NES Walker_Move uses Obj_Shove instead of input
+                         * while shove direction is nonzero. */
+                        moving_dir = LINK_DIR_NONE;
+                    }
+                }
+
+                if (moving_dir != LINK_DIR_NONE) {
+                    link_nes_move_object(moving_dir);
+                } else {
+                    /* NES AnimateObjectWalking (Z_07.asm:5045) advances
+                     * ObjAnimCounter only while the object is MOVING; on stop it
+                     * FREEZES the walk pose at the current frame â€” it does NOT
+                     * snap to frame 0 (live-proven: cave emerge settle holds
+                     * ObjAnimCounter=5 / ObjAnimFrame=1 frozen). Match that: hold
+                     * s_link_frame, reset only the sub-frame tick so the next
+                     * walk re-times cleanly. Fixes two things:
+                     *  - cave_fade descent: the anim is owned by
+                     *    cave_fade_anim_tick_handler; the old `s_link_frame = 0`
+                     *    clobbered it every no-input frame (static frame-0 sink).
+                     *  - cave post-emerge settle: NES holds the last emerge walk
+                     *    frame while Link stands; the old reset snapped Gen to
+                     *    frame 0 (the bulk of the emerge sprite diff). */
+                    s_link_anim_tick = 0u;
+                }
+            }
+
+            edge_load_or_clamp();
+            /* T-116: DrawLink uses NES ObjAnimFrame ($3E4) every frame, not
+             * only while moving: the item-use states set it to 1
+             * (AnimateLinkObjState). It advances on the NES
+             * AnimateObjectWalking cadence in link_anim_state_step. The baked
+             * left/right poses are stored in the other order (pose frame 0 =
+             * NES frame 1, tiles $04/$06; verify_sprites newgame f128-137),
+             * up/down match. */
+            s_link_frame = (u8)((nes_ram[0x03E4u] & 1u) ^
+                ((players[0].face == LINK_FACE_LEFT ||
+                  players[0].face == LINK_FACE_RIGHT) ? 1u : 0u));
+            /* Publish completed movement and its grid phase for room entry.
+             * The tick-start copy alone exposed last frame's coordinates. */
+            nes_ram[0x70u] = (u8)players[0].x;
+            nes_ram[0x84u] = (u8)players[0].y;
+            nes_ram[0x394u] = (u8)s_link_grid_offset;
+            nes_ram[0x3A8u] = s_link_pos_frac;
+            /* T-125: Link is drawn once, after AnimateLinkBase below. */
+            if (!roomrom_combat_link_locked()) s_link_draw_pending = 1u;
+}
+
+typedef struct {
+    PlayerState ps;
+    unsigned char cells[16];
+    unsigned char weapon[7][6];
+    link_dir_t dir;
+    signed char grid;
+    unsigned char go_straight;
+    unsigned char pos_frac;
+    unsigned char doorway;
+    unsigned char frame;
+    unsigned char anim_tick;
+    unsigned char draw_pending;
+} LinkCtx;
+
+static const unsigned short k_ctx_cells[16] = {
+    0x000Eu, 0x000Fu, 0x0064u, 0x0070u, 0x0084u, 0x0098u, 0x00ACu, 0x0394u,
+    0x03A8u, 0x03BCu, 0x03E4u, 0x03F8u, 0x04F0u, 0x00C0u, 0x00D3u, 0x049Eu
+};
+static const unsigned char k_ctx_weapon_slots[7] = { 8u, 9u, 10u, 11u, 13u, 14u, 18u };
+static const unsigned short k_ctx_weapon_cells[6] = {
+    0x0070u, 0x0084u, 0x0098u, 0x00ACu, 0x03D0u, 0x03BCu
+};
+/* T-251: persistent weapon state for P2..P4 (7 slots x 6 cells x 3). */
+static unsigned char s_mp_weapon[3][7][6];
+/* 1 while a player owns live weapon cells. Players with no live weapon
+ * skip the 42-cell weapon context switch (the expensive part). */
+static unsigned char s_mp_weapon_dirty[3];
+
+static void mp_clear_weapon_state(void)
+{
+    unsigned char p, w, s;
+    for (p = 0u; p < 3u; p++) {
+        s_mp_weapon_dirty[p] = 0u;
+        for (w = 0u; w < 7u; w++)
+            for (s = 0u; s < 6u; s++)
+                s_mp_weapon[p][w][s] = 0u;
+    }
+}
+
+static unsigned char mp_weapon_ctx_nonzero(const unsigned char w[7][6])
+{
+    unsigned char a, b;
+    for (a = 0u; a < 7u; a++)
+        for (b = 0u; b < 6u; b++)
+            if (w[a][b] != 0u) return 1u;
+    return 0u;
+}
+
+static void link_ctx_capture(LinkCtx *c, unsigned char weapons)
+{
+    unsigned char k;
+    for (k = 0u; k < 16u; k++) c->cells[k] = nes_ram[k_ctx_cells[k]];
+    if (weapons) {
+        unsigned char w, s;
+        for (w = 0u; w < 7u; w++)
+            for (s = 0u; s < 6u; s++)
+                c->weapon[w][s] = nes_ram[k_ctx_weapon_cells[s] +
+                                          k_ctx_weapon_slots[w]];
+    }
+    c->ps = players[0];
+    c->dir = s_link_dir;
+    c->grid = s_link_grid_offset;
+    c->go_straight = s_link_go_straight;
+    c->pos_frac = s_link_pos_frac;
+    c->doorway = s_doorway_dir;
+    c->frame = s_link_frame;
+    c->anim_tick = s_link_anim_tick;
+    c->draw_pending = s_link_draw_pending;
+}
+
+static void link_ctx_apply(const LinkCtx *c, unsigned char weapons)
+{
+    unsigned char k;
+    for (k = 0u; k < 16u; k++) nes_ram[k_ctx_cells[k]] = c->cells[k];
+    if (weapons) {
+        unsigned char w, s;
+        for (w = 0u; w < 7u; w++)
+            for (s = 0u; s < 6u; s++)
+                nes_ram[k_ctx_weapon_cells[s] + k_ctx_weapon_slots[w]] =
+                    c->weapon[w][s];
+    }
+    players[0] = c->ps;
+    s_link_dir = c->dir;
+    s_link_grid_offset = c->grid;
+    s_link_go_straight = c->go_straight;
+    s_link_pos_frac = c->pos_frac;
+    s_doorway_dir = c->doorway;
+    s_link_frame = c->frame;
+    s_link_anim_tick = c->anim_tick;
+    s_link_draw_pending = c->draw_pending;
+}
+
+/* Load player i's attributes into the slot-0 core. The spare PlayerState
+ * bytes carry the host-only statics (doorway direction, go-straight, render
+ * frame, animation tick) so no extra .bss is needed. */
+static void link_ctx_load_player(unsigned char i, unsigned char weapons)
+{
+    PlayerState *p = &players[i];
+    LinkCtx c;
+    unsigned char k;
+    for (k = 0u; k < 16u; k++) c.cells[k] = 0u;
+    if (weapons) {
+        unsigned char w, s;
+        for (w = 0u; w < 7u; w++)
+            for (s = 0u; s < 6u; s++)
+                c.weapon[w][s] = s_mp_weapon[i - 1u][w][s];
+    }
+    c.cells[3] = (unsigned char)p->x;                 /* ObjX */
+    c.cells[4] = (unsigned char)p->y;                 /* ObjY */
+    c.cells[5] = link_nes_bit_of((link_dir_t)p->dir); /* ObjDir */
+    c.cells[6] = p->state;                            /* ObjState */
+    c.cells[7] = (unsigned char)p->grid_offset;       /* ObjGridOffset */
+    c.cells[8] = p->pos_frac;                         /* ObjPosFrac */
+    c.cells[9] = p->qspeed_frac ? p->qspeed_frac : 0x60u; /* InitLinkSpeed */
+    c.cells[10] = p->anim_frame;                      /* ObjAnimFrame */
+    c.cells[12] = p->invincibility_timer;             /* ObjInvincibility */
+    c.cells[13] = p->shove_dir;                       /* ObjShoveDir */
+    c.cells[14] = p->shove_distance;                  /* ObjShoveDistance */
+    c.ps = *p;
+    c.dir = (link_dir_t)p->dir;
+    c.grid = (signed char)p->grid_offset;
+    c.go_straight = p->metastate;
+    c.pos_frac = p->pos_frac;
+    c.doorway = p->moving_limit;
+    c.frame = p->room_scratch;
+    c.anim_tick = p->death_timer;
+    c.draw_pending = 0u;
+    link_ctx_apply(&c, weapons);
+}
+
+static void link_ctx_store_player(unsigned char i, unsigned char weapons)
+{
+    LinkCtx c;
+    PlayerState *p = &players[i];
+    link_ctx_capture(&c, weapons);
+    *p = c.ps;
+    if (weapons) {
+        unsigned char w, s;
+        for (w = 0u; w < 7u; w++)
+            for (s = 0u; s < 6u; s++)
+                s_mp_weapon[i - 1u][w][s] = c.weapon[w][s];
+        s_mp_weapon_dirty[i - 1u] = mp_weapon_ctx_nonzero(c.weapon);
+    }
+    p->grid_offset = c.grid;
+    p->pos_frac = c.pos_frac;
+    p->dir = (unsigned char)c.dir;
+    p->qspeed_frac = c.cells[9];
+    p->anim_frame = c.cells[10];
+    p->invincibility_timer = c.cells[12];
+    p->shove_dir = c.cells[13];
+    p->shove_distance = c.cells[14];
+    p->state = c.cells[6];
+    p->metastate = c.go_straight;
+    p->moving_limit = c.doorway;
+    p->room_scratch = c.frame;
+    p->death_timer = c.anim_tick;
+    p->death_frame_counter = c.draw_pending;
+}
+
+/* Run P2..P4 through the same NES movement core as P1. Each player sees
+ * its own slot-0 cells and statics; P1's view is restored before the
+ * object loop so enemies and room logic stay on the leader. */
+/* T-251 performance: skip the per-player collision battery when no weapon
+ * is active and no monster is near. */
+static unsigned char mp_any_weapon_active(void)
+{
+    static const unsigned char slots[7] = { 8u, 9u, 10u, 11u, 13u, 14u, 18u };
+    unsigned char k;
+    for (k = 0u; k < 7u; k++)
+        if (nes_ram[0x00ACu + slots[k]] != 0u) return 1u;
+    return 0u;
+}
+
+static unsigned char mp_monster_near(short x, short y, unsigned char radius)
+{
+    unsigned char m;
+    for (m = 1u; m <= 11u; m++) {
+        short mx, my;
+        if (nes_ram[0x034Fu + m] == 0u) continue;
+        mx = (short)nes_ram[0x0070u + m];
+        my = (short)nes_ram[0x0084u + m];
+        if (mx + radius >= x && mx - radius <= x &&
+            my + radius >= y && my - radius <= y) return 1u;
+    }
+    return 0u;
+}
+
+/* T-251: check one monster only. Far slots cannot touch this player or be
+ * hit by a melee weapon, so skipping their collision battery saves the
+ * per-slot call cost without changing reachable outcomes. */
+static unsigned char mp_monster_in_range(short x, short y,
+                                         unsigned char m,
+                                         unsigned char radius)
+{
+    short mx, my;
+    if (nes_ram[0x034Fu + m] == 0u) return 0u;
+    mx = (short)nes_ram[0x0070u + m];
+    my = (short)nes_ram[0x0084u + m];
+    return (unsigned char)(mx + radius >= x && mx - radius <= x &&
+                           my + radius >= y && my - radius <= y);
+}
+
+/* T-251: per-player sword, items and contact. Runs with the player's
+ * slot-0 context loaded. */
+static void mp_player_combat(unsigned char i, u16 pad, unsigned char weapons)
+{
+    PlayerState *p = &players[0];
+    const unsigned char remix = game_profile_is_remix();
+    const u16 sword_btn = remix ? BUTTON_A : BUTTON_B;
+    const u16 item_btn  = remix ? BUTTON_B : BUTTON_A;
+    const unsigned short sword_slot =
+        (unsigned short)(ROOMROM_SPRITE_SLOT_MP_SWORD2 + i - 1u);
+
+    if (weapons)
+        roomrom_sprites_set_weapon_player(i);
+
+    /* Sword: own timer, reuses the P1 sword tiles in this player's slot. */
+    if (p->item_use_kind == 0u) {
+        VDP_setSpriteFull(sword_slot, -32, -32, RENDER_SPRITE_SIZE(1, 2), 0u,
+                          ROOMROM_SPRITE_NEXT(sword_slot));
+        if (p->state == 0u && (p->shoot_timer & sword_btn) != 0u) {
+            p->item_use_kind = 1u;
+            p->item_use_timer = 10u;
+        }
+    }
+    if (p->item_use_kind != 0u) {
+        if (p->item_use_timer != 0u) p->item_use_timer--;
+        if (p->item_use_timer == 0u) p->item_use_kind = 0u;
+    }
+    if (p->item_use_kind != 0u) {
+        roomrom_sprites_set_sword_slot(sword_slot);
+        if (p->face == LINK_FACE_UP)
+            roomrom_sprites_set_sword_vertical(p->x + 4, p->y - 16, 0u, 0u);
+        else if (p->face == LINK_FACE_DOWN)
+            roomrom_sprites_set_sword_vertical(p->x + 4, p->y + 12, 1u, 0u);
+        else if (p->face == LINK_FACE_LEFT)
+            roomrom_sprites_set_sword_horizontal(p->x - 12, p->y - 4, 1u, 0u);
+        else
+            roomrom_sprites_set_sword_horizontal(p->x + 12, p->y - 4, 0u, 0u);
+        roomrom_sprites_set_sword_slot(ROOMROM_SPRITE_SLOT_SWORD);
+
+        if (p->item_use_timer <= 7u) {
+            unsigned char m;
+            const short hx = (p->face == LINK_FACE_LEFT)  ? (short)(p->x - 16) :
+                             (p->face == LINK_FACE_RIGHT) ? (short)(p->x + 16) : p->x;
+            const short hy = (p->face == LINK_FACE_UP)    ? (short)(p->y - 16) :
+                             (p->face == LINK_FACE_DOWN)  ? (short)(p->y + 16) : p->y;
+            for (m = 1u; m <= 11u; m++) {
+                const unsigned char t = nes_ram[0x034Fu + m];
+                if (t == 0u || (t >= 0x31u && t <= 0x48u)) continue;
+                if ((short)(nes_ram[0x0070u + m] + 12) > hx - 8 &&
+                    (short)nes_ram[0x0070u + m] < hx + 8 &&
+                    (short)(nes_ram[0x0084u + m] + 12) > hy - 8 &&
+                    (short)nes_ram[0x0084u + m] < hy + 8) {
+                    core_destroy_monster(m);
+                    break;
+                }
+            }
+        }
+    }
+
+    /* Item use from the shared selected slot. */
+    if (p->state == 0u && (p->shoot_timer & item_btn) != 0u) {
+        if (!g_debug_session) {
+            unsigned char slot = nes_ram[0x0656u];
+            s_b_item = (slot < 9u) ? (b_item_t)k_inv_cursor_to_b_item[slot]
+                                   : B_ITEM_NONE;
+        }
+        switch (s_b_item) {
+        case B_ITEM_BOOMERANG:
+            roomrom_boomerang_throw((link_face_t)p->face, p->x, p->y); break;
+        case B_ITEM_ARROW:
+            if (!roomrom_arrow_active())
+                roomrom_arrow_fire((link_face_t)p->face, p->x, p->y); break;
+        case B_ITEM_BOMB:
+            if (!roomrom_bomb_active())
+                roomrom_bomb_place((link_face_t)p->face, p->x, p->y); break;
+        case B_ITEM_CANDLE:
+            roomrom_candle_fire_spawn((link_face_t)p->face, p->x, p->y); break;
+        case B_ITEM_ROD:
+            roomrom_combat_wield_rod(); break;
+        case B_ITEM_FLUTE:
+            weapon_wield_flute(); break;
+        case B_ITEM_FOOD:
+            roomrom_food_wield(); break;
+        case B_ITEM_POTION:
+            weapon_wield_potion(); break;
+        default: break;
+        }
+    }
+
+    /* T-251: boomerang/bomb/candle are single global NES objects updated
+     * by the main play-object pass. Arrow and rod use slot 18, which is
+     * part of each player's context, so they must tick in this player's
+     * context or a P2 arrow never advances. */
+    if (weapons)
+        roomrom_arrow_update();
+
+    /* Weapon hits and body contact through the real NES battery, with this
+     * player's Link/weapon cells loaded. A live weapon can reach remote
+     * monsters, so that case keeps all 11 slots; otherwise only monsters
+     * inside melee/contact reach are evaluated. With no weapon context the
+     * slot-0 weapon cells still hold P1's weapons, so body contact uses the
+     * body-only entry and cannot duplicate P1's weapon hits. */
+    {
+        const unsigned char any_weapon = weapons && mp_any_weapon_active();
+        unsigned char m;
+        if (!weapons && nes_ram[0x04F0u] != 0u) {
+            /* Already hurt/invincible: no body contact can land. */
+        } else if (!weapons) {
+            /* Body contact: one live hit is enough. Pick the nearest
+             * in-range monster and run the body check once; shared HP
+             * means a second contact in the same frame cannot land. */
+            unsigned char best = 0u;
+            unsigned short best_d = 0xFFFFu;
+            for (m = 1u; m <= 11u; m++) {
+                if (mp_monster_in_range(p->x, p->y, m, 16u)) {
+                    const short dx = (short)((short)nes_ram[0x0070u + m] - p->x);
+                    const short dy = (short)((short)nes_ram[0x0084u + m] - p->y);
+                    const unsigned short d = (unsigned short)
+                        ((dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy));
+                    if (d < best_d) { best_d = d; best = m; }
+                }
+            }
+            if (best != 0u)
+                link_collision_check_link_collision(best);
+        } else {
+            for (m = 1u; m <= 11u; m++)
+                if (any_weapon || mp_monster_in_range(p->x, p->y, m, 16u))
+                    link_collision_check_monster_collisions(m);
+        }
+    }
+
+    if (weapons)
+        roomrom_sprites_set_weapon_player(0u);
+}
+
+static void mp_run_extra_players(void)
+{
+    LinkCtx p1;
+    unsigned char i;
+    unsigned char use_weapons = 0u;
+    if (g_player_count <= 1u) return;
+    for (i = 1u; i < g_player_count; i++) {
+        const u16 pad = (u16)MP_PAD_GET(i);
+        if ((pad & (BUTTON_A | BUTTON_B)) != 0u ||
+            players[i].item_use_kind != 0u ||
+            s_mp_weapon_dirty[i - 1u] != 0u) {
+            use_weapons = 1u;
+            break;
+        }
+    }
+    link_ctx_capture(&p1, use_weapons);
+    for (i = 1u; i < g_player_count; i++) {
+        const u16 pad = (u16)MP_PAD_GET(i);
+        const PlayerState *pi = &players[i];
+        /* T-251 performance: an idle extra Link has nothing to simulate.
+         * Draw his stored pose directly and skip the slot-0 context switch
+         * and combat battery. Keep the full path while any pending state
+         * can still change position/damage/animation. */
+        if (pad == 0u && pi->state == 0u && pi->grid_offset == 0 &&
+            pi->pos_frac == 0u && pi->metastate == 0u &&
+            pi->moving_limit == 0u && pi->item_use_kind == 0u &&
+            pi->invincibility_timer == 0u &&
+            s_mp_weapon_dirty[i - 1u] == 0u &&
+            !mp_monster_near(pi->x, pi->y, 16u)) {
+            if (nes_ram[0x0522u] != 0u) {
+                VDP_setSpriteFull((unsigned short)ROOMROM_MP_LINK_SLOT(i), -32, -32,
+                                  RENDER_SPRITE_SIZE(1, 2), 0u,
+                                  ROOMROM_SPRITE_NEXT(ROOMROM_MP_LINK_SLOT(i)));
+                VDP_setSpriteFull((unsigned short)(ROOMROM_MP_LINK_SLOT(i) + 1u), -32, -32,
+                                  RENDER_SPRITE_SIZE(1, 2), 0u,
+                                  ROOMROM_SPRITE_NEXT(ROOMROM_MP_LINK_SLOT(i) + 1u));
+            } else {
+                roomrom_sprites_set_mp_link_pose(i, pi->x, pi->y,
+                                                 (link_face_t)pi->face,
+                                                 pi->room_scratch);
+            }
+            /* A sword swing ends with item_use_kind already 0, so the
+             * combat path's hide does not run on the first idle frame.
+             * Clear this player's sword slot here or it stays drawn. */
+            {
+                const unsigned short sword_slot =
+                    (unsigned short)(ROOMROM_SPRITE_SLOT_MP_SWORD2 + i - 1u);
+                VDP_setSpriteFull(sword_slot, -32, -32,
+                                  RENDER_SPRITE_SIZE(1, 2), 0u,
+                                  ROOMROM_SPRITE_NEXT(sword_slot));
+            }
+            continue;
+        }
+        link_ctx_load_player(i, use_weapons);
+        {
+            unsigned char nes_dir = 0u;
+            if (pad & BUTTON_RIGHT) nes_dir |= 0x01u;
+            if (pad & BUTTON_LEFT)  nes_dir |= 0x02u;
+            if (pad & BUTTON_DOWN)  nes_dir |= 0x04u;
+            if (pad & BUTTON_UP)    nes_dir |= 0x08u;
+            nes_ram[0x03F8u] = nes_dir;
+        }
+        s_mp_extra = 1u;
+        if (nes_ram[0x066Cu] != 0u)
+            nes_ram[0x04F0u] = (unsigned char)(nes_ram[0x04F0u] + 0x10u);
+        if (nes_ram[0x04F0u] != 0u && (nes_ram[0x0015u] & 1u) == 0u)
+            nes_ram[0x04F0u]--;
+        if (pad != 0u || players[0].state != 0u ||
+            s_link_grid_offset != 0 || players[0].item_use_kind != 0u) {
+            const unsigned char room_before = s_room_id;
+            const unsigned char mode_before = nes_ram[0x0012u];
+            const unsigned char scene_before = (unsigned char)s_scene;
+            player_move_nes_core(pad);
+            (void)mp_try_cave_entry();
+            if (s_room_id != room_before ||
+                nes_ram[0x0012u] != mode_before ||
+                (unsigned char)s_scene != scene_before) {
+                s_mp_owner = i;
+                s_mp_owner_x = players[0].x;
+                s_mp_owner_y = players[0].y;
+            }
+        }
+        s_mp_extra = 0u;
+        if (players[0].x < 16)  { players[0].x = 16;  s_link_dir = LINK_DIR_NONE; s_link_grid_offset = 0; }
+        if (players[0].x > 224) { players[0].x = 224; s_link_dir = LINK_DIR_NONE; s_link_grid_offset = 0; }
+        if (players[0].y < 32)  { players[0].y = 32;  s_link_dir = LINK_DIR_NONE; s_link_grid_offset = 0; }
+        if (players[0].y > 208) { players[0].y = 208; s_link_dir = LINK_DIR_NONE; s_link_grid_offset = 0; }
+        mp_player_combat(i, pad, use_weapons);
+        if (nes_ram[0x0522u] != 0u) {
+            /* Wallmaster/whirlwind capture owns the slot-0 Link; hide the
+             * extra Links until release instead of drawing a stale pose. */
+            VDP_setSpriteFull((unsigned short)ROOMROM_MP_LINK_SLOT(i), -32, -32,
+                              RENDER_SPRITE_SIZE(1, 2), 0u,
+                              ROOMROM_SPRITE_NEXT(ROOMROM_MP_LINK_SLOT(i)));
+            VDP_setSpriteFull((unsigned short)(ROOMROM_MP_LINK_SLOT(i) + 1u), -32, -32,
+                              RENDER_SPRITE_SIZE(1, 2), 0u,
+                              ROOMROM_SPRITE_NEXT(ROOMROM_MP_LINK_SLOT(i) + 1u));
+            s_mp_draw_sig[i - 1u] = ~0UL;
+        } else {
+            const unsigned long sig =
+                ((unsigned long)(unsigned short)players[0].x << 24) |
+                ((unsigned long)(unsigned short)players[0].y << 16) |
+                ((unsigned long)(players[0].face |
+                                 (nes_ram[0x00ACu] & 0x30u)) << 8) |
+                (unsigned long)(s_link_frame & 1u) |
+                ((unsigned long)(players[0].item_use_kind != 0u) << 1);
+            if (s_mp_draw_sig[i - 1u] != sig) {
+                if ((nes_ram[0x00ACu] & 0x30u) == 0x10u ||
+                    (nes_ram[0x00ACu] & 0x30u) == 0x20u) {
+                    roomrom_sprites_set_mp_attack_pose(i,
+                                                       (short)players[0].x,
+                                                       (short)players[0].y,
+                                                       (link_face_t)players[0].face);
+                } else {
+                    roomrom_sprites_set_mp_link_pose(i,
+                                                     (short)players[0].x,
+                                                     (short)players[0].y,
+                                                     (link_face_t)players[0].face,
+                                                     s_link_frame);
+                }
+                s_mp_draw_sig[i - 1u] = sig;
+            }
+        }
+        link_ctx_store_player(i, use_weapons);
+        if (s_mp_owner != 0u) break;
+    }
+    link_ctx_apply(&p1, use_weapons);
+    if (s_mp_owner != 0u) {
+        /* The owner already loaded and snapped the new room. Put P1 on the
+         * owner's tile and let the respawn flag place the rest next tick. */
+        players[0].x = s_mp_owner_x;
+        players[0].y = s_mp_owner_y;
+        players[0].grid_offset = 0;
+        nes_ram[0x0070u] = (unsigned char)players[0].x;
+        nes_ram[0x0084u] = (unsigned char)players[0].y;
+        nes_ram[0x0394u] = 0u;
+        s_mp_packed |= MP_RESPAWN_BIT;
+        s_mp_owner = 0u;
+    }
+}
+
+/* T-251: every monster chases the nearest active player. */
+static void mp_retarget_enemies(void)
+{
+    unsigned char m, i;
+    if (g_player_count <= 1u) return;
+    for (m = 1u; m <= 11u; m++) {
+        unsigned short best;
+        unsigned short bx, by;
+        unsigned short d;
+        if (nes_ram[0x034Fu + m] == 0u) continue;
+        bx = (unsigned short)nes_ram[0x0070u + m];
+        by = (unsigned short)nes_ram[0x0084u + m];
+        best = 0u;
+        d = (unsigned short)((bx > (unsigned short)players[0].x)
+                                 ? bx - (unsigned short)players[0].x
+                                 : (unsigned short)players[0].x - bx);
+        d = (unsigned short)(d + ((by > (unsigned short)players[0].y)
+                                      ? by - (unsigned short)players[0].y
+                                      : (unsigned short)players[0].y - by));
+        for (i = 1u; i < g_player_count; i++) {
+            unsigned short dx = (bx > (unsigned short)players[i].x)
+                                    ? bx - (unsigned short)players[i].x
+                                    : (unsigned short)players[i].x - bx;
+            unsigned short dy = (by > (unsigned short)players[i].y)
+                                    ? by - (unsigned short)players[i].y
+                                    : (unsigned short)players[i].y - by;
+            if ((unsigned short)(dx + dy) < d) {
+                d = (unsigned short)(dx + dy);
+                best = i;
+            }
+        }
+        nes_ram[0x0061u] = (unsigned char)players[best].x;
+        nes_ram[0x0062u] = (unsigned char)players[best].y;
+    }
+}
+
 void roomrom_debug_tick(void)
 {
         /* DEBUG SENTINEL â€” capture players[0]+s_room_id at TOP-of-tick
@@ -4858,6 +5880,20 @@ void roomrom_debug_tick(void)
         s_tick_start_frac  = s_link_pos_frac;
         s_tick_start_anim  = nes_ram[0x03D0u];
         s_tick_start_frame = nes_ram[0x03E4u];
+        /* T-251: no extra Link may draw outside normal play (death, scroll,
+         * cave fade, iris, pause, ending). */
+        if (g_player_count > 1u &&
+            (roomrom_pause_is_active() || cave_fade_is_active() ||
+             circle_transition_active() ||
+             (nes_ram[0x0012u] != 0x05u && s_scene != SCENE_CAVE)))
+            mp_hide_all_players();
+        {
+            static unsigned char s_mp_prev_scene = 0xFFu;
+            if ((unsigned char)s_scene != s_mp_prev_scene) {
+                s_mp_prev_scene = (unsigned char)s_scene;
+                roomrom_sprites_mp_invalidate();
+            }
+        }
         /* T-125 frame budget probe, in the 6502 stack page (unused by the
          * port, masked by the lockstep diff): $01FE = frames the previous
          * tick ran past its own (0 = it fit), $01FF = VDP V counter when
@@ -5146,12 +6182,27 @@ void roomrom_debug_tick(void)
                 if (c < 16u) {
                     u8 slot = s_scroll_state < SCROLL_V_DOWN
                         ? (u8)(s_active_slot_x ^ 1u) : s_active_slot_x;
+                    /* T350: false-wall mesh keeps priority during mode6's
+                     * walk; release it at the actual vertical camera handoff. */
+                    if (c==0u && s_scene==SCENE_UW && s_scroll_state>=SCROLL_V_DOWN &&
+                        roomrom_uw_room_render_false_wall_mask(s_room_id))
+                        roomrom_uw_room_render_set_live_door_priority(
+                            s_active_slot_x,s_active_row_base,0u);
                     if (s_scene == SCENE_UW)
                         roomrom_uw_room_render_fill_one_col_at(s_transition_target,
                             c, plane_col_for_slot(c, slot), s_transition_row_base);
                     else
                         roomrom_ow_room_render_fill_one_col_at(s_transition_target,
                             c, plane_col_for_slot(c, slot), s_transition_row_base);
+                    /* T-314: after the last source column, the whole
+                     * destination room is staged offscreen. Lay its door
+                     * faces there now, not on the finalize tick. */
+                    if (s_scene == SCENE_UW && c == 15u && r != OW_SCROLL_ENTER)
+                        uw_door_state_prelayout_room(
+                            s_transition_target,
+                            roomrom_uw_room_render_get_level(),
+                            roomrom_uw_room_render_get_quest(),
+                            nes_ram[0x0098u]);
                 }
                 distance = (short)ow_scroll_display_pixels();
                 h_scroll = s_scroll_start_x;
@@ -5241,8 +6292,12 @@ void roomrom_debug_tick(void)
 
         /* UpdateMode5Play: while the flute timer runs, nothing updates
          * (Z_07.asm:1772; T-171 the flute played over a live room). */
-        if (nes_ram[0x0012u] == 0x05u && nes_ram[0x0011u] != 0u &&
+        if ((nes_ram[0x0012u] == 0x05u ||
+             (nes_ram[0x0012u] >= 0x09u && nes_ram[0x0012u] <= 0x0Cu)) &&
+            nes_ram[0x0011u] != 0u &&
             nes_ram[0x003Cu] != 0u && !roomrom_pause_is_active()) {
+            /* Modes 9..$C share UpdateMode5Play (UpdateMode jump table), so
+             * the cave (mode $B) freezes under the recorder too (T-318). */
             nes_pad_read_between_modes();
             transfer_buf_drain();
             return;
@@ -5294,7 +6349,7 @@ void roomrom_debug_tick(void)
          * unaffected; only A/B-using sites in this function pick up the
          * swap. Toggling the option mid-session may cause one transient
          * frame of edge-detect skew, accepted as the simplest impl. */
-        if (options_consumer_get_ab_swap()) {
+        if (effective_ab_swap()) {
             u16 ab_mask = (u16)(BUTTON_A | BUTTON_B);
             u16 joy_ab = (u16)(joy & ab_mask);
             u16 pressed_ab = (u16)(pressed & ab_mask);
@@ -5306,6 +6361,15 @@ void roomrom_debug_tick(void)
             if (pressed_ab & BUTTON_B) pressed_ab_swap |= (u16)BUTTON_A;
             joy = (u16)((joy & ~ab_mask) | joy_ab_swap);
             pressed = (u16)((pressed & ~ab_mask) | pressed_ab_swap);
+        }
+        /* T-255: Remix C is an item button, not NES Select. Keep the raw
+         * state for the item/menu handlers; hide it only from the NES
+         * mirror below. */
+        u16 remix_c_pressed = 0u;
+        u16 remix_c_mask = 0u;
+        if (!g_debug_session && game_profile_is_remix()) {
+            remix_c_pressed = (u16)(pressed & BUTTON_C);
+            remix_c_mask = BUTTON_C;
         }
 
         /* Plan v5a T1.1 â€” mirror post-swap joypad bits into NES
@@ -5322,14 +6386,42 @@ void roomrom_debug_tick(void)
              * in mode 5: holding a direction must not move Link against
              * the descent. */
             unsigned char input_dir = nes_ram[0x03F8u];
-            nes_ram_sync_input(joy, pressed);
+            nes_ram_sync_input((u16)(joy & ~remix_c_mask),
+                               (u16)(pressed & ~remix_c_mask));
             nes_ram[0x03F8u] = input_dir;
             joy = 0u;
             pressed = 0u;
         } else {
-            nes_ram_sync_input(joy, pressed);
+            nes_ram_sync_input((u16)(joy & ~remix_c_mask),
+                               (u16)(pressed & ~remix_c_mask));
         }
         nes_pad2_read();
+
+        /* T-251: identity colors are re-asserted once at the end of the
+         * tick, after every palette transfer has run. */
+
+        /* T-251: pads 2..4. A 3-4 player save needs a TeamPlayer/4-Way
+         * adapter; enable SGDK's multitap support only when port 1 does not
+         * report a stock pad, so a 2-player setup keeps normal pads. */
+        if (g_player_count > 2u && !(s_mp_packed & MP_MULTITAP_BIT)) {
+            const u8 port_type = JOY_getPortType(PORT_1);
+            if (port_type == PORT_TYPE_UNKNOWN ||
+                port_type == PORT_TYPE_TEAMPLAYER ||
+                port_type == PORT_TYPE_EA4WAYPLAY) {
+                JOY_setSupport(PORT_1, JOY_SUPPORT_TEAMPLAYER);
+                s_mp_packed |= MP_MULTITAP_BIT;
+            }
+        }
+        if (g_player_count > 1u) {
+            u8 pi;
+            for (pi = 1u; pi < g_player_count; pi++) {
+                const u16 pj = (s_mp_test_input[0] == 0xA5u)
+                                   ? (u16)s_mp_test_input[pi]
+                                   : JOY_readJoypad((u16)(JOY_1 + pi));
+                MP_PAD_SET(pi, (u8)(pj & BUTTON_DIR));
+                players[pi].shoot_timer = (u8)(pj & (BUTTON_A | BUTTON_B));
+            }
+        }
 
         /* NES source: Z_07.asm:UpdateMode5Play @CheckMenu.
          * Drained C: existing inventory_subscreen_tick + pause owner.
@@ -5600,43 +6692,18 @@ void roomrom_debug_tick(void)
                 s_b_item = (slot < 9u) ? (b_item_t)k_inv_cursor_to_b_item[slot]
                                        : B_ITEM_NONE;
             }
-            switch (s_b_item) {
-            case B_ITEM_BOOMERANG:
-                /* WieldBoomerang replaces food in slot $0F (T-057). */
-                roomrom_boomerang_throw(players[0].face,
-                                        players[0].x, players[0].y);
-                break;
-            case B_ITEM_ARROW:
-                if (!roomrom_arrow_active()) {
-                    roomrom_arrow_fire(players[0].face,
-                                       players[0].x, players[0].y);
-                }
-                break;
-            case B_ITEM_BOMB:
-                if (!roomrom_bomb_active()) {
-                    roomrom_bomb_place(players[0].face,
-                                       players[0].x, players[0].y);
-                }
-                break;
-            case B_ITEM_CANDLE:
-                /* The room brightens when the fire stands (UpdateFire ->
-                 * UpdateCandle, T-111), not on the button press. */
-                roomrom_candle_fire_spawn(players[0].face,
-                                          players[0].x, players[0].y);
-                break;
-            case B_ITEM_ROD:
-                roomrom_combat_wield_rod();      /* T-116: NES WieldRod */
-                break;
-            case B_ITEM_FLUTE:
-                weapon_wield_flute();            /* NES WieldFlute (T-171) */
-                break;
-            case B_ITEM_FOOD:
-                roomrom_food_wield();            /* NES WieldFood (T-057) */
-                break;
-            case B_ITEM_POTION:
-                weapon_wield_potion();           /* NES WieldPotion (T-057) */
-                break;
-            default:             break;
+            use_inventory_item(s_b_item);
+        }
+        /* T-255: Remix C uses the derived second item slot. The same-frame
+         * B+C rule keeps B authoritative (B+C recipes are T-260). */
+        if (!g_debug_session && game_profile_is_remix() &&
+            remix_c_pressed && input_was_idle && !(pressed & BUTTON_B)) {
+            const unsigned char c_slot = loadout_c_slot();
+            if (c_slot < 9u && hud_inventory_item_selectable(c_slot)) {
+                const unsigned char saved_slot = nes_ram[0x0656u];
+                nes_ram[0x0656u] = c_slot;
+                use_inventory_item((b_item_t)k_inv_cursor_to_b_item[c_slot]);
+                nes_ram[0x0656u] = saved_slot;
             }
         }
 
@@ -5669,7 +6736,12 @@ void roomrom_debug_tick(void)
          * Toggles voluntary pause when no other button is held. All
          * START-with-modifier handlers already returned above, so a
          * bare START reaches here only when no chord matched. */
+        /* T-340: NES UpdateMenuActive alone accepts Start. During
+         * scroll and restore handoff, keep advancing the existing owner;
+         * restarting exit after s_active clears strands voluntary pause. */
         if ((pressed & BUTTON_START) &&
+            (!roomrom_pause_is_active() ||
+             inventory_subscreen_menu_active()) &&
             !(joy & (BUTTON_A | BUTTON_B | BUTTON_C |
                      BUTTON_X | BUTTON_Y | BUTTON_Z | BUTTON_MODE))) {
             unsigned char was_paused = roomrom_pause_is_active();
@@ -5886,267 +6958,28 @@ void roomrom_debug_tick(void)
                 }
             }
         } else if (!link_halted) {
-            /* NES Z_07 UpdatePlayer returns after the invincibility timer
-             * when halted. Skip the whole Walker_Move path, including shove;
-             * UpdateDock/Wallmaster own the carried position. T-056 raft
-             * tick468: input masking alone kept applying 4px knockback. */
-            /* NES-faithful Link movement, ported from
-             *   Z_05.asm Link_HandleInput / Link_ModifyDirAtGridPoint
-             *   Z_07.asm Walker_Move / MoveObject / AddQSpeedToPositionFraction
-             *
-             * Per-frame:
-             * 1. If on a grid intersection (offset == 0), pick a single-axis
-             *    direction from current input (no diagonal). H over V on tie.
-             * 2. If input released, stop instantly (even mid-grid). Walker_Move
-             *    @ChooseObjDirOrInputDir: input=0 -> moving_dir=0.
-             * 3. At grid offset 0, check the next tile before movement.
-             * 4. If moving, run 4 quarter-steps. Right/down add QSpeed, left/up
-             *    subtract QSpeed. Carry/borrow advances 1 px and changes signed
-             *    ObjGridOffset until it reaches +8 or -8, then returns to 0. */
+            player_move_nes_core(joy);
+        }
 
-            u16 input = joy & (BUTTON_LEFT|BUTTON_RIGHT|BUTTON_UP|BUTTON_DOWN);
-            /* NES Walker_Move (Z_07.asm:2616) clears scratch [0E] (door
-             * block / doorway index) for Link every frame; MoveShot later in
-             * the frame reads it (T-102, t116_shot_hit grid offset). */
-            nes_ram[0x000Eu] = 0u;
-            u8 h_dir = (input & BUTTON_LEFT) ? 1u
-                     : ((input & BUTTON_RIGHT) ? 2u : 0u);
-            u8 v_dir = (input & BUTTON_UP)   ? 1u
-                     : ((input & BUTTON_DOWN) ? 2u : 0u);
-
-            {
-                link_dir_t input_dir = LINK_DIR_NONE;
-                link_dir_t moving_dir = LINK_DIR_NONE;
-
-                if (h_dir && v_dir) {
-                    /* NES Link_ModifyDirAtGridPoint with 2 inputs: in OW,
-                     * picks "last walkable" (h_dir last in bit-iteration).
-                     * H over V matches OW behavior. */
-                    input_dir = (h_dir == 1u) ? LINK_DIR_LEFT : LINK_DIR_RIGHT;
-                } else if (h_dir) {
-                    input_dir = (h_dir == 1u) ? LINK_DIR_LEFT : LINK_DIR_RIGHT;
-                } else if (v_dir) {
-                    input_dir = (v_dir == 1u) ? LINK_DIR_UP : LINK_DIR_DOWN;
-                }
-
-                /* T-131: ObjInputDir ($3F8, ButtonsDown & $0F, masked by
-                 * Link_FilterInput) after Link_ModifyDirInDoorway (UW). */
-                unsigned char in_bits = 0u;
-                /* Link_HandleInput @CheckMovement: while shoved (ObjShoveDir
-                 * $C0 != 0) Link does not turn (T-171 t171_aquamentus_sword
-                 * t702: knocked back mid-swing with Up held, NES kept
-                 * facing right). */
-                if (input != 0u && nes_ram[0x00C0u] == 0u) {
-                    nes_ram[0x0098u] = link_nes_bit_of(s_link_dir);
-                    link_modify_dir_in_doorway();
-                    in_bits = (unsigned char)(nes_ram[0x03F8u] & 0x0Fu);
-                    input_dir = link_dir_of_lowest_bit(in_bits);
-                }
-                if (in_bits != 0u) {
-                    if (s_link_grid_offset == 0 || s_link_dir == LINK_DIR_NONE) {
-                        /* T-122: NES Link_ModifyDirAtGridPoint. */
-                        link_nes_modify_dir_at_grid_point(in_bits, &moving_dir);
-                    } else {
-                        link_nes_modify_dir_on_grid_line(input_dir);
-                        moving_dir = s_link_dir;
-                    }
-                }
-
-                /* NES Walker_Move (Z_07.asm:2612): Link in state $1x/$2x
-                 * keeps the facing Link_HandleInput chose, [0F] = 0. */
-                const u8 item_use_hold = link_item_use_blocks_move();
-                if (moving_dir != LINK_DIR_NONE) {
-                    /* NES draws Link facing ObjDir (s_link_dir), which the
-                     * no-walkable grid-point case leaves unchanged (T-122). */
-                    switch (s_link_dir) {
-                    case LINK_DIR_LEFT:  players[0].face = LINK_FACE_LEFT;  break;
-                    case LINK_DIR_RIGHT: players[0].face = LINK_FACE_RIGHT; break;
-                    case LINK_DIR_UP:    players[0].face = LINK_FACE_UP;    break;
-                    case LINK_DIR_DOWN:  players[0].face = LINK_FACE_DOWN;  break;
-                    default: break;
-                    }
-                }
-                if (item_use_hold) moving_dir = LINK_DIR_NONE;
-
-                /* T-120: Walker_Move for Link (Z_07.asm:2632): tile objects
-                 * (block/rock/gravestone/armos in state 1) within $10 px
-                 * and, with a person or grumble moblin in slot 1, the
-                 * person line reset the movement direction [0F]. */
-                if (moving_dir != LINK_DIR_NONE) {
-                    unsigned char t1 = nes_ram[0x0350u];
-                    nes_ram[0x000Fu] = link_nes_bit_of(moving_dir);
-                    progress_check_tile_objects_blocking();
-                    if (t1 == 0x36u || (t1 >= 0x4Bu && t1 < 0x53u))
-                        uw_person_check_person_blocking();
-                    /* Caves (modes $B/$C): CheckSubroom always runs
-                     * CheckPersonBlocking (Z_05.asm:3113), so Link stops
-                     * below the cave person's row. */
-                    if (s_scene == SCENE_CAVE)
-                        uw_person_check_person_blocking();
-                    if (nes_ram[0x000Fu] == 0u) moving_dir = LINK_DIR_NONE;
-                }
-
-                if (moving_dir != LINK_DIR_NONE && shortcut_cave_exit_if_stair())
-                    moving_dir = LINK_DIR_NONE;
-
-                s_ow_edge = 0u;
-                /* GoWalkableDir returns before CheckScreenEdge while the
-                 * ladder is out (LadderSlot $64, T-056). */
-                if (s_scene == SCENE_OW && moving_dir != LINK_DIR_NONE &&
-                    nes_ram[0x0064u] == 0u) {
-                    u8 d = moving_dir == LINK_DIR_RIGHT ? 1u :
-                           moving_dir == LINK_DIR_LEFT ? 2u :
-                           moving_dir == LINK_DIR_DOWN ? 4u : 8u;
-                    s_ow_edge = ow_scroll_edge(players[0].x, players[0].y,
-                                               d, s_link_grid_offset, s_room_id);
-                    if (s_ow_edge) moving_dir = LINK_DIR_NONE;
-                    if (s_ow_edge == 0x80u) s_ow_edge = 0u;
-                }
-
-                if (s_scene == SCENE_UW && nes_ram[0x00C0u] == 0u) {
-                    /* T-131: NES Walker_Move for Link in the UW:
-                     * BoundByRoom outside doorways, CheckDoorway, then
-                     * Walker_CheckTileCollision (in a doorway the tile test
-                     * is skipped; CheckScreenEdge starts the next room). */
-                    unsigned char edge;
-                    nes_ram[0x0070u] = (unsigned char)players[0].x;
-                    nes_ram[0x0084u] = (unsigned char)players[0].y;
-                    nes_ram[0x0394u] = (unsigned char)s_link_grid_offset;
-                    if (s_link_dir != LINK_DIR_NONE)
-                        nes_ram[0x0098u] = link_nes_bit_of(s_link_dir);
-                    nes_ram[0x000Fu] = link_nes_bit_of(moving_dir);
-                    if (cellar_check_exit()) {
-                        /* CheckSubroom changes RoomId before this tick's
-                         * host-to-NES publication in play_update_objects. */
-                        s_room_id = nes_ram[0x00EBu];
-                        roomrom_main_link_sync_from_nes();
-                        edge = 0u;
-                    } else if (link_uw_walker_checks())
-                        edge = nes_ram[0x0098u];
-                    else
-                        edge = link_walker_check_tile_collision(s_link_grid_offset);
-                    if (nes_ram[0x0098u] != link_nes_bit_of(s_link_dir)) {
-                        s_link_dir = link_dir_of_lowest_bit(nes_ram[0x0098u]);
-                        switch (s_link_dir) {
-                        case LINK_DIR_LEFT:  players[0].face = LINK_FACE_LEFT;  break;
-                        case LINK_DIR_RIGHT: players[0].face = LINK_FACE_RIGHT; break;
-                        case LINK_DIR_UP:    players[0].face = LINK_FACE_UP;    break;
-                        case LINK_DIR_DOWN:  players[0].face = LINK_FACE_DOWN;  break;
-                        default: break;
-                        }
-                    }
-                    moving_dir = link_dir_of_lowest_bit(nes_ram[0x000Fu]);
-                    if (edge) {
-                        s_uw_edge = edge;
-                        moving_dir = LINK_DIR_NONE;
-                    }
-                } else if (moving_dir != LINK_DIR_NONE && s_link_grid_offset == 0) {
-                    if (!link_walkable_at(players[0].x, players[0].y, moving_dir)) {
-                        /* NES PlayerUnwalkable checks passive OW statues
-                         * before stopping Link. The drained checker creates
-                         * Armos/Flying Ghini from collided $BC..$C3 tiles. */
-                        if (s_scene == SCENE_OW) {
-                            nes_ram[0x0070u] = (unsigned char)players[0].x;
-                            nes_ram[0x0084u] = (unsigned char)players[0].y;
-                            nes_ram[0x0098u] = link_nes_bit_of(moving_dir);
-                            nes_ram[0x0394u] = 0u;
-                            trap_check_passive_tile_objects();
-                        }
-                        moving_dir = LINK_DIR_NONE;
-                    }
-                }
-
-                /* T-056: Walker_Move runs CheckLadder for Link after
-                 * Walker_CheckTileCollision, before MoveObject (Z_07.asm).
-                 * Not while shoved (Walker_Move takes Obj_Shove instead) or
-                 * halted (UpdatePlayer returns first). [0F] in and out. */
-                if (nes_ram[0x0064u] != 0u && nes_ram[0x00C0u] == 0u &&
-                    (nes_ram[0x00ACu] & 0xC0u) != 0x40u) {
-                    nes_ram[0x0070u] = (unsigned char)players[0].x;
-                    nes_ram[0x0084u] = (unsigned char)players[0].y;
-                    nes_ram[0x0394u] = (unsigned char)s_link_grid_offset;
-                    if (s_link_dir != LINK_DIR_NONE)
-                        nes_ram[0x0098u] = link_nes_bit_of(s_link_dir);
-                    nes_ram[0x000Fu] = link_nes_bit_of(moving_dir);
-                    {
-                        const unsigned char moved_slot = link_ladder_check();
-                        if (moved_slot != 0u) {
-                            object_move_object(moved_slot);
-                            moving_dir = LINK_DIR_NONE;
-                        } else {
-                            moving_dir = link_dir_of_lowest_bit(nes_ram[0x000Fu]);
-                        }
-                    }
-                }
-
-                /* Link knockback shove â€” NES Z1 Obj_Shove runs every frame
-                 * for slot 0 reading ObjShoveDir ($00C0) + ObjShoveDistance
-                 * ($00D3). link_collision_link_be_harmed (drained NES path)
-                 * sets these on monster contact. While shove is active,
-                 * player input is suppressed (NES stun semantics) and
-                 * Link is shifted in the shove direction. */
-                {
-                    extern void c_obj_shove(unsigned int slot);
-                    unsigned char shove_dir = nes_ram[0x00C0u];
-                    if (shove_dir != 0u) {
-                        /* Mirror C-side players[0] into nes_ram so
-                         * c_obj_shove starts from the live position. */
-                        nes_ram[0x0070u] = (unsigned char)players[0].x;
-                        nes_ram[0x0084u] = (unsigned char)players[0].y;
-                        /* T-113: Obj_Shove reads and advances Link's
-                         * ObjGridOffset ($394); it must see the live
-                         * offset and its edits must survive the
-                         * end-of-tick publish below. */
-                        nes_ram[0x0394u] = (unsigned char)s_link_grid_offset;
-                        c_obj_shove(0u);
-                        players[0].x = (short)nes_ram[0x0070u];
-                        players[0].y = (short)nes_ram[0x0084u];
-                        s_link_grid_offset = (signed char)nes_ram[0x0394u];
-                        /* NES Walker_Move uses Obj_Shove instead of input
-                         * while shove direction is nonzero. */
-                        moving_dir = LINK_DIR_NONE;
-                    }
-                }
-
-                if (moving_dir != LINK_DIR_NONE) {
-                    link_nes_move_object(moving_dir);
-                } else {
-                    /* NES AnimateObjectWalking (Z_07.asm:5045) advances
-                     * ObjAnimCounter only while the object is MOVING; on stop it
-                     * FREEZES the walk pose at the current frame â€” it does NOT
-                     * snap to frame 0 (live-proven: cave emerge settle holds
-                     * ObjAnimCounter=5 / ObjAnimFrame=1 frozen). Match that: hold
-                     * s_link_frame, reset only the sub-frame tick so the next
-                     * walk re-times cleanly. Fixes two things:
-                     *  - cave_fade descent: the anim is owned by
-                     *    cave_fade_anim_tick_handler; the old `s_link_frame = 0`
-                     *    clobbered it every no-input frame (static frame-0 sink).
-                     *  - cave post-emerge settle: NES holds the last emerge walk
-                     *    frame while Link stands; the old reset snapped Gen to
-                     *    frame 0 (the bulk of the emerge sprite diff). */
-                    s_link_anim_tick = 0u;
-                }
+        /* T-251: keep slots 20-25 in the SAT chain when inactive; slot 19
+         * chains through them to the enemy bridge at 26. The hidden slots
+         * stay put until a player count change, so hide them once per
+         * count instead of rewriting 6-9 SAT words every frame. */
+        {
+            static unsigned char s_mp_hidden_count = 0u;
+            if (s_mp_hidden_count != g_player_count) {
+                mp_hide_unused_players();
+                s_mp_hidden_count = g_player_count;
             }
-
-            edge_load_or_clamp();
-            /* T-116: DrawLink uses NES ObjAnimFrame ($3E4) every frame, not
-             * only while moving: the item-use states set it to 1
-             * (AnimateLinkObjState). It advances on the NES
-             * AnimateObjectWalking cadence in link_anim_state_step. The baked
-             * left/right poses are stored in the other order (pose frame 0 =
-             * NES frame 1, tiles $04/$06; verify_sprites newgame f128-137),
-             * up/down match. */
-            s_link_frame = (u8)((nes_ram[0x03E4u] & 1u) ^
-                ((players[0].face == LINK_FACE_LEFT ||
-                  players[0].face == LINK_FACE_RIGHT) ? 1u : 0u));
-            /* Publish completed movement and its grid phase for room entry.
-             * The tick-start copy alone exposed last frame's coordinates. */
-            nes_ram[0x70u] = (u8)players[0].x;
-            nes_ram[0x84u] = (u8)players[0].y;
-            nes_ram[0x394u] = (u8)s_link_grid_offset;
-            nes_ram[0x3A8u] = s_link_pos_frac;
-            /* T-125: Link is drawn once, after AnimateLinkBase below. */
-            if (!roomrom_combat_link_locked()) s_link_draw_pending = 1u;
+        }
+        if (g_player_count > 1u &&
+            (nes_ram[0x0012u] == 0x05u || s_scene == SCENE_CAVE) &&
+            !roomrom_pause_is_active() && !cave_fade_is_active()) {
+            if (s_mp_packed & MP_RESPAWN_BIT) {
+                mp_place_players();
+                s_mp_packed &= (u16)~MP_RESPAWN_BIT;
+            }
+            mp_run_extra_players();
         }
 
         /* T-102: NES UpdateMode5Play order: UpdatePlayer (input, movement,
@@ -6187,6 +7020,21 @@ void roomrom_debug_tick(void)
                     s_lvl_phase == LVL_NONE &&
                     !roomrom_world_transition_is_active() &&
                     s_scroll_state == SCROLL_NONE) {
+                    /* T-251: nearest-player targeting is a party feature,
+                     * not NES per-frame state. Refresh it every 4th play
+                     * tick, and immediately after a room or mode change so
+                     * the first object tick never chases last room's tile. */
+                    {
+                        static unsigned char s_mp_rt_room = 0xFFu;
+                        static unsigned char s_mp_rt_mode = 0xFFu;
+                        const unsigned char now = (unsigned char)nes_ram[0x0012u];
+                        if (s_room_id != s_mp_rt_room ||
+                            now != s_mp_rt_mode ||
+                            (nes_ram[0x0015u] & 3u) == 0u)
+                            mp_retarget_enemies();
+                        s_mp_rt_room = s_room_id;
+                        s_mp_rt_mode = now;
+                    }
                     if (play_update_objects()) return;
                 } else {
                     /* A mode change in UpdatePlayer skips the objects but
@@ -6220,6 +7068,12 @@ void roomrom_debug_tick(void)
         /* HUD B-item icon per-frame update (slot 10). */
         if (!game_profile_is_remix()) roomrom_hud_b_item_update(0u);
 
+        /* T-251: the VDP evaluates SAT slots in order, and every player slot
+         * (0..28) is below the enemy bridge (29..63). A >16-sprite line
+         * (H32) therefore drops enemy sprites first by hardware rule. The
+         * old post-scan budget guard cost 20-60 scanlines per frame and was
+         * written against a 20-sprite limit H32 does not have; the SAT
+         * contract already protects Links. */
         {
             unsigned short dma_count = g_enemy_render_last_sat_slot;
             /* Floor: every gameplay slot (masks, Link, items, HUD). */
@@ -6227,6 +7081,11 @@ void roomrom_debug_tick(void)
                 dma_count = ROOMROM_SPRITE_SLOT_ENEMY_FIRST;
             VDP_updateSprites(dma_count, DMA_QUEUE);
         }
+
+        /* T-251: palette records drained later in the tick (ring pickups,
+         * level loads, flashes) can overwrite PAL1 identity entries; assert
+         * them once more after the frame's transfers. */
+        roomrom_bg_palette_apply_multiplayer();
 
         /* Task 5.4: passive state mirror for BizHawk Lua probes.
          * 2026-05-15: gate INLINED here so function-call overhead (jsr+ret

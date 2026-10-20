@@ -32,6 +32,8 @@
 #include "../world/render/subpal_routing.h"
 #include "../room/room_dispatch.h" /* native per-level map/compass ownership */
 #include "../hud/hud_runtime.h" /* single occupied-slot selection owner */
+#include "../../state/loadout.h"
+#include "../../state/game_profile.h"
 #include "../dungeon/uw_render.h"  /* roomrom_uw_room_render_get_level */
 #include "../dungeon/uw_map_builder.h"
 static unsigned char s_dungeon_map[8][16];
@@ -57,19 +59,13 @@ static unsigned char s_subscreen_uw = 0u;
 /* SAT VRAM base, gameplay context per PR-2 Option F. */
 #define SAT_VRAM_BASE_GAMEPLAY 0xF400u
 
-/* Helper: pack a SAT entry word block and write to a SAT slot via direct
- * VRAM. Y/x are 9-bit per Genesis VDP spec; size_link packs SIZE<<8 | next. */
+/* Assemble the pause packet in the existing SGDK cache. The adapter publishes
+ * the chain with its matching scroll in VBlank; no active-display SAT writes. */
 static void sat_write(unsigned char slot, unsigned short y,
                       unsigned short size, unsigned char link,
                       unsigned short attr, unsigned short x)
 {
-    unsigned short addr = (unsigned short)(SAT_VRAM_BASE_GAMEPLAY + slot * 8u);
-    render_vram_open_write(addr);
-    *((volatile unsigned short *)0xC00000) = y;
-    *((volatile unsigned short *)0xC00000) =
-        (unsigned short)((size << 8) | link);
-    *((volatile unsigned short *)0xC00000) = attr;
-    *((volatile unsigned short *)0xC00000) = x;
+    render_set_sprite_inline(slot,(short)(x-128u),(short)(y-128u),size,attr,link);
 }
 
 /* V2.8 (Phase 7 v2 systematic-debugging 2026-05-20):
@@ -255,9 +251,25 @@ static unsigned char  s_scroll_row   = 0u;
  * OUTSIDE the V64 window ($C000-$DFFF) so the plane fill never touches them.
  * BG_A and BG_B share $C000 (main.c:634-635), so BOTH plane vscroll words
  * are ramped together — else BG_B shows a static menu ghost behind BG_A. */
-#define SCROLL_VSCROLL_TOP  174  /* menu parked off-screen above (= NES delta) */
+#define SCROLL_VSCROLL_TOP  (RENDER_PAUSE_HUD_STRIP_TOP-1u)
 #define SCROLL_VSCROLL_STEP 3
+/* T-318 (byte-diffed against NES, p_q1_scroll / p_q1_close): NES lets the
+ * submenu's first transfers run for 4 frames before CurVScroll moves, the
+ * slide then takes 58 frames, the cursor and map markers appear 2 frames
+ * after the last step, and the status marker rides the slide (MovePosition-
+ * Markers: 3 px a frame from line 53 to line 227). */
+#define SCROLL_START_DELAY  4u
+#define SCROLL_LAST_STEP    58u
+#define SCROLL_ACTIVE_STEP  60u
+#define STATUS_MARKER_REST  175u   /* marker offset at rest: status marker line 227 */
+/* pause_scene_flush places the copied HUD at tile row22. Derive moving
+ * sprite displacement from that same strip origin, rather than maintaining
+ * separate opening/closing counters (which differed by one 3px step). */
+#define STATUS_STRIP_TOP RENDER_PAUSE_HUD_STRIP_TOP
 static short s_vscroll = 0;
+static unsigned char s_scroll_delay;   /* frames left before the slide starts */
+static unsigned char s_scroll_k;       /* slide frames done */
+static unsigned char s_exit_phase;     /* marker frames left after the slide-out ends */
 
 /* Set BG_A AND BG_B vertical scroll (VSRAM slots 0/1) to v — both planes
  * share $C000, so they must scroll in lockstep. */
@@ -296,15 +308,10 @@ static void menu_icons_upload(void)
                                  chr[t*32u+k+1u]);
 }
 
-static void set_subscreen_vscroll(short v)
-{
-    render_vsram_open_write(0u);
-    render_vsram_write_word((unsigned short)v);   /* slot 0 = BG_A */
-    render_vsram_write_word((unsigned short)v);   /* slot 1 = BG_B */
-}
-
 static void draw_cursor(void);   /* forward decl */
 static void draw_item_sprites(void);   /* forward decl */
+static void draw_assignment_box(unsigned char slot, unsigned char pal);
+static void draw_assignment_labels(void);
 static void write_inventory_row(unsigned short row);   /* forward decl */
 
 unsigned char inventory_subscreen_is_active(void)
@@ -606,6 +613,20 @@ static void write_inventory_row(unsigned short gen_row)
         for (i = 28u; i < 32u; ++i) *((volatile unsigned short *)0xC00000) = cells[i];
         return;
     }
+    /* T-252: Vanilla/Original shows the item on A (left) and the sword on B
+     * (right). The captured NES row spells "USE B BUTTON"; only the button
+     * glyph changes, the rest of the row/sheet is untouched. Remix keeps its
+     * own B/C labels via the branch above. */
+    if (!game_profile_is_remix() && nes_row == 18u) {
+        for (i = 0u; i < 32u; ++i) {
+            unsigned short word = cells[i];
+            if (i == 6u)
+                word = RENDER_TILE_ATTR_FULL(0u, 0, 0, 0,
+                    tile_for(0x0Au, k_inventory_subpal[18][6]));
+            *((volatile unsigned short *)0xC00000) = word;
+        }
+        return;
+    }
     for (i = 0; i < 32u; ++i) *((volatile unsigned short *)0xC00000) = cells[i];
 }
 
@@ -784,11 +805,62 @@ static void draw_inv_slot(unsigned char slot, unsigned short nes_x, unsigned cha
 static void draw_marker_sprite(unsigned short nes_x, unsigned short nes_y,
                                unsigned char pal, unsigned short tile)
 {
-    unsigned short attr = RENDER_TILE_ATTR_FULL(pal, 0, 0, 0, tile);
+    /* NES attr bit5=0 puts these dots in front of the map. The copied HUD
+     * retains high-priority background words (e.g.8297 at L2Q1 room7D), so
+     * use the same foreground priority as gameplay's HUD markers. */
+    unsigned short attr = RENDER_TILE_ATTR_FULL(pal, 1, 0, 0, tile);
     unsigned char  link = (unsigned char)(s_next_sat_slot + 1u);
     sat_write(s_next_sat_slot, (unsigned short)(nes_y + SUBSCREEN_SAT_Y_OFFSET),
               RENDER_SPRITE_SIZE(1, 2), link, attr, (unsigned short)(nes_x + 0x80u));
     ++s_next_sat_slot;
+}
+
+/* Status-bar position marker ($3E) of room `room`. UpdatePositionMarker adds the
+ * LevelInfo offset ($6BAC) as a byte, so the x wraps (NES: x = $CA for a $77
+ * offset of $80); disp is the slide offset, 175 at rest (MovePositionMarkers). */
+static void draw_status_marker(unsigned char room, unsigned char uw,
+                               unsigned short disp, unsigned short tile)
+{
+    unsigned char x = (unsigned char)(((room & 0x0Fu) << (uw ? 3u : 2u)) +
+                                      (uw ? 0x12u : 0x11u) + nes_ram[0x6BACu]);
+    /* T-360: Remix moved the HUD map from cols22-29 to cols2-9; the NES
+     * offset byte still points at the old right-side origin. Shift it with
+     * the map. A room outside the new box has no cell; do not draw a stray. */
+    if (game_profile_is_remix()) {
+        short sx = (short)((short)x - 0xA0);
+        if (sx < 0) return;
+        x = (unsigned char)sx;
+    }
+    draw_marker_sprite(x, (unsigned short)(((room & 0x70u) >> 2) + 0x17u + disp),
+                       RENDER_PAL1, tile);
+}
+
+/* Player marker on the UW map sheet (final slide position). */
+static void draw_map_marker(void)
+{
+    unsigned char room  = nes_ram[0x00EBu];
+    unsigned char rot   = uw_map_rotation(nes_ram[0x0010u]);
+    unsigned short rx   = (rot < 8u)
+        ? (unsigned short)(rot << 3)
+        : (unsigned short)(0u - (unsigned short)((16u - rot) << 3));
+    draw_marker_sprite((unsigned short)(((room & 0x0Fu) << 3) + rx + 0x62u),
+                       (unsigned short)(((room & 0xF0u) >> 1) + 0x69u),
+                       RENDER_PAL1, DSPR(8));
+}
+
+/* While the menu slides only the status-bar markers are drawn (they scroll with
+ * it); the chain ends in a Y=0 entry. The UW map-sheet marker joins them on the
+ * frame before the cursor (map != 0). */
+static void draw_scroll_markers(unsigned short disp, unsigned char map)
+{
+    s_next_sat_slot = 0u;
+    if (map && s_subscreen_uw) draw_map_marker();
+    draw_status_marker(nes_ram[0x00EBu], s_subscreen_uw, disp, DSPR(8));
+    if (s_subscreen_uw && room_has_compass())
+        draw_status_marker(uw_map_triforce_room(nes_ram[0x0010u]), 1u, disp, DSPR(14));
+    sat_write(s_next_sat_slot, 0u, 0u, 0u, 0u, 0u);
+    render_pause_frame_deferred(SAT_VRAM_BASE_GAMEPLAY,s_vscroll,
+                                (unsigned short)(s_next_sat_slot+1u));
 }
 
 /* UW compass/map icon. wide!=0 -> mirrored pair (left + h-flip 8px right);
@@ -846,37 +918,24 @@ static void draw_item_sprites(void)
         unsigned char room = nes_ram[0x00EBu];
         /* Z_05.asm:UpdateMenuCommon1 reuses Z_01.asm:UpdatePositionMarker,
          * which adds the installed LevelInfo offset to both status markers. */
-        short status_x_offset = (short)(signed char)nes_ram[0x6BACu];
         if (!s_subscreen_uw) {
             /* OW status-bar map marker: X=(room&$0F)*4+$11, Y=(room&$70)>>2
              * +$17, scrolled 175 px with the menu (Z_01.asm:4083). */
-            draw_marker_sprite((unsigned short)((short)(((room & 0x0Fu) << 2) + 0x11u) + status_x_offset),
-                               (unsigned short)(((room & 0x70u) >> 2) + 0x17u + 175u),
-                               RENDER_PAL1, DSPR(8));
+            draw_status_marker(room, 0u, STATUS_MARKER_REST, DSPR(8));
         } else {
             /* UW dungeon-map markers (Z_05.asm:295-355) + compass/map. */
             /* CurLevel ($0010) is set reliably on the MODE toggle (s_uw_level
              * is not), so index the per-level map config by it. */
             unsigned char  level = nes_ram[0x0010u];
-            unsigned char rot = uw_map_rotation(level);
-            unsigned short rx  = (rot < 8u)
-                ? (unsigned short)(rot << 3)
-                : (unsigned short)(0u - (unsigned short)((16u - rot) << 3));
             /* Player marker on the map sheet (final scroll-end position). */
-            draw_marker_sprite((unsigned short)(((room & 0x0Fu) << 3) + rx + 0x62u),
-                               (unsigned short)(((room & 0xF0u) >> 1) + 0x69u),
-                               RENDER_PAL1, DSPR(8));
+            draw_map_marker();
             /* Status-bar map marker (UW cols *8 + $12; Y scrolled). */
-            draw_marker_sprite((unsigned short)((short)(((room & 0x0Fu) << 3) + 0x12u) + status_x_offset),
-                               (unsigned short)(((room & 0x70u) >> 2) + 0x17u + 175u),
-                               RENDER_PAL1, DSPR(8));
+            draw_status_marker(room, 1u, STATUS_MARKER_REST, DSPR(8));
             /* Triforce/compass map marker: status-bar formula on
              * TriforceRoomId (NES sub-pal 3 -> PAL3). */
             if (room_has_compass()) {
                 unsigned char tr = uw_map_triforce_room(level);
-                draw_marker_sprite((unsigned short)((short)(((tr & 0x0Fu) << 3) + 0x12u) + status_x_offset),
-                                   (unsigned short)(((tr & 0x70u) >> 2) + 0x17u + 175u),
-                                   RENDER_PAL1, DSPR(14));
+                draw_status_marker(tr, 1u, STATUS_MARKER_REST, DSPR(14));
             }
             /* Compass ($6A mirrored) at ($2C,$9E); map ($4C narrow) at
              * ($2C,$76) — UW-extracted tiles, NES SPR sub-pal 2 -> PAL3. */
@@ -890,17 +949,33 @@ static void draw_item_sprites(void)
      * "USE B BUTTON" equipped indicator. */
     /* Z_05 UpdateSubmenuSelection only draws an owned breakout item.
      * Empty inventory still has cursor slot0, but no boomerang preview. */
-    if (slot_owned(s_cursor_slot))
-        draw_inv_slot(s_cursor_slot, 0x40u, 0x36u);
+    if (slot_owned(nes_ram[0x0656u]))
+        draw_inv_slot(nes_ram[0x0656u], 0x40u, 0x36u);
 
+    if (game_profile_is_remix()) {
+        draw_assignment_box(nes_ram[0x0656u], RENDER_PAL2);
+        draw_assignment_box(loadout_c_slot(), RENDER_PAL3);
+    }
     s_cursor_sat = s_next_sat_slot;
     draw_cursor();
+    render_pause_frame_deferred(SAT_VRAM_BASE_GAMEPLAY,s_vscroll,
+                                (unsigned short)(s_next_sat_slot+1u));
 }
 
 void inventory_subscreen_enter(void)
 {
     /* Native pickup/count ownership must be visible on the entry frame. */
     inventory_sync_from_native();
+    hud_move_inventory_item(0u);
+    if (game_profile_is_remix()) {
+        unsigned char c = loadout_c_slot();
+        if (c > 8u || c == nes_ram[0x0656u] ||
+            !hud_inventory_item_selectable(c))
+            loadout_set_c_slot(LOADOUT_SLOT_NONE);
+    } else {
+        loadout_set_c_slot(LOADOUT_SLOT_NONE);
+    }
+    g_inventory.selected_b_item = nes_ram[0x0656u];
     /* Capture scene: UW (dungeon) renders the map subscreen, OW the
      * triforce subscreen. Latched here so the whole open uses one source. */
     s_subscreen_uw = (roomrom_main_current_scene() == ROOMROM_MAIN_SCENE_UW) ? 1u : 0u;
@@ -945,22 +1020,14 @@ void inventory_subscreen_enter(void)
     /* The adapter publishes scroll/window with the copied strip in VBlank.
      * Switching now exposes the previous pause's cells for one frame. */
 
-    /* Hide all sprites during scroll-in (so frozen gameplay sprites
-     * don't render over partially-built subscreen). */
-    {
-        unsigned char i;
-        unsigned short sat_addr = SAT_VRAM_BASE_GAMEPLAY;
-        /* T-172: the VDP draws the link chain from entry 0; entry 0 =
-         * Y 0 (above the screen), link 0 ends it, so no sprite shows.
-         * Zeroing all 80 entries (320 VRAM words during the display)
-         * stretched the pause-open tick past a frame (t013_continue t61). */
-        (void)i;
-        render_vram_open_write(sat_addr);
-        *((volatile unsigned short *)0xC00000) = 0x0000;
-        *((volatile unsigned short *)0xC00000) = 0x0000;
-        *((volatile unsigned short *)0xC00000) = 0x0000;
-        *((volatile unsigned short *)0xC00000) = 0x0000;
-    }
+    /* NES source: Z_05 UpdateMenu states1/2 retain the status markers at
+     * their gameplay position before MovePositionMarkers starts the slide.
+     * Drained C: draw_scroll_markers / inventory_subscreen_enter.
+     * Coverage: FULL first pause-entry marker publication; Stance: EXTEND.
+     * This short chain hides gameplay sprites without erasing the moving
+     * HUD marker for the first frame (live Mesen OAM Y51, Genesis absent). */
+    s_vscroll=(short)SCROLL_VSCROLL_TOP;
+    draw_scroll_markers((unsigned short)(STATUS_STRIP_TOP-s_vscroll), 0u);
 
     unsigned short blank_attr = RENDER_TILE_ATTR_FULL(SUBSCREEN_SUBPAL, 0, 0, 0,
                                                       BLANK_TILE);
@@ -989,6 +1056,8 @@ void inventory_subscreen_enter(void)
         s_menu_rows_pending = MENU_ROWS_FIRST_VISIBLE;
     }
     s_vscroll = (short)SCROLL_VSCROLL_TOP;     /* menu off-screen above */
+    s_scroll_delay = SCROLL_START_DELAY;
+    s_scroll_k     = 0u;
     /* Scroll is published with render_pause_scene_deferred, above. */
 
     /* Start scroll-in: tick ramps VSRAM 174 -> 0 (menu slides down). */
@@ -1017,6 +1086,11 @@ static const unsigned char k_submenu_cursor_xs[9] = {
  * every 8 frames per Z_05.asm:7942 (AND #$08, LSR x3, ADC #$01). */
 static void draw_cursor(void)
 {
+    /* Empty inventory has a native slot0 sentinel, not a selectable item. */
+    if (!hud_inventory_item_selectable(s_cursor_slot)) {
+        sat_write(s_cursor_sat, 0u, 0u, 0u, 0u, 0u);
+        return;
+    }
     /* Cursor Y: B-item row 1 = $36 (slot<5), row 2 = $46. */
     unsigned char  nes_y = (s_cursor_slot < 5u) ? 0x36u : 0x46u;
     unsigned short sat_y = (unsigned short)(nes_y + SUBSCREEN_SAT_Y_OFFSET);
@@ -1027,7 +1101,9 @@ static void draw_cursor(void)
 
     /* Flash palette: NES alternates sprite palette rows 5/6 per FrameCounter
      * bit 3 (Z_05.asm:7990-7999) -> Genesis SPR PAL2/PAL3. */
-    unsigned char  pal = (unsigned char)(((nes_ram[0x0015u] >> 3) & 1u) ?
+    /* The NES draws before its NMI advances FrameCounter: it sees the value
+     * this tick leaves one lower (flip at FrameCounter 9 / 17, not 8 / 16). */
+    unsigned char  pal = (unsigned char)((((nes_ram[0x0015u] - 1u) >> 3) & 1u) ?
                                           RENDER_PAL3 : RENDER_PAL2);
 
     /* NES draws the cursor as TWO $1E sprites forming the selection box:
@@ -1044,13 +1120,82 @@ static void draw_cursor(void)
     s_next_sat_slot = (unsigned char)(s1 + 1u);
 }
 
+/* T-255: a second, non-flashing box for a B/C assignment. */
+static void draw_assignment_box(unsigned char slot, unsigned char pal)
+{
+    unsigned char s;
+    unsigned char nes_y, nes_x, s0, s1;
+    unsigned short lx;
+    if (slot > 8u || !slot_owned(slot) || !hud_inventory_item_selectable(slot))
+        return;
+    s = slot;
+    nes_y = (s < 5u) ? 0x36u : 0x46u;
+    nes_x = k_submenu_cursor_xs[s];
+    lx = (unsigned short)(nes_x + 0x80u);
+    s0 = s_next_sat_slot;
+    s1 = (unsigned char)(s0 + 1u);
+    sat_write(s0, (unsigned short)(nes_y + SUBSCREEN_SAT_Y_OFFSET),
+              RENDER_SPRITE_SIZE(1, 2), s1,
+              RENDER_TILE_ATTR_FULL(pal, 0, 0, 0, CURSOR_VRAM_TILE), lx);
+    sat_write(s1, (unsigned short)(nes_y + SUBSCREEN_SAT_Y_OFFSET),
+              RENDER_SPRITE_SIZE(1, 2), 0u,
+              RENDER_TILE_ATTR_FULL(pal, 0, 0, 1, CURSOR_VRAM_TILE),
+              (unsigned short)(lx + 8u));
+    s_next_sat_slot = (unsigned char)(s1 + 1u);
+}
+
+static unsigned char assignment_label_col(unsigned char slot)
+{
+    unsigned char col = (unsigned char)(s_col_base + (k_submenu_cursor_xs[slot] >> 3));
+    return (col > s_col_base) ? (unsigned char)(col - 1u) : col;
+}
+
+static void write_assignment_letter(unsigned char row, unsigned char col,
+                                    unsigned char tile)
+{
+    const unsigned short addr = (unsigned short)(PLANE_A_BASE + row * 128u +
+                                                 col * 2u);
+    render_vram_open_write(addr);
+    *((volatile unsigned short *)0xC00000) =
+        RENDER_TILE_ATTR_FULL(0u, 0, 0, 0, tile_for(tile, 1u));
+}
+
+static void draw_assignment_labels(void)
+{
+    unsigned char b, c, b_row = 0xFFu, c_row, b_col = 0xFFu, c_col;
+    if (!game_profile_is_remix() || !s_active) return;
+    b = nes_ram[0x0656u];
+    c = loadout_c_slot();
+    if (b <= 8u && slot_owned(b) && hud_inventory_item_selectable(b)) {
+        b_row = (b < 5u) ? 6u : 8u;
+        b_col = assignment_label_col(b);
+        write_assignment_letter(b_row, b_col, 0x0Bu);
+    }
+    if (c <= 8u && c != b && slot_owned(c) &&
+        hud_inventory_item_selectable(c)) {
+        c_row = (c < 5u) ? 6u : 8u;
+        c_col = assignment_label_col(c);
+        if (c_col == b_col && c_row == b_row) ++c_col;
+        write_assignment_letter(c_row, c_col, 0x0Cu);
+    }
+}
+
+static void redraw_assignment_rows(void)
+{
+    if (!game_profile_is_remix()) return;
+    write_inventory_row(6u);
+    write_inventory_row(8u);
+    draw_assignment_labels();
+}
+
 void inventory_subscreen_exit(void)
 {
     /* Trigger scroll-out — tick clears rows N..0 over ~28 frames. */
     s_scroll_state = SCROLL_OUT;
     s_scroll_row   = SCROLL_TOTAL_ROWS;  /* clear from bottom up */
-    /* NES hides inventory sprites before scrolling back to the room. */
-    sat_write(0u, 0u, 0u, 0u, 0u, 0u);
+    /* NES hides inventory sprites but retains status-map dots before the
+     * first upward step. Publish the short marker chain, never a blank SAT. */
+    draw_scroll_markers(STATUS_MARKER_REST,0u);
     /* s_active stays 1 until scroll completes; tick deactivates + signals
      * main.c to call load_room. */
 
@@ -1072,13 +1217,25 @@ void inventory_subscreen_abort(void)
     s_active = 0u;
     s_scroll_state = SCROLL_IDLE;
     roomrom_hud_set_bottom_mode(0u);
-    render_set_window_on_top(7u);
+    /* Controller2 Up+A leaves the inventory without its scroll-out path.
+     * The next mode owns the scene, so cancel the queued pause SAT/scroll. */
+    render_menu_restore_deferred(0,0,7u);
 }
 
-/* Query: is scroll-out done (so main.c knows to call load_room)? */
+/* Poll: is scroll-out done (so main.c knows to call load_room)? The NES
+ * keeps the status marker at the top of the slide (line 53) for one frame
+ * after the last step, then at the HUD position (line 52) for one more with
+ * the room's sprites still hidden (p_q1_close t=52 / t=53); the room returns
+ * the frame after. */
 unsigned char inventory_subscreen_scrolled_out(void)
 {
-    return (s_scroll_state == SCROLL_IDLE && s_active == 0u);
+    if (s_scroll_state != SCROLL_IDLE || s_active != 0u) return 0u;
+    if (s_exit_phase != 0u) {
+        draw_scroll_markers((unsigned short)(s_exit_phase - 1u), 0u);
+        --s_exit_phase;
+        return (unsigned char)(s_exit_phase == 0u);
+    }
+    return 1u;
 }
 
 void inventory_subscreen_tick(unsigned char joy_state)
@@ -1087,19 +1244,29 @@ void inventory_subscreen_tick(unsigned char joy_state)
 
     /* Phase B scroll state machine — real VSRAM ramp, 3 px/frame (NES rate). */
     if (s_scroll_state == SCROLL_IN) {
-        /* NES active VScroll is $41: the eight-line viewport crop is in
-         * the tile-row origin above; Genesis VSRAM +1 aligns its pixel phase. */
-        s_vscroll -= SCROLL_VSCROLL_STEP;
-        menu_icons_upload();
-        menu_rows_catch_up(s_vscroll <= 0);
-        if (s_vscroll <= 0) {
-            s_vscroll = 1;
-            set_subscreen_vscroll(1);
+        unsigned short disp;
+        if (s_scroll_delay != 0u) {
+            --s_scroll_delay;
+            draw_scroll_markers(1u, 0u);
+            return;
+        }
+        if (s_scroll_k < 255u) ++s_scroll_k;
+        if (s_scroll_k <= SCROLL_LAST_STEP) {
+            /* NES active VScroll is $41: the eight-line viewport crop is in
+             * the tile-row origin above; Genesis VSRAM +1 aligns its pixel phase. */
+            s_vscroll = (short)(SCROLL_VSCROLL_TOP - SCROLL_VSCROLL_STEP * (short)s_scroll_k);
+            menu_icons_upload();
+            menu_rows_catch_up(s_scroll_k >= SCROLL_LAST_STEP);
+        }
+        if (s_scroll_k >= SCROLL_ACTIVE_STEP) {
             s_scroll_state = SCROLL_ACTIVE;
             draw_item_sprites();  /* sprites appear once menu is settled */
-        } else {
-            set_subscreen_vscroll(s_vscroll);
+            draw_assignment_labels();
+            return;
         }
+        disp = (unsigned short)(STATUS_STRIP_TOP - s_vscroll);
+        draw_scroll_markers(disp > STATUS_MARKER_REST ? STATUS_MARKER_REST : disp,
+                            (unsigned char)(s_scroll_k >= SCROLL_ACTIVE_STEP - 1u));
         return;
     }
 
@@ -1112,23 +1279,13 @@ void inventory_subscreen_tick(unsigned char joy_state)
              * until pause_restore_room queues the existing atomic VBlank
              * handoff. Resetting VSRAM/Window here exposes the inventory at
              * scroll zero for two frames before the room slot returns. */
-            set_subscreen_vscroll(s_vscroll);
             s_scroll_state = SCROLL_IDLE;
             s_active = 0u;
-            /* Clear ALL 80 SAT slots so no stale item/cursor sprite ghosts
-             * onto the first gameplay frame. */
-            {
-                unsigned char i;
-                render_vram_open_write(SAT_VRAM_BASE_GAMEPLAY);
-                for (i = 0; i < 80u; ++i) {
-                    *((volatile unsigned short *)0xC00000) = 0x0000;
-                    *((volatile unsigned short *)0xC00000) = 0x0000;
-                    *((volatile unsigned short *)0xC00000) = 0x0000;
-                    *((volatile unsigned short *)0xC00000) = 0x0000;
-                }
-            }
+            /* The short packet terminates the chain, hiding all old items. */
+            s_exit_phase = 2u;
+            draw_scroll_markers((unsigned short)(STATUS_STRIP_TOP - s_vscroll), 0u);
         } else {
-            set_subscreen_vscroll(s_vscroll);
+            draw_scroll_markers((unsigned short)(STATUS_STRIP_TOP - s_vscroll), 0u);
         }
         return;
     }
@@ -1141,31 +1298,65 @@ void inventory_subscreen_tick(unsigned char joy_state)
      * V2.10 (2026-05-20): NES-faithful cursor navigation across slots 0..8.
      * D-pad L/R cycles within row (wrap). U/D switches row keeping column.
      * A writes SelectedItemSlot to nes_ram[$656]. */
-    draw_item_sprites();
+    if (!game_profile_is_remix()) {
+        hud_move_inventory_item(0u);
+        s_cursor_slot = nes_ram[0x0656u];
+    } else if (s_cursor_slot > 8u && s_cursor_slot != 0x0Fu) {
+        s_cursor_slot = nes_ram[0x0656u];
+    }
 
     /* Joy bits per SGDK joy.h: UP=$01 DOWN=$02 LEFT=$04 RIGHT=$08
      * B=$10 C=$20 A=$40 START=$80. */
     unsigned char pressed = (unsigned char)(joy_state & ~s_prev_joy);
     s_prev_joy = joy_state;
 
-    /* NES source: Z_05.asm:UpdateSubmenuSelection.
+    /* NES source: Z_05.asm:UpdateSubmenuSelection / CheckLetter.
      * Drained C: hud_runtime.c:find_and_select_occupied_item_slot.
-     * Coverage: FULL selection ownership; preview guarded above.
-     * Stance: REPLACE the unguarded grid navigation with the shared owner.
-     * Right/left search across occupied slots. Up/down validate selection;
-     * the bow itself is not selectable and arrows require its ownership. */
+     * Coverage: PARTIAL (ownership retained, navigation deliberately changed).
+     * Stance: EXTEND shared owner for user-requested four-direction grid.
+     * Letter/potion share one cell; passive gear is never selectable. */
     if (pressed & 0x0Fu) {
         unsigned char old_slot = s_cursor_slot;
-        unsigned char direction = (pressed & 0x08u) ? 1u :
-                                  (pressed & 0x04u) ? 2u : 0u;
-        hud_select_inventory_item(direction);
-        s_cursor_slot = nes_ram[0x0656u];
-        g_inventory.selected_b_item = s_cursor_slot;
-        extern void roomrom_set_b_item_from_inv_cursor(unsigned char);
-        roomrom_set_b_item_from_inv_cursor(s_cursor_slot);
+        if (game_profile_is_remix()) {
+            /* Remix: the cursor is independent of the B assignment. Move
+             * the shared selector only to reuse its grid navigation, then
+             * restore the B slot. */
+            unsigned char b_slot = nes_ram[0x0656u];
+            nes_ram[0x0656u] = s_cursor_slot;
+            hud_move_inventory_item((unsigned char)(pressed & 0x0Fu));
+            s_cursor_slot = nes_ram[0x0656u];
+            nes_ram[0x0656u] = b_slot;
+            g_inventory.selected_b_item = b_slot;
+        } else {
+            hud_move_inventory_item((unsigned char)(pressed & 0x0Fu));
+            s_cursor_slot = nes_ram[0x0656u];
+            g_inventory.selected_b_item = s_cursor_slot;
+            extern void roomrom_set_b_item_from_inv_cursor(unsigned char);
+            roomrom_set_b_item_from_inv_cursor(s_cursor_slot);
+        }
         if (s_cursor_slot != old_slot)
             nes_ram[0x0602u] = 1u;       /* Tune1Request: selection changed */
     }
 
-    draw_cursor();
+    if (game_profile_is_remix()) {
+        unsigned char cur = (s_cursor_slot == 0x0Fu) ? 7u : s_cursor_slot;
+        unsigned char b = (nes_ram[0x0656u] == 0x0Fu) ? 7u : nes_ram[0x0656u];
+        extern void roomrom_set_b_item_from_inv_cursor(unsigned char);
+        if ((pressed & 0x10u) && cur <= 8u && cur != loadout_c_slot() &&
+            slot_owned(cur) && hud_inventory_item_selectable(cur)) {
+            nes_ram[0x0656u] = cur;
+            g_inventory.selected_b_item = cur;
+            roomrom_set_b_item_from_inv_cursor(cur);
+            nes_ram[0x0602u] = 1u;
+            redraw_assignment_rows();
+        }
+        if ((pressed & 0x20u) && cur <= 8u && cur != b &&
+            slot_owned(cur) && hud_inventory_item_selectable(cur)) {
+            loadout_set_c_slot(cur);
+            nes_ram[0x0602u] = 1u;
+            redraw_assignment_rows();
+        }
+    }
+
+    draw_item_sprites();
 }

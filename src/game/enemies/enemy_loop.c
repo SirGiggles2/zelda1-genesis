@@ -1126,6 +1126,7 @@ const enemy_update_fn enemy_update_fns[ENEMY_LOOP_TYPE_MAX] = {
  * past the @SetSpeed branch entirely). */
 static void clear_slot_scratch(unsigned int slot)
 {
+    enemy_like_like_shield_forget(slot);
     ENEMY_DIR(slot)            = 0u;
     ENEMY_STATE_TIMER(slot)    = 0u;
     ENEMY_METASTATE(slot)      = 1u;          /* NES default: first cloud state */
@@ -1172,6 +1173,7 @@ static void clear_slot_scratch(unsigned int slot)
 void enemy_loop_enter_cave_slots(void)
 {
     unsigned int slot;
+    enemy_like_like_shields_reset();
     core_clear_ram0300_up_to(5u, 0x1Fu);
     RAM(0x04CDu) = (unsigned char)DUNGEON_LBA_F(RAM(0x00EBu));   /* LevelBlockAttrsByteF */
     room_setup_obj_room_bounds();
@@ -1261,6 +1263,8 @@ static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene
      * counters, ...). Only on a real entry: the repeat-entry guard below
      * returns without touching room state. */
     if (!same_room && !s_fix_arm_suppress_room_init) {
+        /* T342: native room reset also ends transient shield ownership. */
+        enemy_like_like_shields_reset();
         core_clear_ram0300_up_to(5u, 0x1Fu);
         /* ResetInvObjState's LadderSlot half (T-056): no ladder is out in
          * a newly entered room. Its weapon-slot half stays with the
@@ -1486,6 +1490,7 @@ void enemy_loop_init_object(unsigned int slot, unsigned char t)
 {
     enemy_init_fn fn;
     const unsigned char cloud = (unsigned char)(t < 0x53u && t != 0x1Eu && t != 0x22u);
+    enemy_like_like_shield_forget(slot);
     RAM(0x000Fu) = (unsigned char)ENEMY_ALIVE_FLAG(slot);   /* STY $0F: uninit flag */
     /* UpdateObject: cloud types start with ObjTimer 7 (InitObject sets
      * the real value); flagged initialized before InitObject runs. */

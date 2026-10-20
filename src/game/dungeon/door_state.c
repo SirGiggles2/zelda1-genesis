@@ -51,6 +51,9 @@ static unsigned char s_false_timer;                /* $18..0 countdown      */
 static unsigned char s_entering;                   /* entering doorway bit  */
 static unsigned char s_cur_level;                  /* 1-based               */
 static unsigned char s_cur_room_id;
+static unsigned char s_defer_faces;                /* T-314: stage faces off-tick */
+static unsigned char s_prelaid_room;
+static unsigned char s_prelaid_valid;
 
 static void layout_door(unsigned char dir, unsigned char plane);
 static void publish_cur_opened_doors(void);
@@ -99,9 +102,28 @@ static void reset_door_flag(unsigned char room_id, unsigned char dir)
     if (a) nes_ram[a] = (unsigned char)(nes_ram[a] & (unsigned char)~DOOR_DIR_BIT(dir));
 }
 
+/* Shared FindDoorAttrByDoorBit extraction: rooms_dungeons[] LevelBlock
+ * AttrsA (N/S) and AttrsB (W/E). */
+static void read_door_types(unsigned char level, unsigned char quest,
+                            unsigned char room_id, unsigned char *out)
+{
+    unsigned short base;
+    unsigned char attrsA, attrsB;
+    base = (level <= 6u) ? 0u : 768u;
+    if (quest == 2u) base += 1536u;
+    attrsA = rooms_dungeons[base + (unsigned short)room_id];
+    attrsB = rooms_dungeons[base + 128u + (unsigned short)room_id];
+    out[DOOR_DIR_N] = (unsigned char)((attrsA >> 5) & 7u);
+    out[DOOR_DIR_S] = (unsigned char)((attrsA >> 2) & 7u);
+    out[DOOR_DIR_E] = (unsigned char)((attrsB >> 2) & 7u);
+    out[DOOR_DIR_W] = (unsigned char)((attrsB >> 5) & 7u);
+}
+
 /* LayOutDoors: clear CurOpenedDoors bits of doorways that are not true
  * doors, set the door flag of every opened key / bombable door, and copy
- * each door face into the play area (plane + PlayAreaTiles). */
+ * each door face into the play area (plane + PlayAreaTiles).
+ * T-314: when the scroll staged the faces into the destination plane,
+ * s_defer_faces skips the duplicate plane pass here. */
 static void lay_out_doors(unsigned char plane)
 {
     unsigned char dir;
@@ -114,7 +136,8 @@ static void lay_out_doors(unsigned char plane)
             set_door_flag(s_cur_room_id, dir);
         }
     }
-    for (dir = 0u; dir < DOOR_DIR_COUNT; dir++) layout_door(dir, plane);
+    if (!s_defer_faces)
+        for (dir = 0u; dir < DOOR_DIR_COUNT; dir++) layout_door(dir, plane);
     publish_cur_opened_doors();
     uw_door_state_apply_walkability();
 }
@@ -141,12 +164,11 @@ void uw_door_state_room_init(unsigned char level,
                               unsigned char quest,
                               unsigned char room_id)
 {
-    unsigned short base;
-    unsigned char attrsA, attrsB;
     unsigned short flags_at;
     unsigned char entering = s_entering;
 
     s_entering = 0u;
+    s_prelaid_valid = 0u;
     if (level == 0u || level > 9u || room_id >= 128u) return;
 
     s_cur_level   = level;
@@ -155,23 +177,9 @@ void uw_door_state_room_init(unsigned char level,
     s_false_open  = 0u;
 
     /* FindDoorAttrByDoorBit (Z_05.asm:4520) — packed attribute extraction.
-     *
      * rooms_dungeons[] LevelBlock layout (768 bytes per block):
-     *   [+0 .. +127]   AttrsA: N = (byte>>5)&7, S = (byte>>2)&7
-     *   [+128 .. +255] AttrsB: W = (byte>>5)&7, E = (byte>>2)&7
-     *
-     * Block offsets: L1-6 Q1 = 0, L7-9 Q1 = 768,
-     *                L1-6 Q2 = 1536, L7-9 Q2 = 2304. */
-    base = (level <= 6u) ? 0u : 768u;
-    if (quest == 2u) base += 1536u;
-
-    attrsA = rooms_dungeons[base + (unsigned short)room_id];
-    attrsB = rooms_dungeons[base + 128u + (unsigned short)room_id];
-
-    s_door_types[DOOR_DIR_N] = (unsigned char)((attrsA >> 5) & 7u);
-    s_door_types[DOOR_DIR_S] = (unsigned char)((attrsA >> 2) & 7u);
-    s_door_types[DOOR_DIR_E] = (unsigned char)((attrsB >> 2) & 7u);
-    s_door_types[DOOR_DIR_W] = (unsigned char)((attrsB >> 5) & 7u);
+     *   [+0 .. +127] AttrsA: N/S, [+128 .. +255] AttrsB: W/E. */
+    read_door_types(level, quest, room_id, s_door_types);
 
     /* InitMode7_Sub1: PrevOpenedDoors := CurOpenedDoors, CurOpenedDoors :=
      * entering doorway (scroll entries only; other entries start at 0);
@@ -190,6 +198,59 @@ void uw_door_state_room_init(unsigned char level,
         nes_ram[NES_TRIG_DOOR_DIR] = d;
         if (d) nes_ram[NES_TRIG_DOOR_CMD] = 0x02u;
     }
+}
+
+/* T-314: let the scroll lay the destination room's faces into the staged
+ * plane while the camera is still on the old room. Live door state is
+ * saved and restored; only plane tiles / live walkability are touched. */
+void uw_door_state_prelayout_room(unsigned char room_id, unsigned char level,
+                                  unsigned char quest, unsigned char nes_dir)
+{
+    unsigned char entering = (unsigned char)(((nes_dir >> 1) & 0x05u) |
+                                             ((nes_dir << 1) & 0x0Au));
+    unsigned char save_types[DOOR_DIR_COUNT];
+    unsigned char save_opened = s_cur_opened;
+    unsigned char save_level = s_cur_level;
+    unsigned char save_room = s_cur_room_id;
+    unsigned char save_false_open = s_false_open;
+    unsigned char save_false_timer = s_false_timer;
+    unsigned char save_entering = s_entering;
+    unsigned short flags_at;
+    unsigned char dir;
+
+    if (level == 0u || level > 9u || room_id >= 128u) return;
+    for (dir = 0u; dir < DOOR_DIR_COUNT; dir++)
+        save_types[dir] = s_door_types[dir];
+
+    read_door_types(level, quest, room_id, s_door_types);
+    s_cur_opened = entering;
+    flags_at = room_flags_addr(room_id);
+    if (flags_at) s_cur_opened |= (unsigned char)(nes_ram[flags_at] & 0x0Fu);
+    for (dir = 0u; dir < DOOR_DIR_COUNT; dir++) layout_door(dir, 1u);
+
+    for (dir = 0u; dir < DOOR_DIR_COUNT; dir++)
+        s_door_types[dir] = save_types[dir];
+    s_cur_opened = save_opened;
+    s_cur_level = save_level;
+    s_cur_room_id = save_room;
+    s_false_open = save_false_open;
+    s_false_timer = save_false_timer;
+    s_entering = save_entering;
+    s_prelaid_room = room_id;
+    s_prelaid_valid = 1u;
+}
+
+unsigned char uw_door_state_take_prelayout(unsigned char room_id)
+{
+    unsigned char ok = (unsigned char)(s_prelaid_valid &&
+                                       s_prelaid_room == room_id);
+    s_prelaid_valid = 0u;
+    return ok;
+}
+
+void uw_door_state_set_defer_faces(unsigned char defer)
+{
+    s_defer_faces = defer ? 1u : 0u;
 }
 
 /* Re-lay every door face (after the plane is repainted, e.g. relight). */

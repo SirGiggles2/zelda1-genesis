@@ -38,6 +38,9 @@
 #define FS_OPTIONS_ROW_COUNT   8u
 #define FS_OPTIONS_SAVE_ROW    7u
 #define FS_OPTIONS_CORE_ROW    0u
+#define FS_OPTIONS_MUSIC_ROW   6u
+#define FS_MUSIC_BACK_ROW      11u
+#define FS_MUSIC_ROW_COUNT     12u
 
 #ifdef __cplusplus
 extern "C" {

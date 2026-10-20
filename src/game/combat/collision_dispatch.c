@@ -14,6 +14,7 @@
 #include "world_state.h"       /* LINK_DIR */
 #include "core/core_dispatch.h"        /* core_play_parry_tune, core_handle_shot_blocked */
 #include "combat/combat_dispatch.h"    /* combat_play_parry_sound_for_damage_type, combat_deal_damage */
+#include "combat/combat_runtime.h"     /* roomrom_combat_is_redux */
 #include "combat/link_collision_dispatch.h" /* link_collision_begin_shove */
 #include "enemies/enemy_dispatch.h"    /* enemy_gohma_handle_weapon_collision */
 
@@ -44,6 +45,10 @@ static const unsigned char k_sword_damage_points[3] = {
     0x10u, 0x20u, 0x40u
 };
 
+/* T-358: 96-byte leaf hitbox compare with 228 static call sites, reached
+ * multiple times per monster per frame. Inline it so each check does not pay
+ * JSR/RTS + argument setup. The external definition stays for non-LTO users. */
+__attribute__((always_inline))
 unsigned char collision_do_objects_collide_with_thresholds(void)
 {
     /* drain at collision_runtime.c:8-28. */
@@ -396,7 +401,10 @@ __attribute__((always_inline)) void collision_check_monster_arrow_or_rod_collisi
     /* drain at collision_runtime.c:168-181. */
     COMBAT_WEAPON_SLOT = (uint8_t)weapon_slot;
     const unsigned char state = (unsigned char)OBJ_STATE(weapon_slot);
-    if (state >= 0x30u) {
+    /* Redux misc.asm (bank 1 $B5D4, CMP #$32): the wand's windup states $30/$31 no
+     * longer hit behind Link; they fall through to the arrow branch, which ignores
+     * states >= $20. Original keeps CMP #$30. */
+    if (state >= (roomrom_combat_is_redux() ? 0x32u : 0x30u)) {
         COMBAT_DAMAGE_TYPE = 1u;
         collision_check_monster_stabbing_collision(monster_slot, 32u);
         return;

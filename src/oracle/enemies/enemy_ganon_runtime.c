@@ -57,6 +57,7 @@
 #include "platform_abi.h"
 #include "core/core_dispatch.h"
 #include "world/progress_dispatch.h"
+#include "../../state/game_profile.h"
 #include "../combat/collision_runtime.h"
 #include "../combat/link_collision_runtime.h"
 #include "../world/sprite_runtime.h"
@@ -348,7 +349,9 @@ static void ganon_dying(unsigned int slot)
         }
         ganon_set_up_burst_rays(slot);
         enrt_play_boss_death_cry();
-        GANON_SONG_REQUEST = 0x02u;
+        /* T-349 user arrangement: Remix only, at the existing post-flash
+         * ashes/burst cue. Original retains the native Ganon song. */
+        GANON_SONG_REQUEST = game_profile_is_remix() ? 0x03u : 0x02u;
     }
 
     ganon_draw_ashes(slot);

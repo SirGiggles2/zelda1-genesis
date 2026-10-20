@@ -1,6 +1,8 @@
 #include "bg_palette.h"
 #include "render_abi.h"
 #include "platform_abi.h"
+#include "../../state/player_state.h"   /* T-251: g_player_count */
+#include "render/green_rupee.h"          /* T-317 green rupee palette entries */
 
 /* Reuse the existing misc_palettes NES-color-index -> Gen-CRAM-word LUT.
  * Same table consumed by ow_room_render_roomrom.c, uw_room_render_roomrom.c,
@@ -113,12 +115,40 @@ void roomrom_bg_palette_load_sprite_only(const unsigned char *palram32)
         pal3[1] = roomrom_bg_palette_nes_to_cram(palram32[16 + 9]);   /* $3F19 */
         pal3[2] = roomrom_bg_palette_nes_to_cram(palram32[16 + 10]);  /* $3F1A */
         pal3[3] = roomrom_bg_palette_nes_to_cram(palram32[16 + 11]);  /* $3F1B */
+        /* T-317: free high entries for the green world-rupee tile. NES-
+         * derived sprites use indices 0..3, so 13/14 do not collide. */
+        pal3[GREEN_RUPEE_PAL_BODY] =
+            roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_BODY);
+        pal3[GREEN_RUPEE_PAL_SHADE] =
+            roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_SHADE);
         render_load_palette(3u, pal3);
     }
+
+    /* T-251: with more than one player, PAL1 is also the identity palette.
+     * Re-assert it after every sprite-palette load (room/level changes). */
+    roomrom_bg_palette_apply_multiplayer();
+}
+
+void roomrom_bg_palette_apply_multiplayer(void)
+{
+    if (g_player_count <= 1u) return;
+    /* NES palette indices: $29 green, $16 red, $12 blue, $14 purple,
+     * $30 white. Using the console's own palette keeps the colors inside
+     * the conversion table; identity selection is permanent. */
+    render_cram_write_color_if_changed(17u, roomrom_bg_palette_nes_to_cram(0x29u)); /* PAL1[1] */
+    render_cram_write_color_if_changed(20u, roomrom_bg_palette_nes_to_cram(0x16u)); /* PAL1[4] */
+    render_cram_write_color_if_changed(24u, roomrom_bg_palette_nes_to_cram(0x12u)); /* PAL1[8] */
+    render_cram_write_color_if_changed(28u, roomrom_bg_palette_nes_to_cram(0x14u)); /* PAL1[12] */
+    render_cram_write_color_if_changed(21u, roomrom_bg_palette_nes_to_cram(0x30u)); /* PAL1[5] flash */
 }
 
 void roomrom_bg_palette_refresh_link_color(void)
 {
+    if (g_player_count > 1u) {
+        /* T-251: identity color is permanent; rings never repaint P1. */
+        render_cram_write_color(17u, roomrom_bg_palette_nes_to_cram(0x29u));
+        return;
+    }
     const unsigned char c = nes_ram[LEVEL_PALETTE_LINK_COLOR];
     if (c == 0u) return;
     s_sprite_palram_cram[1] = roomrom_bg_palette_nes_to_cram(c);
@@ -158,40 +188,20 @@ static unsigned char  s_gray_active = 0u;
  * Built once; first NES index wins, which resolves $0000 to $0D (same
  * gray as $0F) and $0AAA to $10. Words not produced by the NES table
  * (none in Zelda's palettes) fall back to the $0F gray. */
-static unsigned short s_gray_by_word[512];
-static unsigned char  s_gray_table_ready = 0u;
-
-static unsigned short word_key(unsigned short w)
-{
-    return (unsigned short)(((w >> 1) & 0x7u) | ((w >> 2) & 0x38u) |
-                            ((w >> 3) & 0x1C0u));
-}
-
-static void build_gray_table(void)
-{
-    unsigned short k;
-    signed char i;
-    for (k = 0u; k < 512u; ++k)
-        s_gray_by_word[k] = roomrom_bg_palette_nes_to_cram(0x0Fu & 0x30u);
-    /* Descending, so the lowest NES index sharing a word is written last. */
-    for (i = 63; i >= 0; --i) {
-        s_gray_by_word[word_key(roomrom_bg_palette_nes_to_cram((unsigned char)i))] =
-            roomrom_bg_palette_nes_to_cram((unsigned char)((unsigned char)i & 0x30u));
-    }
-    s_gray_table_ready = 1u;
-}
+/* T-251 P0.4: the gray lookup is ROM-const (generated from misc_palettes),
+ * freeing 1 KB of .bss for per-player weapon contexts. */
+extern const unsigned short k_gray_by_word[512];
+static unsigned char  s_gray_table_ready = 1u;
 
 void roomrom_ppu_mask_grayscale_init(void)
 {
-    /* Built outside gameplay frames: the first flash must not pay for it. */
-    if (!s_gray_table_ready) build_gray_table();
+    (void)s_gray_table_ready;
 }
 
 void roomrom_ppu_mask_grayscale_sync(void)
 {
     unsigned char want = (unsigned char)(nes_ram[NES_CUR_PPU_MASK] & 0x01u);
     if (want == s_gray_active) return;
-    if (!s_gray_table_ready) build_gray_table();
-    render_cram_set_grayscale(want ? s_gray_by_word : (const unsigned short *)0);
+    render_cram_set_grayscale(want ? k_gray_by_word : (const unsigned short *)0);
     s_gray_active = want;
 }

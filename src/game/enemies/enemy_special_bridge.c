@@ -38,6 +38,33 @@
 #define LIKELIKE_CAPTURE_TIMER(slot)    OBJ(0x042Cu, (slot))  /* ObjCaptureTimer */
 #define LINK_PARALYZED_FLAG             RAM(0x0512u)          /* LinkParalyzed */
 #define INV_MAGIC_SHIELD                RAM(0x0676u)          /* InvMagicShield */
+/* NES source: UpdateLikeLike's actual shield-removal boundary.
+ * Drained C: enrt_update_like_like / native_set_up_dropped_item.
+ * Coverage: PARTIAL theft/death/lifecycle; Stance: EXTEND. The user requests
+ * Redux shield return beyond the source no-drop policy; Original stays native.
+ * Only slots1..11 can own a shield, so two transient bytes suffice. */
+static unsigned short s_like_like_shields;
+
+void enemy_like_like_shields_reset(void)
+{
+    s_like_like_shields = 0u;
+}
+
+void enemy_like_like_shield_forget(unsigned int slot)
+{
+    if (slot >= 1u && slot <= 11u)
+        s_like_like_shields &= (unsigned short)~(1u << slot);
+}
+
+unsigned char enemy_like_like_shield_take(unsigned int slot)
+{
+    unsigned short bit;
+    if (slot < 1u || slot > 11u) return 0u;
+    bit = (unsigned short)(1u << slot);
+    if ((s_like_like_shields & bit) == 0u) return 0u;
+    s_like_like_shields &= (unsigned short)~bit;
+    return 1u;
+}
 #define LIKELIKE_OBJ_SHOVE_DIR(slot)    OBJ(0x00C0u, (slot))  /* ObjShoveDir */
 #define LIKELIKE_OBJ_SHOVE_DIST(slot)   OBJ(0x00D3u, (slot))  /* ObjShoveDistance */
 
@@ -239,6 +266,9 @@ void enrt_update_like_like(unsigned int slot)
              * to match the lock semantics from the NES routine. */
             if (options_consumer_get_like_like_behavior()
                 == OPTIONS_LIKELIKE_VANILLA) {
+                if (INV_MAGIC_SHIELD != 0u && game_profile_is_remix() &&
+                    slot >= 1u && slot <= 11u)
+                    s_like_like_shields |= (unsigned short)(1u << slot);
                 INV_MAGIC_SHIELD = 0u;
             }
             LIKELIKE_CAPTURE_TIMER(slot) = 0xC0u;

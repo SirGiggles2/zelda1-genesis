@@ -217,6 +217,28 @@ extern unsigned char enemy_loop_probe_is_armed(void);
  * sizes SGDK set up; both now land above the mirror. No allocation can
  * reach NES RAM. (DMA_initEx's MEM_free of the old buffer clears bit 0 of
  * its old header word, NES $15C; the memset below runs after it.) */
+/* T-318: an Original launch after an MD Remix one (same boot, no reset) must
+ * show the VRAM of a fresh Original launch. Tiles the Remix loaders fill and
+ * the Original loaders never touch stay behind; the alternate capture
+ * (p17_gen_file_alternate alt3 vs file_original) named them: the BG atlas
+ * tail 664..676, the core BG extras 1172..1181 and two single tiles. They
+ * are zero after a fresh Original launch. Tiles 1440..1535 (SGDK's system
+ * font, overwritten by the Remix iris masks, T-284) are not touched: the
+ * product never draws them. */
+static void clear_remix_only_tiles(void)
+{
+    static const unsigned short range[4][2] = {
+        { 664u, 13u }, { 1172u, 10u }, { 1347u, 1u }, { 1352u, 1u }
+    };
+    unsigned char r;
+    unsigned short w;
+    for (r = 0u; r < 4u; ++r) {
+        render_vram_open_write((unsigned short)(range[r][0] * 32u));
+        for (w = 0u; w < range[r][1] * 16u; ++w)
+            *((volatile unsigned short *)0xC00000) = 0u;
+    }
+}
+
 extern u32 _bend;
 #define NES_MIRROR_LO 0xFF8000ul
 #define NES_MIRROR_HI 0xFF8800ul
@@ -330,6 +352,8 @@ int debug_main_after_a4(bool hardReset)
                 {
                     unsigned char slot = g_fs_handoff_slot;
                     (void)game_profile_activate(slot);
+                    if (save_game_slot_mode(slot) != SAVE_MODE_MD_REMIX)
+                        clear_remix_only_tiles();
                     unsigned char q2 = (save_game_slot_active(slot) &&
                                         save_game_slot_quest(slot)) ? 1u : 0u;
                     roomrom_main_set_quest(q2 ? 2u : 1u);

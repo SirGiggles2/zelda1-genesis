@@ -427,6 +427,8 @@ static unsigned char s_ps_pending;
 static unsigned char s_menu_restore_pending;
 static unsigned short s_menu_restore_rows;
 static unsigned short s_ps_col, s_ps_room_col, s_ps_room_row;
+static unsigned short s_pf_base, s_pf_count;
+static short s_pf_vertical;
 static void startup_triangle_flush(void);
 
 void render_plane_defer_flush(void)
@@ -434,6 +436,15 @@ void render_plane_defer_flush(void)
     unsigned char i;
     if (s_wm_pending) window_move_flush();
     if (s_ps_pending) pause_scene_flush();
+    if (s_pf_count && !s_ps_pending) {
+        /* NES source: Z_05 MovePositionMarkers and NMI scroll/OAM publish.
+         * Drained C: inventory_render.c pause strip/SAT owner.
+         * Coverage: PARTIAL(pause publication); Stance: EXTEND.
+         * Active-display SAT writes reached sprite evaluation one frame
+         * before the new full-screen scroll. Publish the complete pair. */
+        DMA_doDma(DMA_VRAM,vdpSpriteCache,s_pf_base,(u16)(s_pf_count*4u),2);
+        s_pf_count=0u;
+    }
     if (s_menu_restore_pending) {
         s_menu_restore_pending = 0u;
         VDP_setWindowOnTop(s_menu_restore_rows);
@@ -533,6 +544,16 @@ void render_cram_write_color(unsigned short slot, unsigned short value)
     cram_store((unsigned short)(slot & 0x3Fu), &value, 1u);
 }
 
+/* T-251: skip the VDP write when the shadow already holds this color.
+ * Uses the same s_cram_shadow that every cram_store keeps current. */
+void render_cram_write_color_if_changed(unsigned short slot,
+                                        unsigned short value)
+{
+    const unsigned short idx = (unsigned short)(slot & 0x3Fu);
+    if (s_cram_shadow[idx] == value) return;
+    cram_store(idx, &value, 1u);
+}
+
 /* Open CRAM at offset 0 and stream count color words. */
 void render_cram_upload(const unsigned short *src, unsigned short count)
 {
@@ -599,9 +620,21 @@ void render_update_sprites(unsigned short count)
  * engine HUD lives on the Window plane (NES status-bar parity at top
  * of screen). Underlying SGDK call: VDP_setTileMapXY(WINDOW, ...).
  * Adapter routes here so src/game/hud/ can drop <genesis.h>. */
+/* NES source: Redux FormatStatusBarText/map_once native HUD transfers.
+ * Drained C: mask_scene_copy/startup_triangle_flush backing-store owner.
+ * Coverage: PARTIAL (HUD writes during approved Genesis masks).
+ * Stance: EXTEND. A mask borrows Window; its saved HUD remains live. */
+static unsigned char s_mask_active;
+static unsigned short s_mask_col;
+
 void render_set_window_word(unsigned short col, unsigned short row,
                             unsigned short word)
 {
+    if (s_mask_active && col < 32u && row < 7u) {
+        plane_word((unsigned short)(PLANE_A_BASE + row * 128u +
+                                    s_mask_col * 2u + col * 2u), word);
+        return;
+    }
     /* T-172: same deferral as the plane cells (status-bar changes reach
      * the NES screen in the next NMI). */
     if (s_pd_on) {
@@ -616,6 +649,10 @@ void render_set_window_word(unsigned short col, unsigned short row,
 void render_clear_window_rect(unsigned short col, unsigned short row,
                               unsigned short w, unsigned short h)
 {
+    if (s_mask_active && col + w <= 32u && row + h <= 7u) {
+        VDP_clearTileMapRect(BG_A, (u16)(s_mask_col + col), row, w, h);
+        return;
+    }
     VDP_clearTileMapRect(WINDOW, col, row, w, h);
 }
 
@@ -634,12 +671,28 @@ void render_set_window_on_bottom(unsigned short rows)
 /* Keep scroll and fixed-window restoration at the same VBlank boundary. */
 void render_menu_restore_deferred(short horizontal, short vertical, unsigned short window_rows)
 {
+    s_pf_count=0u; /* The room restore supersedes the final pause packet. */
     VDP_setHorizontalScrollVSync(BG_A, horizontal);
     VDP_setHorizontalScrollVSync(BG_B, horizontal);
     VDP_setVerticalScrollVSync(BG_A, vertical);
     VDP_setVerticalScrollVSync(BG_B, vertical);
     s_menu_restore_rows = window_rows;
     s_menu_restore_pending = 1u;
+}
+
+void render_pause_frame_deferred(unsigned short sat_base, short vertical,
+                                 unsigned short sprite_count)
+{
+    s_pf_base=sat_base;
+    s_pf_vertical=vertical;
+    /* SGDK applies scroll at the start of SYS_doVBlankProcess, before the
+     * VDP's full-screen scroll latch. Our existing transfer flush follows
+     * that call and publishes the matching SAT before sprite evaluation. */
+    if (s_ps_pending!=1u) {
+        VDP_setVerticalScrollVSync(BG_A,vertical);
+        VDP_setVerticalScrollVSync(BG_B,vertical);
+    }
+    s_pf_count=sprite_count;
 }
 
 void render_pause_scene_deferred(unsigned short menu_col,
@@ -659,23 +712,31 @@ static void pause_scene_flush(void)
 {
     unsigned short row;
     const unsigned short dst = (unsigned short)(PLANE_A_BASE + s_ps_col * 2u);
+    if (s_ps_pending==2u) {
+        /* The frozen strip was copied last tick. SGDK has now published
+         * its scroll at this VBlank; expose it with the matching SAT. */
+        VDP_setWindowOnTop(0u);
+        s_ps_pending=0u;
+        return;
+    }
     SYS_disableInts();
     for (row = 0u; row < 28u; ++row) {
         const unsigned short src = row < 7u
             ? (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u)
             : (unsigned short)(PLANE_A_BASE +
                 ((s_ps_room_row + row - 7u) & 63u) * 128u + s_ps_room_col * 2u);
-        DMA_doVRamCopy(src, (unsigned short)(dst + (22u + row) * 128u), 64u, 1);
+        DMA_doVRamCopy(src, (unsigned short)(dst + (RENDER_PAUSE_HUD_STRIP_TOP/8u + row) * 128u), 64u, 1);
         DMA_waitCompletion();
     }
     render_set_autoinc_word();
-    VDP_setWindowOnTop(0u);
-    VDP_setHorizontalScroll(BG_A, s_ps_col ? -256 : 0);
-    VDP_setHorizontalScroll(BG_B, s_ps_col ? -256 : 0);
-    VDP_CTRL_LONG = 0x40000010UL;
-    VDP_DATA_WORD = 174u;
-    VDP_DATA_WORD = 174u;
-    s_ps_pending = 0u;
+    /* Keep the old viewport while copying. The 28 source-row DMA setups
+     * can reach active display; switching here exposed a partly built strip
+     * for one frame (T353 Q2 open001). Commit only at the next VBlank. */
+    VDP_setHorizontalScrollVSync(BG_A,s_ps_col ? -256 : 0);
+    VDP_setHorizontalScrollVSync(BG_B,s_ps_col ? -256 : 0);
+    VDP_setVerticalScrollVSync(BG_A,s_pf_vertical);
+    VDP_setVerticalScrollVSync(BG_B,s_pf_vertical);
+    s_ps_pending = 2u;
     SYS_enableInts();
 }
 
@@ -685,7 +746,7 @@ static void pause_scene_flush(void)
  * Highest existing dynamic pattern is 1439; tables begin at tile 1536. */
 static const unsigned long *s_tri_patterns;
 static const unsigned short *s_tri_map;
-static unsigned short s_tri_count, s_tri_color, s_mask_col;
+static unsigned short s_tri_count, s_tri_color;
 static short s_tri_h, s_tri_v;
 static unsigned char s_tri_pending, s_mask_stride = 32u;
 static unsigned short s_circle_priorities[5];
@@ -723,6 +784,18 @@ static void mask_scene_copy(short horizontal, short vertical)
             DMA_waitCompletion();
         }
     }
+    /* A native NMI HUD transfer may already be queued for Window when the
+     * mask takes its snapshot. Preserve its next-VBlank timing but retarget
+     * it to the backing HUD, so mask upload cannot erase the update. */
+    for (unsigned short i = 0u; i < s_pd_count; ++i) {
+        const unsigned short base = VDP_getWindowAddress();
+        const unsigned short offset = (unsigned short)(s_pd_addr[i] - base);
+        const unsigned short r = (unsigned short)(offset >> (windowWidthSft + 1u));
+        const unsigned short c = (unsigned short)((offset >> 1) & (windowWidth - 1u));
+        if (s_pd_addr[i] >= base && r < 7u && c < 32u)
+            s_pd_addr[i] = (unsigned short)(PLANE_A_BASE + r * 128u + s_mask_col * 2u + c * 2u);
+    }
+    s_mask_active = 1u;
 }
 
 static void mask_scene_activate(void)
@@ -829,6 +902,7 @@ static void startup_triangle_flush(void)
                            (unsigned short)(VDP_getWindowAddress() + row * windowWidth * 2u), 64u, 1);
             DMA_waitCompletion();
         }
+        s_mask_active = 0u;
         PAL_setColor(63u, s_tri_color);
         VDP_setWindowOnTop(7u);
         render_scene_scroll_set(s_tri_h, s_tri_v);

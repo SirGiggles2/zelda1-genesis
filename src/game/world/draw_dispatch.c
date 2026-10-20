@@ -33,6 +33,7 @@
                                       * sprite_anim_fetch_obj_pos */
 #include "../options/options_consumer.h"  /* options_consumer_get_no_reduced_flashing */
 #include "../enemies/enemy_render.h"      /* Phase A: enemy_render_publish_pair_left */
+#include "render/green_rupee.h"          /* T-317 green world rupee tile */
 
 /* --------------------------------------------------------------- */
 /* Zero-page scratch slot semantic aliases for the draw pipeline.   */
@@ -572,8 +573,14 @@ static void anim_write_specific_item_sprites(unsigned int slot,
      * in this chain (item draws don't use the mirrored flag). */
     tile_idx = (unsigned char)(tile_idx + (unsigned char)DRAW_MIRRORED);
 
-    const unsigned char left_tile =
+    unsigned char left_tile =
         k_anim_item_frame_tiles[tile_idx & 0x3Fu];
+    /* T-317: Remix world 1-rupee uses the remapped green copy. HUD/item
+     * context (g_draw_in_item_context == 2) keeps the normal tile. */
+    if (game_profile_is_remix() && item_slot == 0x16u &&
+        g_draw_in_item_context == 1u) {
+        left_tile = GREEN_RUPEE_NES_TILE;
+    }
     DRAW_LEFT_TILE = left_tile;
     DRAW_RIGHT_TILE = (uint8_t)(left_tile + 2u);
 
@@ -768,6 +775,15 @@ void draw_item_by_slot(unsigned int item_slot, unsigned int slot)
         return;
     }
 
+    /* T-317 MD Remix red rupee slot $20: reuse the small rupee tile via
+     * slot $1C (same frame-0 tile as $16) with sprite sub-palette 2
+     * (PAL3 red ramp). Sub-pal 3 routes to PAL2 (blue), so it cannot be
+     * used here. Slot $1C avoids the green tile substitution on $16. */
+    if (item_slot == 0x20u) {
+        anim_write_static_item_sprites_with_attributes(2u, draw_slot, 0x1Cu);
+        return;
+    }
+
     /* Slots $00/$04/$02/$07/$0B: add item value in TMP4 to attr offset.
      * TMP4 is set by DrawItemInInventory or AnimateItemObject. */
     int add_item_and_table =
@@ -828,6 +844,7 @@ void draw_write_boss_sprite(unsigned char tile, unsigned char x,
      * Net: write y/tile/attr/x to the rolling OAM record + cycle cursor. */
     const unsigned char cur_idx = (unsigned char)DRAW_CUR_SPRITE_INDEX;
     const unsigned char off = k_sprite_offsets[cur_idx & 0x3Fu];
+    enemy_render_note_boss_oam();
     DRAW_OAM_TILE(off) = tile;
     DRAW_OAM_X(off)    = x;
     DRAW_OAM_Y(off)    = y;
@@ -880,7 +897,8 @@ void draw_animate_item_object(unsigned char item_id, unsigned int slot)
     DRAW_LEFT_ATTR = value;
 
     const unsigned char item_slot =
-        (idx < 36u) ? k_item_id_to_slot[idx] : 0x00u;
+        (idx < 36u) ? k_item_id_to_slot[idx]
+        : (game_profile_is_remix() && idx == 0x24u) ? 0x20u : 0x00u;
     draw_item_by_slot((unsigned int)item_slot, slot);
 }
 

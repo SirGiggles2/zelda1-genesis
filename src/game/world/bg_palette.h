@@ -77,7 +77,10 @@ void roomrom_bg_palette_load_bg_only(const unsigned char *palram16);
  * byte $6B92. For load paths that set the save's ring after the room
  * palette went up (File Select handoff, debug item unlock). */
 void roomrom_bg_palette_refresh_link_color(void);
-
+/* T-251: lock the four player identity colors into PAL1 when more than one
+ * player is active. Entry 1 = green (P1), 4 = red (P2), 8 = blue (P3),
+ * 12 = purple (P4), 5 = flash white. No-op for one player. */
+void roomrom_bg_palette_apply_multiplayer(void);
 /* Returns pointer to 4 cached CRAM words for NES sprite sub-palette
  * `subpal_idx` (0..3) from the most recent load_palram_full. Layout
  * mirrors NES palram $3F10+$04*subpal: word 0 = universal-bg mirror

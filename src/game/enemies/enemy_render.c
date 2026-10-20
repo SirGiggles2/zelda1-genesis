@@ -24,8 +24,10 @@
 #include "world/render/sprite_render.h"  /* roomrom_sprites_item_chr_variant */
 #include "world/render/redux_chr.h"
 #include "world/render/subpal_routing.h"  /* Phase AA centralized sub-pal -> OAM pal API */
+#include "world/render/green_rupee.h"     /* T-317 green world rupee tile */
 #include "enemy_loop.h"   /* ENEMY_LOOP_SLOT_FIRST/LAST */
 #include "enemy_state.h"  /* ENEMY_X, ENEMY_Y, ENEMY_ALIVE_FLAG, ENEMY_THROWER_SLOT */
+#include "../../state/game_profile.h"
 #include "../../../engine/src/vram_layout.h"  /* canonical ROOMROM_SPR_TILE_BASE */
 #include "../../../engine/src/atlas/level_chr_swap.h"  /* sub-pal 3 cache flush key */
 
@@ -51,6 +53,9 @@ static const unsigned char k_sprite_offsets[41] = {
 #define ENEMY_RENDER_OBJ_X(slot)  OBJ(NES_OBJ_X, (slot))
 #define ENEMY_RENDER_OBJ_Y(slot)  OBJ(NES_OBJ_Y, (slot))
 #define ENEMY_RENDER_INV_TIMER(slot) OBJ(NES_OBJ_INV_TIMER_BASE, (slot))
+
+/* T-358: direct-OAM boss producer latch; reset at frame start. */
+static unsigned char s_boss_oam_written = 0u;
 
 /* NES Z_01.asm:3088 — CycleCurSpriteIndex: advance + wrap at $28. */
 static inline void cycle_cur_sprite_index(void)
@@ -434,19 +439,22 @@ void enemy_render_prepare_fx_chr(void)
  * fields; item tiles carry ITEM_ATTR_MARKER, cloud frames use the same
  * biased cloud bank as enemy_render_publish_meta (DrawCloud is the one
  * NES routine behind both). */
-#define ENEMY_RENDER_WEAPON_SLOTS      4u
+#define ENEMY_RENDER_WEAPON_SLOTS      5u
 #define ENEMY_RENDER_WEAPON_MAX        8u   /* 4 clouds x mirrored pair */
 static enemy_render_entry_t
     s_weapon_entries[ENEMY_RENDER_WEAPON_SLOTS][ENEMY_RENDER_WEAPON_MAX];
 static unsigned char s_weapon_count[ENEMY_RENDER_WEAPON_SLOTS];
 
-/* Cache index, in NES weapon update order: $0E, $10, $11. */
+/* Cache index, in NES weapon update order: $0E, $10, $11. The sword's right
+ * piece ($0D) goes last: NES allocates a two-piece item's second sprite from
+ * the end of OAM, so it loses every overlap to the shot's pieces. */
 static unsigned char weapon_index(unsigned char slot)
 {
     if (slot == 0x0Eu) return 0u;
     if (slot == 0x10u) return 1u;
     if (slot == 0x11u) return 2u;
     if (slot == 0x13u) return 3u;              /* room item (T-130) */
+    if (slot == 0x0Du) return 4u;              /* sword's right piece (T-318) */
     return 0xFFu;
 }
 
@@ -567,6 +575,7 @@ void enemy_render_publish_meta(unsigned int slot)
 void enemy_render_reset_oam(void)
 {
     unsigned int i;
+    s_boss_oam_written = 0u;
     /* Both render paths consume only this frame's writes. Boss rooms
      * read OAM; ordinary rooms read the native cache. Clearing only at
      * the end of the native sweep preserved old entries in boss rooms.
@@ -701,6 +710,15 @@ void enemy_render_reset_oam(void)
  * routines emit raw NES tiles $C0+ (PPU $0C00 bank); translate_tile remaps
  * those to ROOMROM_BOSS_TILE_BASE when this is set. */
 static unsigned char s_boss_bank_active = 0u;
+
+/* T-358: set by the only boss producers that still write the NES OAM
+ * shadow (Aquamentus via draw_write_boss_sprite, Gleeok via its direct
+ * OAM writers). Bosses that publish through the native cache leave it 0,
+ * so the 64-entry OAM scan and both cache passes can be skipped. */
+void enemy_render_note_boss_oam(void)
+{
+    s_boss_oam_written = 1u;
+}
 
 /* CommonSpritePatterns is already extracted from the supplied ROM.
  * Its $44/$45 bytes match live NES boss CHR (bank 2 offset $04BF).
@@ -1084,6 +1102,11 @@ static inline unsigned short translate_tile(unsigned char nes_tile,
         /* 2026-05-22 — route item tiles to ITEM atlas. NES tile ID
          * maps to atlas index via lookup. Genesis VRAM slot =
          * ITEM_TILE_BASE + atlas_index. */
+        /* T-317: remapped green world-rupee tile uploaded by
+         * roomrom_sprites_upload_items_chr into a free atlas slot. */
+        if (nes_tile == GREEN_RUPEE_NES_TILE)
+            return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
+                                    GREEN_RUPEE_ATLAS_IDX);
         unsigned char atlas_idx = k_nes_item_tile_to_atlas_idx[nes_tile];
         if (atlas_idx != 0xFFu)
             return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
@@ -1317,6 +1340,22 @@ static inline __attribute__((always_inline)) unsigned short xlat_sat(unsigned ch
     unsigned short tid;
     unsigned char force;
     unsigned short sat;
+    /* T-332: Moldorm publishes tile $44 for every segment every frame, so
+     * the generic slow path paid translate_tile + four palette-range tests
+     * ten times per frame. $44/$45 have a fixed resident translation once
+     * the cold CHR upload has run; reproduce it exactly, including the
+     * sub-pal-3 copy and its forced PAL1. Marker attrs stay generic. */
+    if ((unsigned char)(tile - 0x44u) < 2u &&
+        !(attrs & (META_ATTR_MARKER | ITEM_ATTR_MARKER))) {
+        const unsigned char sp3 = (unsigned char)((attrs & 3u) == 3u);
+        if (!s_fireball_chr_uploaded) ensure_fireball_chr();
+        tid = (unsigned short)((sp3 ? ROOMROM_FIREBALL_SUBPAL3_TILE_BASE
+                                    : ROOMROM_FIREBALL_TILE_BASE) +
+                               (unsigned short)(tile - 0x44u));
+        sat = (unsigned short)(s_xlat_attr[attrs] | tid);
+        if (sp3) sat = (unsigned short)((sat & 0x9FFFu) | (RENDER_PAL1 << 13));
+        return sat;
+    }
     /* T-172: ordinary translated tiles need no lazy CHR/palette path. */
     if (e < 0x0800u && !(attrs & (META_ATTR_MARKER | ITEM_ATTR_MARKER)) &&
         (attrs & 3u) != 3u)
@@ -1551,9 +1590,26 @@ static unsigned short emit_native_entries_all(unsigned short sat_slot,
 unsigned char enemy_render_needs_oam_sweep(void)
 {
     unsigned char room_type = RAM(0x035F);
-    return (unsigned char)(level_chr_boss_is_ready() &&
-                          room_type != 0x3Eu &&
-                          room_type != 0x47u && room_type != 0x48u);
+    /* NES source: Z_04 UpdateMoldorm -> Anim_WriteSprite.
+     * Drained C: enemy_moldorm_runtime + anim_write_sprite_drained above.
+     * Coverage: Remix Moldorm segments/death FX and cached weapons.
+     * Stance: EXTEND the existing native producer selection. T332's live
+     * room27 has no manual boss OAM, so the unused 64-entry scan and its
+     * second cache traversal are removed; the single-pass cache keeps the
+     * bomb-explosion frame. Original retains its existing route. */
+    if (room_type == 0x41u) {
+        if (g_profile_remix) return 0u;
+        /* Original keeps the historical route: no flag check here. */
+        return (unsigned char)level_chr_boss_is_ready();
+    }
+    if (room_type == 0x3Eu || room_type == 0x47u || room_type == 0x48u) {
+        return 0u;
+    }
+    if (!level_chr_boss_is_ready()) return 0u;
+    /* Digdogger/Gohma/Manhandla/Dodongo/Lanmola draw only through the
+     * native cache. Aquamentus and Gleeok set the flag from their direct
+     * OAM writers during the object update. */
+    return s_boss_oam_written;
 }
 
 void enemy_render_sweep_oam_to_sat(void)
@@ -1764,7 +1820,7 @@ void enemy_render_native_sweep(void)
     }
 
     /* Clear per-slot entry counts for next frame; entries arrays stay
-     * populated (overwritten as new anim_write calls append). */
+     * populated (overwritten as anim_write calls append). */
     {
         unsigned char i;
         for (i = 0u; i <= ENEMY_LOOP_SLOT_LAST; ++i) {
@@ -1772,3 +1828,4 @@ void enemy_render_native_sweep(void)
         }
     }
 }
+

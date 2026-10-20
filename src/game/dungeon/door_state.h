@@ -103,6 +103,14 @@ void uw_door_state_set_entering(unsigned char nes_dir);
 void uw_door_state_trigger_open(unsigned char dir_bit);
 /* Re-lay all door faces after the plane is repainted. */
 void uw_door_state_layout_all(void);
+/* T-314: stage the destination room's door faces during the scroll. */
+void uw_door_state_prelayout_room(unsigned char room_id, unsigned char level,
+                                  unsigned char quest, unsigned char nes_dir);
+/* Consume a staged layout for `room_id`; 1 when the faces are already in
+ * the destination plane and the finalize pass may skip them. */
+unsigned char uw_door_state_take_prelayout(unsigned char room_id);
+/* Skip the plane-face pass in the next room_init (already staged). */
+void uw_door_state_set_defer_faces(unsigned char defer);
 
 /* Task 5.5 accessors for the state-mirror publisher. Read-only views
  * of internal state needed by BizHawk Lua probes. */

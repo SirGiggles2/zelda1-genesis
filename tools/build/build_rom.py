@@ -121,6 +121,7 @@ INCS = [
     ROOT / "src" / "core",
     ROOT / "data" / "audio",
     ROOT / "data" / "audio_music",
+    ROOT / "build" / "redux_music",
     SGDK / "inc",
     SGDK / "res",
 ]
@@ -138,6 +139,7 @@ TITLE_C_SOURCES = [
     # src/sgdk_adapter/audio_adapter.c::audio_music_play(SONG_OW=$01) →
     # XGM_startPlay(*_theme_xgm).
     ("data/audio_music/ow_theme_xgm.c",     "ow_theme_xgm.o"),
+    ("data/audio_music/post_ganon_lullaby_xgm.c", "post_ganon_lullaby_xgm.o"),
     ("data/audio_music/uw_theme_xgm.c",     "uw_theme_xgm.o"),
     # Alternate underworld theme (Cyberdeous), picked in Options > UW MUSIC.
     ("data/audio_music/uw_theme_cyberdeous_xgm.c", "uw_theme_cyberdeous_xgm.o"),
@@ -214,6 +216,7 @@ ROOMROM_C_SOURCES = [
     # which is why save_slot_serialize had no callers before now.
     ("src/state/save_game.c",                   "save_game.o"),
     ("src/state/game_profile.c",                "game_profile.o"),
+    ("src/state/loadout.c",                     "loadout.o"),
     # Cart SRAM backend. sram_adapter.c's _sram_* externs claimed to come
     # from src/nes_io.asm, which is NOT linked into Zelda.md (nor is
     # genesis_shell.asm, which called _sram_load_save_slots at boot), so
@@ -557,6 +560,7 @@ ROOMROM_C_SOURCES = [
     # T-011: NES sprite tiles $70.. (demo block; Link item-lift pose $78/$79).
     ("data/chr/demo.c", "demo_chr.o"),
     ("data/misc/palettes.c", "palettes.o"),
+    ("data/misc/gray_table.c", "gray_table.o"),
     # T-189: existing ROM-derived piece offsets/replacements/empty tiles.
     ("data/misc/ui_layout.c", "ui_layout.o"),
     # T-098: existing ROM-extracted ending tables, no new game-data input.
@@ -709,6 +713,8 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     ROM_OUT.parent.mkdir(parents=True, exist_ok=True)
 
+    print("[Build] prepare local Redux music choices")
+    run([sys.executable, ROOT / "tools/audio/build_redux_music.py"])
     print("[Build] check_sgdk_pin.py")
     run([sys.executable, ROOT / "tools" / "check_sgdk_pin.py"])
 
@@ -730,6 +736,8 @@ def main() -> int:
     run([sys.executable, ROOT / "tools" / "probes" / "check_generated_freshness.py"])
     print("[Build][UW coverage gate] Redux Q2 L1 normal destinations")
     run([sys.executable, ROOT / "tools" / "audit" / "check_redux_q2_l1_coverage.py"])
+    print("[Build][UW coverage gate] both Redux quests, all eighteen installed inventories")
+    run([sys.executable, ROOT / "tools" / "audit" / "check_uw_room_coverage.py"])
     print("[Build][CHR-1 gate] authenticated core Redux banks")
     run([sys.executable, ROOT / "tools" / "converter" / "redux_graphics.py", "--verify"])
 
@@ -765,6 +773,7 @@ def main() -> int:
         if not ensure_nes_music():
             return 1
         c_units.append(("build/nes_music/nes_music.c", "nes_music.o"))
+    c_units.append(("build/redux_music/redux_music.c", "redux_music.o"))
     if LOCAL_MUSIC:
         if not (ROOT / "build" / "local_music" / "local_music.c").is_file():
             print("ERROR: ZELDA_LOCAL_MUSIC=1 but build/local_music/local_music.c is missing "

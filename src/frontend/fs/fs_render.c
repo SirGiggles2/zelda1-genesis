@@ -160,30 +160,24 @@ void fs_render_static_layout(void) {
     write_text(8u,20u,"MODE");
 }
 
+/* The approved custom menus share green occupied portraits and scene-aware
+ * animation. Palette banks remain separate so empty portraits can stay dim. */
+static const unsigned short k_link_bright[3] = {0x00E6u, 0x008Eu, 0x0048u};
+static const unsigned short k_link_faded[3] = {0x0082u, 0x0048u, 0x0024u};
+
 /* Redux main Link positions: ($30,$58 + slot*$18) in NES OAM space.
  * Misc menus use ($50,$30 + slot*$18); visible Y is OAM Y+1, minus crop. */
-void fs_render_slot(uint8_t slot_idx) {
+static void write_link_sprite(uint8_t slot_idx, uint8_t flip) {
     uint16_t nes_y = (uint16_t)((s_misc_scene ? 0x30u : 0x58u) + (uint16_t)slot_idx * 0x18u);
     uint16_t sat_y = (uint16_t)(nes_y + 129u - FS_ROW_SHIFT*8u);   /* +128 SAT bias */
     uint16_t sat_x = (uint16_t)((s_misc_scene ? 0x50u : 0x30u) + 128u);   /* NES X=$30, +128 bias → 0xB0 */
 
     uint8_t sat_entry = (uint8_t)(1u + slot_idx);
     uint16_t palette = (uint16_t)(slot_idx + 1u);
-    /* Link pixels use entries 4..6, leaving BG LIFE and cursor colours
-     * independent in the same Genesis palette. Exact Redux NES colours. */
-    static const unsigned short bright[3][3] = {
-        {0x00E6u, 0x008Eu, 0x0048u},
-        {0x0E88u, 0x008Eu, 0x0048u},
-        {0x002Cu, 0x008Eu, 0x0048u}
-    };
-    static const unsigned short faded[3] = {0x0082u, 0x0048u, 0x0024u};
-    render_cram_open_write_byte((unsigned short)(palette * 32u + 8u));
-    render_vram_write_words((fs_sram_slot_occupied(slot_idx) || s_register_slot == slot_idx)
-                            ? bright[s_misc_scene ? slot_idx : 0u] : faded, 3u);
-
     /* tile_attr: priority=0, palette=palette, no flip, tile=LINK_CHR_BASE.
      * Genesis tile_attr word: pri(15) | pal(14:13) | flipV(12) | flipH(11) | tile(10:0) */
-    uint16_t tile_attr = (uint16_t)((palette & 0x3u) << 13) | (uint16_t)LINK_CHR_BASE;
+    uint16_t tile_attr = (uint16_t)((palette & 0x3u) << 13) | (uint16_t)LINK_CHR_BASE |
+                         (flip ? 0x0800u : 0u);
 
     /* size_link: H=2cells,V=2cells → 0x0500; link → next sprite in SAT chain.
      * Chain: cursor (entry 0) → slot 0 (1) → slot 1 (2) → slot 2 (3) → end.
@@ -195,6 +189,13 @@ void fs_render_slot(uint8_t slot_idx) {
 
     /* Sprite entries: use slots 1, 2, 3 (slot 0 reserved for cursor). */
     sat_write(sat_entry, sat_y, size_link, tile_attr, sat_x);
+}
+
+void fs_render_slot(uint8_t slot_idx) {
+    render_cram_open_write_byte((unsigned short)((slot_idx + 1u) * 32u + 8u));
+    render_vram_write_words((fs_sram_slot_occupied(slot_idx) || s_register_slot == slot_idx)
+                            ? k_link_bright : k_link_faded, 3u);
+    write_link_sprite(slot_idx, 0u);
 }
 
 /* ---------------------------------------------------------------------------
@@ -461,11 +462,9 @@ static void misc_marker(uint8_t entry,uint8_t slot,uint8_t pal,uint8_t next) {
 void fs_render_copy_destination(uint8_t source) {
     render_cram_open_write_byte(66u); render_vram_write_word(0x002Cu);
     slot_name_colour(source,2u);
-    /* File-coloured fixed marker remains at the selected copy source. */
-    static const unsigned short bright[3][3]={
-        {0x00E6u,0x008Eu,0x0048u},{0x0E88u,0x008Eu,0x0048u},{0x002Cu,0x008Eu,0x0048u}};
+    /* Fixed marker remains at the selected copy source. */
     render_cram_open_write_byte(14u);
-    render_vram_write_words(bright[source],3u);
+    render_vram_write_words(k_link_bright,3u);
     misc_marker(4u,source,0u,0u);
 }
 void fs_render_confirmation(const char *prompt, uint8_t choice, uint8_t copy,
@@ -521,10 +520,10 @@ void fs_render_board_cursor(uint8_t idx)
 void fs_render_tick(uint8_t selected, uint8_t animate)
 {
     if (s_register_slot != 0xFFu) {
-        s_anim_clock++;
+        selected=s_register_slot;
+        animate=1u;
         fs_render_board_cursor(s_board_index);
         fs_render_name_cursor(1u,s_name_col,s_name_row);
-        return;
     }
     uint8_t slot=(animate && selected<3u && fs_sram_slot_occupied(selected)) ? selected : 0xFFu;
     if (slot != s_anim_slot) {
@@ -532,9 +531,8 @@ void fs_render_tick(uint8_t selected, uint8_t animate)
         s_anim_slot=slot; s_anim_clock=0u;
     }
     if (slot<3u && (++s_anim_clock & 7u)==0u) {
-        uint16_t tile=(uint16_t)(LINK_CHR_BASE | ((s_anim_clock&8u) ? 0x0800u : 0u));
-        sat_write((uint8_t)(slot+1u),(uint16_t)(0x58u+slot*24u+129u-FS_ROW_SHIFT*8u),
-                  (uint16_t)(0x0500u|((slot==2u)?4u:slot+2u)),
-                  (uint16_t)(((slot+1u)<<13)|tile),0x30u+128u);
+        write_link_sprite(slot,(uint8_t)(s_anim_clock&8u));
     }
+    /* Empty registration still needs blinking cursors, but no walking Link. */
+    if (slot==0xFFu && s_register_slot!=0xFFu) ++s_anim_clock;
 }

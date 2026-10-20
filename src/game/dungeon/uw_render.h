@@ -19,6 +19,12 @@ unsigned char roomrom_uw_room_render_get_quest(void);
 
 void roomrom_uw_room_render_load_palette(unsigned char room_id);
 void roomrom_uw_room_render_upload_chr(void);
+/* T350: static checkerboard copies in the gap after text, before pause CHR.
+ * Five native wall patterns, four background subpalettes; zero extra RAM. */
+#define UW_DITHER_TILE_BASE 1230u
+#define UW_DITHER_TILE_COUNT 20u
+/* Native E/W/S/N direction bits for a Q2 Redux room in the installed block. */
+unsigned char roomrom_uw_room_render_false_wall_mask(unsigned char room_id);
 void roomrom_uw_room_render_fill_plane_a(unsigned char room_id);
 
 /* Task 5.8: paint plane A play area cells (32x22) with a black-tile

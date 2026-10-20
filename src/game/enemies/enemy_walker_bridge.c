@@ -858,6 +858,17 @@ static unsigned char native_set_up_dropped_item(unsigned int slot)
     unsigned char item_id;
     unsigned char i;
 
+    /* NES source: SetUpDroppedItem excludes Like Like ($17).
+     * Drained C: this existing death-to-drop owner / enrt_update_like_like.
+     * Coverage: PARTIAL user-authorized Redux return; Stance: EXTEND.
+     * Consume the thief's ownership before no-drop/RNG gates. Item1C uses
+     * the normal shield art, grace period and native pickup descriptor. */
+    if (game_profile_is_remix() && monster_type == 0x17u &&
+        enemy_like_like_shield_take(slot)) {
+        item_id = 0x1Cu;
+        goto commit_drop;
+    }
+
     /* @FindNoDropType — destroy if type is in no-drop list. */
     for (i = 0u; i < 7u; ++i) {
         if (monster_type == k_no_drop_types[i]) {
@@ -904,6 +915,16 @@ static unsigned char native_set_up_dropped_item(unsigned int slot)
          * Coverage: FULL(authenticated40-entry profile table).
          * Stance: EXTEND lookup only; kill/help/random gates retained. */
         item_id = game_profile_is_remix() ? core_redux_drop_items[idx] : k_drop_item_table[idx];
+        /* T-317 MD Remix red rupee: any green/blue rupee has a 1/16 chance
+         * to become the red 20-rupee id ($24). RNG_B is a separate per-slot
+         * random byte, so the drop-chance draw in RNG_A and the rest of the
+         * drop sequence are unchanged. Random is 13 bytes ($18-$24): RNG_B
+         * for slot 12+ leaves that table, so those slots are excluded. */
+        if (game_profile_is_remix() && slot < 12u &&
+            (item_id == 0x18u || item_id == 0x0Fu) &&
+            ((unsigned char)ENEMY_RNG_B(slot) & 0x0Fu) == 0u) {
+            item_id = 0x24u;
+        }
     }
 
     /* Fairy-on-$10-kills gate. */
@@ -930,6 +951,7 @@ static unsigned char native_set_up_dropped_item(unsigned int slot)
     }
 
     /* @Commit — store lifetime + id. NES jumps to SetUpFairyObject for $23. */
+commit_drop:
     META_ITEM_LIFETIME(slot) = 0xFFu;
     META_ITEM_ID(slot)       = item_id;
     if (item_id == 0x23u) {

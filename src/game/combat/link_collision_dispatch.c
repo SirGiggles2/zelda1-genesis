@@ -277,14 +277,31 @@ __attribute__((always_inline)) void link_collision_check_monster_collisions(unsi
          * only prepare scratch for a rejected action; the final arrow/rod
          * check and Link collision still establish the consumed result.
          * Read current state per monster: a previous hit may clear a shot. */
-        if ((unsigned char)OBJ_STATE(15u))
+        /* Idle slots still run the NES routine prologue (CheckMonsterCollisions
+         * calls all six): boomerang sets $0D/$0E=$0A, the shot check $0D/$0E=$0C
+         * (CheckMonsterSlenderWeaponCollision copies $0D to $0E), bomb/fire $0D=$0E.
+         * Replay those threshold stores in call order so the scratch matches NES
+         * (T-292 C5: rod windup tick leaves $0D=$0E, $0E=$0C). */
+        if ((unsigned char)OBJ_STATE(15u)) {
             collision_check_monster_boomerang_or_food_collision(monster_slot, 15u);
-        if ((unsigned char)OBJ_STATE(14u))
+        } else {
+            COMBAT_THRESHOLD_X = 10u;
+            COMBAT_THRESHOLD_Y = 10u;
+        }
+        if ((unsigned char)OBJ_STATE(14u)) {
             collision_check_monster_sword_shot_or_magic_shot_collision(monster_slot, 14u);
+        } else {
+            COMBAT_THRESHOLD_X = 12u;
+            COMBAT_THRESHOLD_Y = 12u;
+        }
         if ((unsigned char)OBJ_STATE(16u))
             collision_check_monster_bomb_or_fire_collision(monster_slot, 16u);
+        else
+            COMBAT_THRESHOLD_X = 14u;
         if ((unsigned char)OBJ_STATE(17u))
             collision_check_monster_bomb_or_fire_collision(monster_slot, 17u);
+        else
+            COMBAT_THRESHOLD_X = 14u;
         if ((unsigned char)OBJ_STATE(13u) == 2u)
             collision_check_monster_sword_collision(monster_slot, 13u);
         /* The final check also establishes the NES scratch-cell result

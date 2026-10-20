@@ -115,6 +115,9 @@ void sprite_anim_set_obj_hflip(unsigned int slot)
     ENEMY_FRAME_FLAGS = OBJ_HFLIP(slot);
 }
 
+/* T-358: 60-byte per-sprite wrapper with 26 static call sites. Inline it
+ * so every walking enemy does not pay a JSR/RTS before the roll-over/fetch. */
+__attribute__((always_inline))
 void sprite_anim_advance_and_fetch(unsigned int val, unsigned int slot)
 {
     COMBAT_WEAPON_SLOT = (unsigned char)val;
