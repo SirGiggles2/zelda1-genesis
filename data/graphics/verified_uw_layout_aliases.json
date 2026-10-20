@@ -1,0 +1,20 @@
+[
+  {
+    "source": [
+      0,
+      1,
+      6,
+      29
+    ],
+    "target": [
+      1,
+      1,
+      6,
+      29
+    ],
+    "play_nt_sha256": "22e65f93f306ca01596ade127e187fe4dc927aef30e308e2368405595a3d9fe8",
+    "evidence": "docs/audit/2026-10-11_T304_l6_layout.md",
+    "source_rom_sha256": "a73a7e43fa8dffe75f5b8da91e1481d2b35be24faac0de51efab54d0e21de340",
+    "target_live_capture": "build/t301/l6_nes/room_System_Bus.bin"
+  }
+]

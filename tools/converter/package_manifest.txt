@@ -49,10 +49,12 @@ engine/tools/verify_item_chr_manifest.py
 engine/tools/verify_vram_budget.py
 data/audio_music/ow_theme_xgm.c
 data/audio_music/ow_theme_xgm.h
+data/audio_music/post_ganon_lullaby_xgm.c
 data/audio_music/uw_theme_cyberdeous_xgm.c
 data/audio_music/uw_theme_cyberdeous_xgm.h
 data/audio_music/uw_theme_xgm.c
 data/audio_music/uw_theme_xgm.h
+data/graphics/verified_uw_layout_aliases.json
 data/rooms/dungeons_offsets.c
 data/rooms/dungeons_offsets.h
 data/rooms/overworld_offsets.h
@@ -392,6 +394,8 @@ tools/atlas/gen_sprite_catalog.py
 tools/audio/build_redux_music.py
 tools/audio/synth_noise_sfx.py
 tools/audio/synth_square_sfx.py
+tools/audit/check_redux_q2_l1_coverage.py
+tools/audit/check_uw_room_coverage.py
 tools/converter/build.py
 tools/converter/disasm_template.py
 tools/converter/extract_uw_collision.py

@@ -734,10 +734,17 @@ def main() -> int:
 
     print("[Build][CHR-1 gate] check_generated_freshness.py")
     run([sys.executable, ROOT / "tools" / "probes" / "check_generated_freshness.py"])
-    print("[Build][UW coverage gate] Redux Q2 L1 normal destinations")
-    run([sys.executable, ROOT / "tools" / "audit" / "check_redux_q2_l1_coverage.py"])
-    print("[Build][UW coverage gate] both Redux quests, all eighteen installed inventories")
-    run([sys.executable, ROOT / "tools" / "audit" / "check_uw_room_coverage.py"])
+    if (ROOT / "docs/audit/2026-10-18_T352_room_inventory.json").is_file():
+        print("[Build][UW coverage gate] Redux Q2 L1 normal destinations")
+        run([sys.executable, ROOT / "tools" / "audit" / "check_redux_q2_l1_coverage.py"])
+        print("[Build][UW coverage gate] both Redux quests, all eighteen installed inventories")
+        run([sys.executable, ROOT / "tools" / "audit" / "check_uw_room_coverage.py"])
+    else:
+        # Converted checkouts prove coverage from their own installed source
+        # captures rather than distributing private ROM-derived receipts.
+        print("[Build][UW coverage gate] fresh converted quest inventories")
+        run([sys.executable, ROOT / "tools" / "audit" / "check_uw_room_coverage.py",
+             "--captures", ROOT / "engine" / "out"])
     print("[Build][CHR-1 gate] authenticated core Redux banks")
     run([sys.executable, ROOT / "tools" / "converter" / "redux_graphics.py", "--verify"])
 

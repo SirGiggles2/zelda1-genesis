@@ -133,6 +133,8 @@ BANNED_EXTENSIONS = (
 # Always allow these (override prefix-bans).
 ALLOWLIST = (
     "data/.gitkeep",
+    # Authenticated room coordinates and hashes only; no payload bytes.
+    "data/graphics/verified_uw_layout_aliases.json",
     # Hand-written layout constants for the extract_rooms.py blobs: offsets
     # and field positions only, no game bytes.
     "data/rooms/dungeons_offsets.c",
@@ -143,6 +145,8 @@ ALLOWLIST = (
     # (data/audio_music/*_xgm.c, from xgmtool; see each file's header).
     "VGMS/LM-zelda overworld more done.vgm",
     "VGMS/LM-Zelda_Underworld.vgm",
+    # User-authored Music Studio arrangement (T-349), not ROM extraction.
+    "data/audio_music/post_ganon_lullaby_xgm.c",
     "data/audio_music/ow_theme_xgm.c",
     "data/audio_music/ow_theme_xgm.h",
     "data/audio_music/uw_theme_xgm.c",

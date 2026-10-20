@@ -5449,66 +5449,72 @@ static void link_ctx_apply(const LinkCtx *c, unsigned char weapons)
  * frame, animation tick) so no extra .bss is needed. */
 static void link_ctx_load_player(unsigned char i, unsigned char weapons)
 {
-    PlayerState *p = &players[i];
-    LinkCtx c;
-    unsigned char k;
-    for (k = 0u; k < 16u; k++) c.cells[k] = 0u;
+    const PlayerState *p = &players[i];
+    /* T-251: publish the same slice directly. Constructing a temporary
+     * LinkCtx copied every Link/weapon cell twice on each extra-player
+     * load; no temporary snapshot is needed when the source is stable. */
+    nes_ram[0x000Eu] = 0u;
+    nes_ram[0x000Fu] = 0u;
+    nes_ram[0x0064u] = 0u;
+    nes_ram[0x0070u] = (unsigned char)p->x;
+    nes_ram[0x0084u] = (unsigned char)p->y;
+    nes_ram[0x0098u] = link_nes_bit_of((link_dir_t)p->dir);
+    nes_ram[0x00ACu] = p->state;
+    nes_ram[0x0394u] = (unsigned char)p->grid_offset;
+    nes_ram[0x03A8u] = p->pos_frac;
+    nes_ram[0x03BCu] = p->qspeed_frac ? p->qspeed_frac : 0x60u;
+    nes_ram[0x03E4u] = p->anim_frame;
+    nes_ram[0x03F8u] = 0u;
+    nes_ram[0x04F0u] = p->invincibility_timer;
+    nes_ram[0x00C0u] = p->shove_dir;
+    nes_ram[0x00D3u] = p->shove_distance;
+    nes_ram[0x049Eu] = 0u;
     if (weapons) {
         unsigned char w, s;
         for (w = 0u; w < 7u; w++)
             for (s = 0u; s < 6u; s++)
-                c.weapon[w][s] = s_mp_weapon[i - 1u][w][s];
+                nes_ram[k_ctx_weapon_cells[s] + k_ctx_weapon_slots[w]] =
+                    s_mp_weapon[i - 1u][w][s];
     }
-    c.cells[3] = (unsigned char)p->x;                 /* ObjX */
-    c.cells[4] = (unsigned char)p->y;                 /* ObjY */
-    c.cells[5] = link_nes_bit_of((link_dir_t)p->dir); /* ObjDir */
-    c.cells[6] = p->state;                            /* ObjState */
-    c.cells[7] = (unsigned char)p->grid_offset;       /* ObjGridOffset */
-    c.cells[8] = p->pos_frac;                         /* ObjPosFrac */
-    c.cells[9] = p->qspeed_frac ? p->qspeed_frac : 0x60u; /* InitLinkSpeed */
-    c.cells[10] = p->anim_frame;                      /* ObjAnimFrame */
-    c.cells[12] = p->invincibility_timer;             /* ObjInvincibility */
-    c.cells[13] = p->shove_dir;                       /* ObjShoveDir */
-    c.cells[14] = p->shove_distance;                  /* ObjShoveDistance */
-    c.ps = *p;
-    c.dir = (link_dir_t)p->dir;
-    c.grid = (signed char)p->grid_offset;
-    c.go_straight = p->metastate;
-    c.pos_frac = p->pos_frac;
-    c.doorway = p->moving_limit;
-    c.frame = p->room_scratch;
-    c.anim_tick = p->death_timer;
-    c.draw_pending = 0u;
-    link_ctx_apply(&c, weapons);
+    s_link_dir = (link_dir_t)p->dir;
+    s_link_grid_offset = (signed char)p->grid_offset;
+    s_link_go_straight = p->metastate;
+    s_link_pos_frac = p->pos_frac;
+    s_doorway_dir = p->moving_limit;
+    s_link_frame = p->room_scratch;
+    s_link_anim_tick = p->death_timer;
+    s_link_draw_pending = 0u;
+    players[0] = *p;
 }
 
 static void link_ctx_store_player(unsigned char i, unsigned char weapons)
 {
-    LinkCtx c;
     PlayerState *p = &players[i];
-    link_ctx_capture(&c, weapons);
-    *p = c.ps;
+    /* The destination is separate from slot 0, so capture directly into
+     * its persistent record instead of round-tripping through LinkCtx. */
+    *p = players[0];
     if (weapons) {
         unsigned char w, s;
         for (w = 0u; w < 7u; w++)
             for (s = 0u; s < 6u; s++)
-                s_mp_weapon[i - 1u][w][s] = c.weapon[w][s];
-        s_mp_weapon_dirty[i - 1u] = mp_weapon_ctx_nonzero(c.weapon);
+                s_mp_weapon[i - 1u][w][s] =
+                    nes_ram[k_ctx_weapon_cells[s] + k_ctx_weapon_slots[w]];
+        s_mp_weapon_dirty[i - 1u] = mp_weapon_ctx_nonzero(s_mp_weapon[i - 1u]);
     }
-    p->grid_offset = c.grid;
-    p->pos_frac = c.pos_frac;
-    p->dir = (unsigned char)c.dir;
-    p->qspeed_frac = c.cells[9];
-    p->anim_frame = c.cells[10];
-    p->invincibility_timer = c.cells[12];
-    p->shove_dir = c.cells[13];
-    p->shove_distance = c.cells[14];
-    p->state = c.cells[6];
-    p->metastate = c.go_straight;
-    p->moving_limit = c.doorway;
-    p->room_scratch = c.frame;
-    p->death_timer = c.anim_tick;
-    p->death_frame_counter = c.draw_pending;
+    p->grid_offset = s_link_grid_offset;
+    p->pos_frac = s_link_pos_frac;
+    p->dir = (unsigned char)s_link_dir;
+    p->qspeed_frac = nes_ram[0x03BCu];
+    p->anim_frame = nes_ram[0x03E4u];
+    p->invincibility_timer = nes_ram[0x04F0u];
+    p->shove_dir = nes_ram[0x00C0u];
+    p->shove_distance = nes_ram[0x00D3u];
+    p->state = nes_ram[0x00ACu];
+    p->metastate = s_link_go_straight;
+    p->moving_limit = s_doorway_dir;
+    p->room_scratch = s_link_frame;
+    p->death_timer = s_link_anim_tick;
+    p->death_frame_counter = s_link_draw_pending;
 }
 
 /* Run P2..P4 through the same NES movement core as P1. Each player sees

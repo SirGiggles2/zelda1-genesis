@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "tools"))
-from builder import nes_music
-from builder.build import SUPPORTED_ROMS, SUPPORTED_REDUX_ROMS
+sys.path.insert(0, str(REPO / "tools" / "converter"))
+import nes_music
+from build import SUPPORTED_ROMS, SUPPORTED_REDUX_ROMS
 from convert_nes_music import SONGS
 
 

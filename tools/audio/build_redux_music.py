@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/music_studio')]
+sys.path[:0] = [str(ROOT / 'tools' / 'converter'), str(ROOT / 'tools/music_studio')]
 
 # Stable order: these indices are saved in per-file options. Never reorder.
 IDS = ('overworld', 'dungeon_zelda', 'dungeon_new_light',
@@ -24,7 +24,7 @@ def generate():
     manifest = folder / 'extraction.json'
     if not manifest.is_file():
         from extract_soundtrack import extract_soundtrack
-        from builder.build import SUPPORTED_REDUX_ROMS
+        from build import SUPPORTED_REDUX_ROMS
         candidates = [ROOT / 'build/redux/Zelda Redux.nes', *ROOT.glob('*.nes'),
                       *ROOT.glob('roms/*.nes')]
         rom = next((p for p in candidates if p.is_file() and
@@ -33,7 +33,7 @@ def generate():
             raise ValueError('Redux music needs the supported Redux ROM or VGMS/Redux/extraction.json')
         extract_soundtrack(rom, folder)
     report = json.loads(manifest.read_text())
-    from builder.build import SUPPORTED_REDUX_ROMS
+    from build import SUPPORTED_REDUX_ROMS
     if report['rom_sha256'] not in SUPPORTED_REDUX_ROMS:
         raise ValueError('Redux music extraction has an unsupported source ROM')
     rows = {s['id']: s for s in report['songs']}

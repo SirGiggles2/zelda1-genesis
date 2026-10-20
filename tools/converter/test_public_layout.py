@@ -39,6 +39,8 @@ def main():
             assert line in files, f'missing converter dependency: {line}'
     # Every explicitly compiled implementation must reach the public package.
     from package_check import is_banned
+    assert not is_banned("data/graphics/verified_uw_layout_aliases.json")[0]
+    assert is_banned("data/graphics/other.json")[0]
     script = export_repo.ROOT / ('tools/build/build_rom.py' if public_layout.is_public(export_repo.ROOT)
                                  else 'tools/debug/build_debug.py')
     for node in ast.walk(ast.parse(script.read_text(encoding='utf-8'))):
@@ -53,7 +55,10 @@ def main():
     build_text = export_repo.export_bytes(files['tools/converter/build.py']).decode('utf-8')
     assert '"builds" / "Zelda.md"' in build_text
     steps = build.plan_steps(Path('original.nes'), Path('redux.nes'))
-    final = ('generated asset catalog', 'record generated freshness', 'verify generated freshness')
+    for _, command in steps:
+        script = Path(command[1]).resolve().relative_to(build.ROOT.resolve()).as_posix()
+        assert public_layout.rename(script) in files, f'missing conversion stage: {script}'
+    final = ('generated asset catalog' , 'record generated freshness', 'verify generated freshness')
     assert tuple(label for label, _ in steps[-3:]) == final
     calls = []
     def failed_producer(argv, **kwargs):
