@@ -108,11 +108,10 @@ This port stands on a lot of other people's work. Thank you, all of you.
 - **Inglebard** — the Genesis/Mega Drive covers of the Overworld and
   Underworld themes that play in this port, made in DefleMask.
 
-  All the other songs are extracted and converted from your NES ROM (but tbh
-  they don't sound as good as what Inglebard did).
-
   **Cyberdeous** — the duo graciously made their own version of the Underworld
   theme. Select **Cyberdeous** in Options > Music (Inglebard stays the default).
+
+All the other songs are extracted and converted from your NES ROM and Redux patch. I personally edited them by hand. But tbh inglebard and Cyberdeous music is waaaaay better. 
 
 **The original game**
 
@@ -163,7 +162,11 @@ OpenAI's Codex, directed and play-tested by the maintainer. That includes most
 of the game code, the converter, the tests and this README. The port was checked
 against the original NES game with automated byte-for-byte comparisons rather
 than taken on trust, but treat it as you would any hobby project. Bug reports
-are welcome.
+are welcome.  
+
+Some music was CONVERTED from the NES and Redux data but tweaked by hand by me. 
+
+INGLEBARD and CYBERDEOUS' music was made WITHOUT AI
 
 ## Legal
 
