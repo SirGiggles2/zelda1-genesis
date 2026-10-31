@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include "platform_abi.h"
 #include "../../state/inventory.h"
+#include "../../state/weapon_state.h"
 #include "../../state/combat_state.h"
 #include "../../state/enemy_state.h"
 #include "../enemies/enemy_render.h"
@@ -43,8 +44,8 @@
 #define FIRE_TILE_LEFT          0x5Cu
 #define FIRE_ATTRS              0x02u
 
-#define OBJ_STATE_(s)  nes_ram[NES_OBJ_STATE_BASE + (s)]
-#define OBJ_TIMER_(s)  nes_ram[NES_OBJ_TIMER_BASE + (s)]
+#define OBJ_STATE_(s)  (g_shared_effect[(s) - 16u].state)
+#define OBJ_TIMER_(s)  (g_shared_effect[(s) - 16u].timer)
 
 void roomrom_candle_fire_init(void)
 {
@@ -54,18 +55,18 @@ void roomrom_candle_fire_init(void)
 
 unsigned char roomrom_candle_fire_used_this_room(void)
 {
-    return nes_ram[NES_USED_CANDLE];
+    return F_ram_0513_N;
 }
 
 void roomrom_candle_fire_mark_used(void)
 {
-    nes_ram[NES_USED_CANDLE] = 0x01u;
+    F_ram_0513_N = 0x01u;
 }
 
 void roomrom_candle_fire_room_reset(void)
 {
     /* UsedCandle lies in the $0300-$051F block InitMode_EnterRoom clears. */
-    nes_ram[NES_USED_CANDLE] = 0x00u;
+    F_ram_0513_N = 0x00u;
 }
 
 /* WieldCandle. */
@@ -76,15 +77,15 @@ void roomrom_candle_fire_spawn(link_face_t face, short link_x, short link_y)
         x = 0x11u;
         if (OBJ_STATE_(x) != 0u) return;
     }
-    if (nes_ram[NES_INV_CANDLE] == 0x01u &&
-        nes_ram[NES_USED_CANDLE] != 0u) return;
-    nes_ram[NES_USED_CANDLE] = 0x01u;
-    OBJ(NES_OBJ_GRID_OFFSET, x) = 0u;
-    OBJ(NES_OBJ_POS_FRAC, x) = 0u;
-    OBJ(NES_OBJ_QSPD_FRAC, x) = 0x20u;
-    OBJ_STATE_(x) = 0x21u;
-    nes_ram[NES_EFFECT_REQUEST] |= 0x04u;
-    nes_ram[NES_OBJ_ANIM_COUNTER + x] = 0x04u;
+    if (F_ram_065B_N == 0x01u &&
+        F_ram_0513_N != 0u) return;
+    F_ram_0513_N = 0x01u;
+    F_ram_0394_O(x) = 0u;
+    F_ram_03A8_O(x) = 0u;
+    F_ram_03BC_O(x) = 0x20u;
+    shared_effect_set_state(x, 0x21u);
+    F_ram_0603_N |= 0x04u;
+    F_ram_03D0_X(x) = 0x04u;
     link_place_weapon_for_player_state(0u);   /* PlaceWeaponForPlayerState (T-116) */
     bomb_fire_place_weapon(x, bomb_fire_nes_dir_for_face(face),
                            (unsigned char)link_x, (unsigned char)link_y);
@@ -101,14 +102,14 @@ unsigned char candle_fire_wield_from_shot(void)
         x = 0x11u;
         if (OBJ_STATE_(x) != 0u) return x;
     }
-    OBJ(NES_OBJ_GRID_OFFSET, x) = 0u;
-    OBJ(NES_OBJ_POS_FRAC, x) = 0u;
-    OBJ(NES_OBJ_QSPD_FRAC, x) = 0x20u;
-    OBJ_STATE_(x) = 0x21u;
-    nes_ram[NES_EFFECT_REQUEST] |= 0x04u;
-    nes_ram[NES_OBJ_ANIM_COUNTER + x] = 0x04u;
-    bomb_fire_place_weapon(x, nes_ram[NES_OBJ_DIR_BASE],
-                           nes_ram[NES_OBJ_X], nes_ram[NES_OBJ_Y]);
+    F_ram_0394_O(x) = 0u;
+    F_ram_03A8_O(x) = 0u;
+    F_ram_03BC_O(x) = 0x20u;
+    shared_effect_set_state(x, 0x21u);
+    F_ram_0603_N |= 0x04u;
+    F_ram_03D0_X(x) = 0x04u;
+    bomb_fire_place_weapon(x, F_ram_0098_N3,
+                           F_ram_0070_N3, F_ram_0084_N3);
     return x;
 }
 
@@ -123,70 +124,85 @@ void roomrom_candle_fire_update(void)
     /* UpdateFire runs inside roomrom_bomb_update (UpdateBombOrFire). */
 }
 
+/* T-251: apply the original UpdateFire contact tail to the currently
+ * loaded player. World movement, animation and expiry remain single-owner. */
+static void fire_check_link(unsigned char x, unsigned char ox, unsigned char oy)
+{
+    if (F_ram_04F0_N2 != 0u) return;
+    COMBAT_HITBOX_X = (uint8_t)(F_ram_0070_O2(0u) + 8u);
+    COMBAT_HITBOX_Y = (uint8_t)(F_ram_0084_O2(0u) + 8u);
+    ENEMY_GLEEOK_NECK_Y_PTR_LO = (uint8_t)(ox + 8u);
+    ENEMY_GLEEOK_NECK_Y_PTR_HI = (uint8_t)(oy + 8u);
+    COMBAT_WEAPON_SLOT = x;
+    if (!collision_do_objects_collide(0x0Eu)) return;
+    COMBAT_WEAPON_SLOT = 0u;
+    link_collision_begin_shove(x);
+    COMBAT_THRESHOLD_X = 0x00u;
+    COMBAT_THRESHOLD_Y = 0x80u;
+    link_collision_link_be_harmed(x);
+}
+
+void roomrom_candle_fire_check_player_contact(void)
+{
+    unsigned char x;
+    for (x = 16u; x <= 17u; x++) {
+        if (OBJ_STATE_(x) != 0x21u &&
+            !(OBJ_STATE_(x) == 0x22u && OBJ_TIMER_(x) != 0u)) continue;
+        fire_check_link(x, F_ram_0070_O2(x), F_ram_0084_O2(x));
+    }
+}
+
 static void draw_fire_and_check_link(unsigned char x)
 {
     unsigned char frame_ctr;
     unsigned char left = FIRE_TILE_LEFT;
     unsigned char right = (unsigned char)(FIRE_TILE_LEFT + 2u);
     unsigned char attrs = bomb_fire_flash_attrs(x, FIRE_ATTRS);
-    unsigned char ox = OBJ(NES_OBJ_X, x);
-    unsigned char oy = OBJ(NES_OBJ_Y, x);
+    unsigned char ox = F_ram_0070_O2(x);
+    unsigned char oy = F_ram_0084_O2(x);
 
     /* Anim_AdvanceAnimCounterAndSetObjPosForSpriteDescriptor(4). */
-    frame_ctr = (unsigned char)(nes_ram[NES_OBJ_ANIM_COUNTER + x] - 1u);
-    nes_ram[NES_OBJ_ANIM_COUNTER + x] = frame_ctr;
+    frame_ctr = (unsigned char)(F_ram_03D0_X(x) - 1u);
+    F_ram_03D0_X(x) = frame_ctr;
     if (frame_ctr == 0u) {
-        nes_ram[NES_OBJ_ANIM_COUNTER + x] = 0x04u;
-        nes_ram[NES_OBJ_ANIM_FRAME + x] ^= 0x01u;
+        F_ram_03D0_X(x) = 0x04u;
+        F_ram_03E4_X(x) ^= 0x01u;
     }
     /* Anim_WriteHorizontallyFlippableSpritePair with [0F] = ObjAnimFrame. */
-    if (nes_ram[NES_OBJ_ANIM_FRAME + x] != 0u) {
+    if (F_ram_03E4_X(x) != 0u) {
         unsigned char t = left; left = right; right = t;
         attrs ^= 0x40u;
     }
     enemy_render_weapon_add_obj(x, left, attrs, ox, oy);
     enemy_render_weapon_add_obj(x, right, attrs, (unsigned char)(ox + 8u), oy);
 
-    /* Collision with Link. */
-    if (nes_ram[NES_OBJ_INV_TIMER_BASE + 0u] != 0u) return;
-    /* GetWideObjectMiddle: Link into [04]/[05], fire into [02]/[03]. */
-    COMBAT_HITBOX_X = (uint8_t)(OBJ(NES_OBJ_X, 0u) + 8u);
-    COMBAT_HITBOX_Y = (uint8_t)(OBJ(NES_OBJ_Y, 0u) + 8u);
-    ENEMY_GLEEOK_NECK_Y_PTR_LO = (uint8_t)(ox + 8u);
-    ENEMY_GLEEOK_NECK_Y_PTR_HI = (uint8_t)(oy + 8u);
-    COMBAT_WEAPON_SLOT = x;
-    if (!collision_do_objects_collide(0x0Eu)) return;
-    COMBAT_WEAPON_SLOT = 0u;               /* [00] = 0: Link is shoved */
-    link_collision_begin_shove(x);
-    COMBAT_THRESHOLD_X = 0x00u;            /* [0D] */
-    COMBAT_THRESHOLD_Y = 0x80u;            /* [0E] */
-    link_collision_link_be_harmed(x);
+    fire_check_link(x, ox, oy);
 }
 
 /* UpdateFire. */
 void bomb_fire_update_fire(unsigned char x)
 {
     if (OBJ_STATE_(x) == 0x21u) {
-        unsigned char saved = OBJ(NES_OBJ_GRID_OFFSET, x);
+        unsigned char saved = F_ram_0394_O(x);
         unsigned char moved;
-        OBJ(NES_OBJ_GRID_OFFSET, x) = 0u;
-        nes_ram[NES_OBJ_DIR] = nes_ram[NES_OBJ_DIR_BASE + x];
+        F_ram_0394_O(x) = 0u;
+        F_ram_000F_N2 = F_ram_0098_X(x);
         object_move_object(x);
-        moved = (unsigned char)(saved + OBJ(NES_OBJ_GRID_OFFSET, x));
-        OBJ(NES_OBJ_GRID_OFFSET, x) = moved;
+        moved = (unsigned char)(saved + F_ram_0394_O(x));
+        F_ram_0394_O(x) = moved;
         if (((moved & 0x80u) ? (unsigned char)(0u - moved) : moved) != 0x10u) {
             draw_fire_and_check_link(x);
             return;
         }
-        OBJ_TIMER_(x) = 0x3Fu;
-        OBJ_STATE_(x)++;
+        shared_effect_set_timer(x, 0x3Fu);
+        shared_effect_set_state(x, (unsigned char)(OBJ_STATE_(x) + 1u));
     }
     /* Standing fire. */
     if (OBJ_TIMER_(x) == 0u) {
-        OBJ_STATE_(x) = 0u;                /* ResetObjState */
+        shared_effect_set_state(x, 0u);    /* ResetObjState */
         return;
     }
     /* In the UW a standing fire brightens a dark room (UpdateCandle). */
-    if (nes_ram[0x0010u] != 0u) uw_dark_update_candle();
+    if (F_ram_0010 != 0u) uw_dark_update_candle();
     draw_fire_and_check_link(x);
 }

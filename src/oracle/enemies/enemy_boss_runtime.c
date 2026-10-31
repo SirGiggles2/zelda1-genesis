@@ -43,8 +43,8 @@ static void enrt_jumper_move_y(unsigned char accel, signed char max_speed_hi,
     unsigned int sum;
     signed char speed_hi;
 
-    RAM(0x0000) = accel;                        /* NES STA $00 */
-    RAM(0x0002) = (unsigned char)max_speed_hi;  /* NES STY $02 (T-171) */
+    F_ram_0000_R3 = accel;                        /* NES STA $00 */
+    F_ram_0002_R2 = (unsigned char)max_speed_hi;  /* NES STY $02 (T-171) */
     ENEMY_Y(slot) = (unsigned char)(ENEMY_Y(slot) + ENEMY_JUMPER_VSPEED_HI(slot));
 
     sum = (unsigned int)ENEMY_JUMPER_VSPEED_LO(slot) + (unsigned int)accel;
@@ -67,7 +67,7 @@ static void enrt_jumper_move_y(unsigned char accel, signed char max_speed_hi,
 static void enrt_jumper_animate_and_check_collisions(unsigned int slot) {
     unsigned char frame;
 
-    RAM(0x000D) = z07_anim_fetch_obj_pos(slot);   /* NES STA $0D (A = 0), T-171 */
+    F_ram_000D_R2 = z07_anim_fetch_obj_pos(slot);   /* NES STA $0D (A = 0), T-171 */
     if (ENEMY_TYPE(slot) != 0x20) {
         /* Drain Rule D1: NES Z_04.asm:2482 leaves A holding ObjState
          * when BNE enters @DrawTektite.  State 1 therefore draws image 1;
@@ -300,7 +300,7 @@ void enrt_update_vire_state(unsigned int slot) {
     if ((ENEMY_DIR(slot) & 0x03) == 0)
         return;
 
-    ENEMY_Y(slot) = (unsigned char)(ENEMY_Y(slot) + enrt_vire_jump_offsets[z01_abs(OBJ(0x0394, slot))]);
+    ENEMY_Y(slot) = (unsigned char)(ENEMY_Y(slot) + enrt_vire_jump_offsets[z01_abs(F_ram_0394_O3(slot))]);
 }
 
 void enrt_check_vire_collisions(unsigned int slot) {
@@ -505,7 +505,7 @@ unsigned int enrt_extract_hit_point_value(unsigned int val) {
 unsigned char enrt_is_dark_room_bank4(unsigned int room_idx) {
     if (ENEMY_DARK_ROOM_FLAG == 0)
         return 0;
-    return nes_ram[0x6000u + 0x0A7E + room_idx] & 0x80;
+    return F_ram_6A7E_X3(room_idx) & 0x80;
 }
 
 void enrt_init_digdogger1(unsigned int slot) {
@@ -867,7 +867,7 @@ void enrt_update_gohma(unsigned int slot) {
     if (dir & dist_mask) ENEMY_Y(slot)++;          /* down */
     dist_mask <<= 1;
     if (dir & dist_mask) ENEMY_Y(slot)--;          /* up */
-    RAM(0x0002u) = dist_mask;                       /* NES mask in [02] ($08) */
+    F_ram_0002_R = dist_mask;                       /* NES mask in [02] ($08) */
 
     if (ENEMY_GOHMA_DIST_TRAVELED(slot) != 0x20)
         goto animate_eye;

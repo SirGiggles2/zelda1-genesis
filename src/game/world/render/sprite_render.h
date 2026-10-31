@@ -27,6 +27,10 @@ typedef enum {
     LINK_FACE_RIGHT = 3
 } link_face_t;
 
+void roomrom_sprites_clear_mp_weapons_from(unsigned char player);
+/* T-257: first VRAM tile of Link's walk-pose bank (pose 0 = down frame 0,
+ * tiles TL, BL, TR, BR). Static between room loads. */
+unsigned short roomrom_sprites_link_walk_tile(void);
 void roomrom_sprites_upload_chr(void);    /* one-shot at boot (persistent + items) */
 /* PR-4 split: persistent CHR (common + Link walk/attack) covers tiles
  * 1025..1310 — overlaps SCENE_OBJ at 1069..1204. Re-uploading on every
@@ -51,6 +55,8 @@ void roomrom_sprites_hide_hud_marker(unsigned char compass);
 void roomrom_sprites_set_link_pos(short x, short y);
 /* T-011: NES Link item-lift pose (one_hand = half-width item). */
 void roomrom_sprites_set_link_lift(short x, short y, unsigned char one_hand);
+void roomrom_sprites_set_mp_lift(unsigned char player, short x, short y,
+                                unsigned char one_hand);
 /* T-011: Link halves from Genesis SAT words. */
 void roomrom_sprites_set_link_sat(short x, short y,
                                   unsigned short left_sat, unsigned short right_sat);
@@ -73,9 +79,10 @@ void roomrom_sprites_set_link_hurt_pose(short x, short y,
  * remapping tunic pixels 1 -> the player's PAL1 slot (4/8/12). */
 void roomrom_sprites_set_mp_link_pose(unsigned char player,
                                       short x, short y,
-                                      link_face_t face, unsigned char frame);
+                                      link_face_t face, unsigned char frame,
+                                      unsigned char hurt_timer);
 void roomrom_sprites_set_mp_attack_pose(unsigned char player, short x, short y,
-                                        link_face_t face);
+                                        link_face_t face, unsigned char hurt_timer);
 
 
 /* S7 v4 combat. */

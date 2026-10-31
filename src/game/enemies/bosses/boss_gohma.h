@@ -33,4 +33,9 @@
  * drained enrt_init_gohma / enrt_update_gohma symbols (declared in
  * src/oracle/enemies/enemy_runtime.h). */
 
+/* Loaded extra-player context:0 full,1 melee,2 sword/beam,3 body only.
+ * Uses the same five source parts without advancing or drawing the boss. */
+void boss_gohma_check_party_collisions(unsigned int slot, unsigned char player,
+                                      unsigned char context);
+
 #endif /* GAME_ENEMIES_BOSSES_BOSS_GOHMA_H */

@@ -34,6 +34,7 @@
 #include "candle_fire.h"
 #include "platform_abi.h"
 #include "../../state/inventory.h"
+#include "../../state/weapon_state.h"
 #include "../enemies/enemy_render.h"
 #include "../world/bg_palette.h"
 #include "../dungeon/door_state.h"
@@ -54,8 +55,8 @@
 #define BOMB_ITEM_TILE          0x34u   /* Anim_ItemFrameTiles[$03] */
 #define BOMB_CLOUD_ATTR         0x01u   /* DrawCloud: [04]/[05] = 1 */
 
-#define OBJ_STATE_(s)  nes_ram[NES_OBJ_STATE_BASE + (s)]
-#define OBJ_TIMER_(s)  nes_ram[NES_OBJ_TIMER_BASE + (s)]
+#define OBJ_STATE_(s)  (g_shared_effect[(s) - BOMB_SLOT_A].state)
+#define OBJ_TIMER_(s)  (g_shared_effect[(s) - BOMB_SLOT_A].timer)
 
 static const unsigned char k_bomb_times[4] = { 0x30u, 0x18u, 0x0Cu, 0x06u };
 static const unsigned char k_wall_hotspot_x[4] = { 0x78u, 0x78u, 0x20u, 0xD0u };
@@ -92,32 +93,32 @@ void bomb_fire_place_weapon(unsigned char slot, unsigned char link_dir,
     else if (link_dir & 0x02u) dx = 0xF0u;
     if (link_dir & 0x04u)      dy = 0x10u;
     else if (link_dir & 0x08u) dy = 0xF0u;
-    nes_ram[NES_OBJ_DIR_BASE + slot] = link_dir;
-    OBJ(NES_OBJ_X, slot) = (unsigned char)(link_x + dx);
-    OBJ(NES_OBJ_Y, slot) = (unsigned char)(link_y + dy);
+    F_ram_0098_X(slot) = link_dir;
+    F_ram_0070_O2(slot) = (unsigned char)(link_x + dx);
+    F_ram_0084_O2(slot) = (unsigned char)(link_y + dy);
     /* NES PlaceWeapon leaves its offset choices in [01] ($10) / [02] ($F0)
      * and ChooseOffsetForDirectionH's [00] = 0. A magic shot that becomes
      * a fire inside CheckMonsterCollisions (HandleShotBlocked -> WieldCandle)
      * leaves [02] = $F0 as the monster's middle X for the bomb/fire checks
      * that follow in the same frame (T-171 asm_equiv: those checks hit and
      * killed the monster again on the Genesis). */
-    nes_ram[0x0000u] = 0x00u;
-    nes_ram[0x0001u] = 0x10u;
-    nes_ram[0x0002u] = 0xF0u;
+    F_ram_0000 = 0x00u;
+    F_ram_0001 = 0x10u;
+    F_ram_0002 = 0xF0u;
 }
 
 /* Anim_WriteSpritePair palette patch: ObjInvincibilityTimer low bits. */
 unsigned char bomb_fire_flash_attrs(unsigned char slot, unsigned char attrs)
 {
-    unsigned char t = nes_ram[NES_OBJ_INV_TIMER_BASE + slot];
+    unsigned char t = F_ram_04F0_X2(slot);
     if (t == 0u) return attrs;
     return (unsigned char)((attrs & 0xFCu) | (t & 0x03u));
 }
 
 void roomrom_bomb_init(void)
 {
-    OBJ_STATE_(BOMB_SLOT_A) = 0u;
-    OBJ_STATE_(BOMB_SLOT_B) = 0u;
+    shared_effect_set_state(BOMB_SLOT_A, 0u);
+    shared_effect_set_state(BOMB_SLOT_B, 0u);
     enemy_render_weapon_reset(BOMB_SLOT_A);
     enemy_render_weapon_reset(BOMB_SLOT_B);
     roomrom_sprites_clear_bomb();
@@ -133,7 +134,7 @@ void roomrom_bomb_place(link_face_t face, short link_x, short link_y)
     unsigned char st;
     unsigned char other;
 
-    if (nes_ram[NES_INV_BOMBS] == 0u) return;
+    if (F_ram_0658_N == 0u) return;
     st = OBJ_STATE_(x);
     if (st != 0u && (st & 0xF0u) == 0x10u) {
         x = BOMB_SLOT_B;
@@ -144,12 +145,12 @@ void roomrom_bomb_place(link_face_t face, short link_x, short link_y)
     other = OBJ_STATE_(x ^ 0x01u);
     if (other != 0u && other < 0x13u) return;
 
-    nes_ram[NES_INV_BOMBS]--;
-    g_inventory.bombs = nes_ram[NES_INV_BOMBS];
+    F_ram_0658_N--;
+    g_inventory.bombs = F_ram_0658_N;
     inventory_hud_mark_dirty();
-    nes_ram[NES_TUNE0_REQUEST] = 0x20u;
-    OBJ_TIMER_(x) = 0u;
-    OBJ_STATE_(x) = 0x11u;
+    F_ram_0604_N = 0x20u;
+    shared_effect_set_timer(x, 0u);
+    shared_effect_set_state(x, 0x11u);
     /* PlaceWeaponForPlayerStateAndAnimAndWeaponState (T-116). */
     link_place_weapon_for_player_state(1u);
     bomb_fire_place_weapon(x, bomb_fire_nes_dir_for_face(face),
@@ -171,24 +172,24 @@ unsigned char roomrom_bomb_active(void)
 static void bomb_check_wall(unsigned char x)
 {
     signed char y;
-    if (nes_ram[NES_CUR_LEVEL] == 0u) return;   /* OW: tile objects own it */
+    if (F_ram_0010_N2 == 0u) return;   /* OW: tile objects own it */
     /* NES skips mode $09 cellars. Native controller entry uses that
      * mode too; metadata alone misses L3Q1's out-of-list raft cellar.
      * Keep the legacy direct-scene fixture fallback. */
-    if (nes_ram[0x0012u] == 9u || roomrom_uw_room_is_cellar(roomrom_uw_room_render_get_level(),
+    if (F_ram_0012 == 9u || roomrom_uw_room_is_cellar(roomrom_uw_room_render_get_level(),
                                   roomrom_uw_room_render_get_quest(),
-                                  nes_ram[NES_CUR_ROOM_ID])) return;
+                                  F_ram_00EB_N3)) return;
     for (y = 3; y >= 0; --y) {
         unsigned char bit;
         unsigned char dir;
-        if (abs8((unsigned char)(k_wall_hotspot_x[y] - OBJ(NES_OBJ_X, x))) >= 0x18u)
+        if (abs8((unsigned char)(k_wall_hotspot_x[y] - F_ram_0070_O2(x))) >= 0x18u)
             continue;
-        if (abs8((unsigned char)(k_wall_hotspot_y[y] - OBJ(NES_OBJ_Y, x))) >= 0x18u)
+        if (abs8((unsigned char)(k_wall_hotspot_y[y] - F_ram_0084_O2(x))) >= 0x18u)
             continue;
         bit = k_reverse_dirs[y];
         /* Already opened or a door command pending: nothing to do. */
         if (uw_door_state_get_opened() & bit) return;
-        if (nes_ram[0x0054u] != 0u) return;   /* TriggeredDoorCmd */
+        if (F_ram_0054 != 0u) return;   /* TriggeredDoorCmd */
         dir = (bit == DOOR_BIT_E) ? DOOR_DIR_E :
               (bit == DOOR_BIT_W) ? DOOR_DIR_W :
               (bit == DOOR_BIT_S) ? DOOR_DIR_S : DOOR_DIR_N;
@@ -205,9 +206,9 @@ static void bomb_flash_effect(unsigned char x)
     if (OBJ_STATE_(x) != 0x13u) return;
     t = OBJ_TIMER_(x);
     if (t == 0x16u || t == 0x11u) {
-        nes_ram[NES_PPU_MASK_SHADOW] |= 0x01u;
+        F_ram_00FE_N2 |= 0x01u;
     } else if (t == 0x12u || t == 0x0Du) {
-        nes_ram[NES_PPU_MASK_SHADOW] &= (unsigned char)~0x01u;
+        F_ram_00FE_N2 &= (unsigned char)~0x01u;
     }
 }
 
@@ -219,7 +220,7 @@ static void draw_bomb_or_cloud(unsigned char x, unsigned char px,
     if (frame == 0u) {
         /* Narrow item tile: one 8x16 sprite, X + 4 unless the status bar
          * is being drawn (Anim_WriteSpecificItemSprites). */
-        if (nes_ram[NES_STATUS_BAR_DRAWING] == 0u) px = (unsigned char)(px + 4u);
+        if (F_ram_0504_N == 0u) px = (unsigned char)(px + 4u);
         enemy_render_weapon_add_item(x, BOMB_ITEM_TILE,
                                      bomb_fire_flash_attrs(x, BOMB_CLOUD_ATTR),
                                      px, py);
@@ -232,8 +233,8 @@ static void draw_bomb_or_cloud(unsigned char x, unsigned char px,
 
 static void draw_bomb(unsigned char x)
 {
-    unsigned char ox = OBJ(NES_OBJ_X, x);
-    unsigned char oy = OBJ(NES_OBJ_Y, x);
+    unsigned char ox = F_ram_0070_O2(x);
+    unsigned char oy = F_ram_0084_O2(x);
     signed char c;
 
     bomb_flash_effect(x);
@@ -242,7 +243,7 @@ static void draw_bomb(unsigned char x)
     /* DrawOtherBombClouds: clouds 2,1,0; odd frames use the second set. */
     for (c = 2; c >= 0; --c) {
         unsigned char i = (unsigned char)c;
-        if (nes_ram[NES_FRAME_COUNTER_CELL] & 0x01u) i = (unsigned char)(i + 6u);
+        if (F_ram_0015_N2 & 0x01u) i = (unsigned char)(i + 6u);
         draw_bomb_or_cloud(x,
                            (unsigned char)(ox + k_cloud_offsets[i + 3u]),
                            (unsigned char)(oy + k_cloud_offsets[i]));
@@ -254,15 +255,15 @@ static void update_bomb(unsigned char x)
 {
     if (OBJ_TIMER_(x) == 0u) {
         unsigned char minor = (unsigned char)(OBJ_STATE_(x) & 0x0Fu);
-        OBJ_TIMER_(x) = k_bomb_times[(unsigned char)(minor - 1u) & 0x03u];
-        OBJ_STATE_(x)++;
+        shared_effect_set_timer(x, k_bomb_times[(unsigned char)(minor - 1u) & 0x03u]);
+        shared_effect_set_state(x, (unsigned char)(OBJ_STATE_(x) + 1u));
         minor = (unsigned char)(OBJ_STATE_(x) & 0x0Fu);
         if (minor == 0x03u) {
-            nes_ram[NES_EFFECT_REQUEST] |= 0x10u;
+            F_ram_0603_N |= 0x10u;
         }
         if (minor == 0x05u) {
-            OBJ_STATE_(x) = 0u;   /* ResetObjState; A = 0 */
-            OBJ_TIMER_(x) = 0u;
+            shared_effect_set_state(x, 0u);   /* ResetObjState; A = 0 */
+            shared_effect_set_timer(x, 0u);
             return;
         }
         if (minor == 0x04u) bomb_check_wall(x);
@@ -288,12 +289,12 @@ static unsigned char s_last_level = 0xFFu;
 
 void roomrom_bomb_update(void)
 {
-    if (nes_ram[NES_CUR_ROOM_ID] != s_last_room ||
-        nes_ram[NES_CUR_LEVEL] != s_last_level) {
-        s_last_room = nes_ram[NES_CUR_ROOM_ID];
-        s_last_level = nes_ram[NES_CUR_LEVEL];
-        OBJ_STATE_(BOMB_SLOT_A) = 0u;
-        OBJ_STATE_(BOMB_SLOT_B) = 0u;
+    if (F_ram_00EB_N3 != s_last_room ||
+        F_ram_0010_N2 != s_last_level) {
+        s_last_room = F_ram_00EB_N3;
+        s_last_level = F_ram_0010_N2;
+        shared_effect_set_state(BOMB_SLOT_A, 0u);
+        shared_effect_set_state(BOMB_SLOT_B, 0u);
     }
     update_bomb_or_fire(BOMB_SLOT_A);
     update_bomb_or_fire(BOMB_SLOT_B);

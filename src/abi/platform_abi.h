@@ -49,7 +49,7 @@ extern "C" {
 #ifdef ROOMROM_BUILD
 /* engine variant: regular global pointer. Initialized at boot by
  * engine/src/boot/nes_ram_init.c BEFORE any drained code runs. */
-extern volatile unsigned char *nes_ram;
+extern volatile unsigned char *nes_ram; /* native_ram bulk:abi_accessor */
 #else
 /* Zelda.md variant: A4-register pinned. Boot shell loads A4 = $FF0000
  * before C entry; -ffixed-a4 flag prevents gcc from clobbering. */
@@ -58,15 +58,18 @@ extern volatile unsigned char *nes_ram;
  * so re-reading every access only blocked register allocation across the
  * inlined enemy pipeline (room $38: Remix updates past $C5 93 -> 20, Original
  * 30 -> 0; end-of-tick parity exact in OW rooms $38/$37/$3A/$77, both modes). */
-register unsigned char *nes_ram asm("a4");
+register unsigned char *nes_ram asm("a4"); /* native_ram bulk:abi_accessor */
 #endif
+
+/* T-382: field macros (generated). */
+#include "../state/game_ram.h"
 
 /* SGDK memory_base.h defines an object-like RAM (0xE0FF0000). No project
  * code uses it (T-093 audit); our function-like RAM(off) replaces it. */
 #ifdef RAM
 #undef RAM
 #endif
-#define RAM(off) (nes_ram[(off)])
+#define RAM(off) (nes_ram[(off)]) /* native_ram bulk:abi_accessor */
 
 /* Debug/probe sentinels (T-109). Previously written straight into
  * nes_ram[$07E0..$07FF], which is NES WorldFlags for levels 7-9
@@ -80,7 +83,7 @@ extern volatile unsigned char g_debug_sentinel[32];
 /* Slot-indexed accessor: NES RAM offsets are often base + slot (with
  * slot 0..11 for objects). Same encoding as transpiled `(off,A4,D2.W)`.
  */
-#define OBJ(off, slot) (nes_ram[(off) + (slot)])
+#define OBJ(off, slot) (nes_ram[(off) + (slot)]) /* native_ram bulk:abi_accessor */
 
 /* NES-RAM offsets used by the walker / MoveObject path. Kept in one
  * place so a bank migration or data-layout change only edits here.

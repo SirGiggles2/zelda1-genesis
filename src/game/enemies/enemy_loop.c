@@ -37,6 +37,9 @@
 #include "../world/render/ow_render.h"      /* T-050 roomrom_ow_room_tile_object */
 #include "../world/pushblock.h"             /* T-054 moving block sprite */
 #include "../world/dock.h"                  /* T-056 UpdateDock */
+#include "../../state/player_state.h"
+#include "../../state/game_profile.h"
+#include "../options/options_consumer.h"         /* Remix LOW HP BEEP */
 
 /* NES Z_07.asm:5227 ObjectTypeToHpPairs — packed HP, 2 per byte.
  * Indexed by ObjType/2. Even-type uses high nibble (AND #$F0); odd-type
@@ -106,7 +109,7 @@ static const unsigned char k_object_type_attrs[95] = {
 static void native_init_obj_attr(unsigned int slot, unsigned char type)
 {
     if (type >= (unsigned char)sizeof(k_object_type_attrs)) return;
-    RAM(0x04BFu + slot) = k_object_type_attrs[type];
+    F_ram_04BF_R(slot) = k_object_type_attrs[type];
 }
 
 /* Forward decls — defined in src/oracle/enemies/enemy_walker_runtime.c
@@ -127,7 +130,7 @@ extern void enrt_update_blue_wizzrobe(unsigned int slot);        /* enemy_fix Wa
 extern void enrt_update_red_wizzrobe(unsigned int slot);         /* enemy_fix Wave 5 */
 extern void uw_person_update_person_full(unsigned int slot);
 extern void uw_person_update_grumble_full(unsigned int slot);
-extern void roomrom_food_apply_chase_target(void);   /* items/boomerang.c */
+#include "../items/boomerang.h"
 extern void uw_person_update_life_or_money_full(unsigned int slot);
 extern void uw_person_init_underworld_person_a(unsigned int slot);
 extern void uw_person_init_underworld_person_b(unsigned int slot);
@@ -145,12 +148,12 @@ extern void core_reset_obj_metastate(unsigned int slot);
  *   L0=DoNothing, L1/L2/L5/L7=A, L3/L4/L6/L8=B, L9=C. */
 static void uw_person_init_dispatch_by_level(unsigned int slot)
 {
-    unsigned char level = (unsigned char)RAM(0x0010u);  /* CUR_LEVEL */
+    unsigned char level = (unsigned char)F_ram_0010_R;  /* CUR_LEVEL */
     /* Z_01.asm:1003 preamble: PersonTextPtr ($045F) = TextboxLineAddrsLo+2
      * ($A4, front of the first line). T-166: missing, so the first line
      * streamed from whatever the pointer held (L1 old man: NT $2103+, the
      * room's top wall). */
-    RAM(0x045Fu) = 0xA4u;
+    F_CAVE_TEXT_LINE_ADDR_LO_R = 0xA4u;
     switch (level) {
     case 1: case 2: case 5: case 7:
         uw_person_init_underworld_person_a(slot); break;
@@ -1148,7 +1151,7 @@ static void clear_slot_scratch(unsigned int slot)
     ENEMY_FLYER_X_FINE(slot)   = 0u;
     ENEMY_STUN_TIMER(slot)     = 0u;          /* Z_05.asm:1693 ObjStunTimer */
     ENEMY_OBJ_SHOVE_DIR(slot)  = 0u;          /* ResetShoveInfo */
-    OBJ(0x00D3u, slot)         = 0u;          /* ObjShoveDistance */
+    F_ram_00D3_O(slot)         = 0u;          /* ObjShoveDistance */
     /* ObjTimer ($28+slot) is not touched by InitMode_EnterRoom: it keeps
      * running down from the old room (T-171: t012_route t1385 NES $0C
      * after $73). ENEMY_LIFE ($BF+slot) was cleared here too: that is
@@ -1175,22 +1178,22 @@ void enemy_loop_enter_cave_slots(void)
     unsigned int slot;
     enemy_like_like_shields_reset();
     core_clear_ram0300_up_to(5u, 0x1Fu);
-    RAM(0x04CDu) = (unsigned char)DUNGEON_LBA_F(RAM(0x00EBu));   /* LevelBlockAttrsByteF */
+    F_ram_04CD_R = (unsigned char)DUNGEON_LBA_F(F_ram_00EB_R);   /* LevelBlockAttrsByteF */
     room_setup_obj_room_bounds();
-    RAM(0x0340u) = 0x0Bu;                 /* CurObjIndex */
+    F_ram_0340_R = 0x0Bu;                 /* CurObjIndex */
     for (slot = ENEMY_LOOP_SLOT_LAST; slot >= ENEMY_LOOP_SLOT_FIRST; --slot) {
-        RAM(0x0492u + slot) = (unsigned char)(RAM(0x0492u + slot) - 1u); /* ObjUninitialized */
-        RAM(0x00C0u + slot) = 0u;         /* ObjShoveDir */
-        RAM(0x00D3u + slot) = 0u;         /* ObjShoveDistance */
-        RAM(0x00ACu + slot) = 0u;         /* ObjState */
-        RAM(0x0098u + slot) = 0u;         /* ObjDir */
-        RAM(0x003Du + slot) = 0u;         /* ObjStunTimer */
-        RAM(0x03D0u + slot) = (unsigned char)(RAM(0x03D0u + slot) + 1u); /* ObjAnimCounter */
-        RAM(0x0405u + slot) = (unsigned char)(RAM(0x0405u + slot) + 1u); /* ObjMetastate */
-        RAM(0x03BCu + slot) = 0x20u;      /* ObjQSpeedFrac */
+        F_ram_0492_R2(slot) = (unsigned char)(F_ram_0492_R2(slot) - 1u); /* ObjUninitialized */
+        F_ram_00C0_R2(slot) = 0u;         /* ObjShoveDir */
+        F_ram_00D3_R2(slot) = 0u;         /* ObjShoveDistance */
+        F_ram_00AC_R5(slot) = 0u;         /* ObjState */
+        F_ram_0098_R3(slot) = 0u;         /* ObjDir */
+        F_NES_OBJ_STUN_TIMER_R2(slot) = 0u;         /* ObjStunTimer */
+        F_ram_03D0_R2(slot) = (unsigned char)(F_ram_03D0_R2(slot) + 1u); /* ObjAnimCounter */
+        F_NES_OBJ_METASTATE_BASE_R(slot) = (unsigned char)(F_NES_OBJ_METASTATE_BASE_R(slot) + 1u); /* ObjMetastate */
+        F_ram_03BC_R4(slot) = 0x20u;      /* ObjQSpeedFrac */
     }
-    RAM(0x03D0u) = 4u;                    /* Link ObjAnimCounter */
-    RAM(0x03BCu) = 0x60u;                 /* InitLinkSpeed */
+    F_ram_03D0_R = 4u;                    /* Link ObjAnimCounter */
+    F_ram_03BC_R = 0x60u;                 /* InitLinkSpeed */
 }
 
 /* T-171: the object part of InitMode_EnterRoom for a cave entry
@@ -1228,9 +1231,9 @@ static void ow_tile_object_room_setup(unsigned char scene_id, unsigned char leve
     unsigned char t, x, y;
     if (scene_id != 0u || level != 0u) return;
     roomrom_ow_room_tile_object(room_id, &t, &x, &y);
-    RAM(0x052Bu) = t;                    /* RoomTileObjType */
-    RAM(0x052Cu) = x;                    /* RoomTileObjX */
-    RAM(0x052Du) = y;                    /* RoomTileObjY */
+    F_ROOM_TILE_OBJ_0_R = t;                    /* RoomTileObjType */
+    F_ROOM_TILE_OBJ_1_R = x;                    /* RoomTileObjX */
+    F_ROOM_TILE_OBJ_2_R = y;                    /* RoomTileObjY */
     room_setup_tile_object_ow();
     if ((unsigned char)ENEMY_TYPE(11u) == 0u) {
         ENEMY_ALIVE_FLAG(11u) = 0xFFu;
@@ -1239,10 +1242,10 @@ static void ow_tile_object_room_setup(unsigned char scene_id, unsigned char leve
     clear_slot_scratch(11u);
     ENEMY_ALIVE_FLAG(11u) = 0xFFu;       /* NES ObjUninitialized $FF */
     ENEMY_METASTATE(11u) = 1u;
-    OBJ(NES_OBJ_QSPD_FRAC, 11u) = 0x20u;
-    OBJ(0x0098u, 11u) = 0u;              /* ObjDir */
-    OBJ(NES_OBJ_GRID_OFFSET, 11u) = 0u;
-    OBJ(NES_OBJ_POS_FRAC, 11u) = 0u;
+    F_ram_03BC_O(11u) = 0x20u;
+    F_ram_0098_O(11u) = 0u;              /* ObjDir */
+    F_ram_0394_O(11u) = 0u;
+    F_ram_03A8_O(11u) = 0u;
 }
 
 static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene_id,
@@ -1269,11 +1272,11 @@ static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene
         /* ResetInvObjState's LadderSlot half (T-056): no ladder is out in
          * a newly entered room. Its weapon-slot half stays with the
          * weapon owners (bomb.c room-change reset). */
-        RAM(0x0064u) = 0u;
+        F_ram_0064_R = 0u;
     }
     /* InitMode_EnterRoom @PlaceObjects: CurObjIndex = $B, ready for the
      * first mode 5 frame (T-171: t013_route t883 after a cave exit). */
-    RAM(0x0340u) = 0x0Bu;
+    F_ram_0340_R = 0x0Bu;
     /* NES SetupObjRoomBounds (Z_05.asm:6409), run by InitMode_EnterRoom
      * after placing Link and by RunCrossRoomTasks: RoomBoundLeft/Right/
      * Up/Down ($346-$349) + ObjectFirstUnwalkableTile ($34A). */
@@ -1284,13 +1287,13 @@ static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene
      * then animates Link once in mode 4 (AnimateLinkBase); Genesis has no
      * mode-4 frame (T-096), so store the result: NES captures show $3D0 = 3
      * at every mode 4 -> 5 transition (t105_scroll, t105_horizontal, t114). */
-    RAM(0x003Du) = 0u;       /* ObjStunTimer */
-    RAM(0x00C0u) = 0u;       /* ObjShoveDir */
-    RAM(0x00D3u) = 0u;       /* ObjShoveDistance */
+    F_NES_OBJ_STUN_TIMER_R = 0u;       /* ObjStunTimer */
+    F_ram_00C0_R = 0u;       /* ObjShoveDir */
+    F_ram_00D3_R = 0u;       /* ObjShoveDistance */
     /* ObjAnimCounter after the mode-4 step; a whirlwind teleport does not
      * animate (Link_EndMoveAndAnimate returns), so it stays 4 (T-171). */
-    RAM(0x03D0u) = (RAM(0x0522u) != 0u) ? 4u : 3u;
-    RAM(0x03BCu) = 0x60u;    /* ObjQSpeedFrac */
+    F_ram_03D0_R = (F_ram_0522_R != 0u) ? 4u : 3u;
+    F_ram_03BC_R = 0x60u;    /* ObjQSpeedFrac */
     /* enemy_fix arm hook: bail this room_init pass exactly once. */
     if (s_fix_arm_suppress_room_init) {
         s_fix_arm_suppress_room_init = 0u;
@@ -1317,16 +1320,16 @@ static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene
      * Coverage: PARTIAL (native room entry); Stance: EXTEND.
      * History reads RoomId implicitly; install incoming identity before it.
      * RoomKillCount is per visit and was saved by the departure path. */
-    RAM(0x00EBu) = room_id;
+    F_ram_00EB_R = room_id;
     /* NES source: Z_05.asm:InitMode_EnterRoom caches the active room's
      * LevelBlockAttrsF byte at $04CD. Drained C: native room init.
      * Coverage: PARTIAL room-entry consumers. Stance: EXTEND. */
-    RAM(0x04CDu) = (unsigned char)DUNGEON_LBA_F(room_id);
+    F_ram_04CD_R = (unsigned char)DUNGEON_LBA_F(room_id);
     /* NES source: Z_07.asm:ResetPlayerState / Walker_Move:CheckStunned.
      * Drained C: c_walker_move and native room entry.
      * Coverage: PARTIAL clock lifetime; Stance: EXTEND.
      * Clock lasts for the room, not one enemy tick. */
-    RAM(0x066Cu) = 0u;
+    F_ram_066C_R = 0u;
     /* NES Z_07.asm:MarkRoomVisited; existing room_dispatch drain.
      * Installed dungeon flags retain visits across room transitions. */
     /* RunCrossRoomTasksAndBeginUpdateMode_EnterPlayModes (UW): then
@@ -1337,15 +1340,15 @@ static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene
         room_mark_room_visited();
         core_write_blank_priority_sprites();
     }
-    RAM(0x034Fu) = 0u;
+    F_ram_034F_R = 0u;
 
     /* 2026-05-24 — reset ROOM_MONSTER_ALL_DEAD ($034D) + ROOM_SHUTTER_TRIGGERED
      * ($04CE) on room load. Pre-fix, $034D held stale value from prior room
      * (e.g. $D1 garbage post-warp), causing shutter auto-trigger fix to fire
      * immediately on room entry before enemies spawned. NES Z_05.asm InitMode4
      * clears via @ClearRamPage in mode-transition sequence. */
-    RAM(0x034Du) = 0u;
-    RAM(0x04CEu) = 0u;
+    F_ram_034D_R = 0u;
+    F_ram_04CE_R = 0u;
 
     /* Clear all enemy slots on room load. 2026-05-22 — was clearing
      * only TYPE/ALIVE/X/Y; shove + state cells inherited from prior
@@ -1364,14 +1367,14 @@ static void enemy_loop_room_init_impl(unsigned char room_id, unsigned char scene
         ENEMY_ALIVE_FLAG(slot) = 0xFFu;  /* ObjUninitialized, NES DEC from 0 */
         /* ObjX/ObjY keep their values (outside NES ClearRam0300UpTo). */
         ENEMY_OBJ_SHOVE_DIR(slot) = 0u;        /* $00C0+slot */
-        OBJ(0x00D3u, slot)         = 0u;       /* shove distance */
-        OBJ(NES_OBJ_POS_FRAC, slot) = 0u;      /* $03A8+slot */
-        OBJ(NES_OBJ_GRID_OFFSET, slot) = 0u;   /* $0394+slot */
+        F_ram_00D3_O(slot)         = 0u;       /* shove distance */
+        F_ram_03A8_O(slot) = 0u;      /* $03A8+slot */
+        F_ram_0394_O(slot) = 0u;   /* $0394+slot */
         ENEMY_STUN_TIMER(slot)     = 0u;       /* $003D+slot */
         ENEMY_HIT_REACTION(slot)   = 0u;       /* $04F0+slot */
         /* NES room-entry object reset (Z_05.asm, slots $B..1): default
          * q-speed $20 before the monster list / tile object. */
-        OBJ(NES_OBJ_QSPD_FRAC, slot) = 0x20u;
+        F_ram_03BC_O(slot) = 0x20u;
     }
 
     /* Phase 7 Task 7.7 step 1+2 — wire NES InitMode_EnterRoom monster-list
@@ -1454,7 +1457,7 @@ __attribute__((always_inline)) static void loop_object_wrapper(unsigned int slot
      * collide. Without it, Moblin walks invisibly and Link can't
      * touch-damage. Octorok/Stalfos have bit 0 set, skip wrapper. */
     if (ENEMY_METASTATE(slot) == 0u) {
-        unsigned char attr = (unsigned char)RAM(0x04BFu + slot);
+        unsigned char attr = (unsigned char)F_ram_04BF_R(slot);
         if ((attr & 0x01u) == 0u) {
             if ((attr & 0x04u) == 0u) {
                 extern void z07_animate_object_walking(unsigned int slot);
@@ -1491,7 +1494,7 @@ void enemy_loop_init_object(unsigned int slot, unsigned char t)
     enemy_init_fn fn;
     const unsigned char cloud = (unsigned char)(t < 0x53u && t != 0x1Eu && t != 0x22u);
     enemy_like_like_shield_forget(slot);
-    RAM(0x000Fu) = (unsigned char)ENEMY_ALIVE_FLAG(slot);   /* STY $0F: uninit flag */
+    F_ram_000F_R = (unsigned char)ENEMY_ALIVE_FLAG(slot);   /* STY $0F: uninit flag */
     /* UpdateObject: cloud types start with ObjTimer 7 (InitObject sets
      * the real value); flagged initialized before InitObject runs. */
     if (cloud) ENEMY_MOVE_TIMER(slot) = 7u;
@@ -1501,18 +1504,18 @@ void enemy_loop_init_object(unsigned int slot, unsigned char t)
      * bit 3, read from the room-entry copy LevelBlockAttrsByteF $4CD as the
      * NES does) bring monsters in from the edge, one per long-timer period;
      * zora, fire, armos, whirlwind and non-cloud objects spawn normally. */
-    if ((unsigned char)RAM(0x0010u) == 0u &&
+    if ((unsigned char)F_ram_0010_R == 0u &&
         ((unsigned char)DUNGEON_ATTRS_BYTE_F & 0x08u) != 0u &&
         t != 0x11u && t != 0x40u && t != 0x1Eu && t != 0x2Eu && t < 0x53u) {
-        if ((unsigned char)RAM(0x004Bu) != 0u) {
+        if ((unsigned char)F_ram_004B_R != 0u) {
             /* @UninitMonsterFromEdge: stay uninitialized. */
-            ENEMY_ALIVE_FLAG(slot) = (unsigned char)RAM(0x004Bu);
+            ENEMY_ALIVE_FLAG(slot) = (unsigned char)F_ram_004B_R;
             return;
         }
         enemy_edge_spawn_next(slot);
-        RAM(0x004Bu) = (unsigned char)(((unsigned char)ENEMY_RNG_B(slot) & 3u) + 2u);
+        F_ram_004B_R = (unsigned char)(((unsigned char)ENEMY_RNG_B(slot) & 3u) + 2u);
         if (!enemy_edge_distance_safe(slot)) {
-            ENEMY_ALIVE_FLAG(slot) = (unsigned char)RAM(0x004Bu);
+            ENEMY_ALIVE_FLAG(slot) = (unsigned char)F_ram_004B_R;
             return;
         }
         ENEMY_METASTATE(slot) = 0u;        /* no spawn cloud */
@@ -1520,7 +1523,7 @@ void enemy_loop_init_object(unsigned int slot, unsigned char t)
 
     /* @NormalSpawn: cloud monsters start moving at slot-staggered times. */
     if (cloud) ENEMY_MOVE_TIMER(slot) = (unsigned char)slot;
-    RAM(0x0000u) = t;               /* [00] holds the object type */
+    F_ram_0000_R = t;               /* [00] holds the object type */
     native_init_obj_attr(slot, t);  /* NES Z_07.asm:5566 @FetchAttrs */
     native_init_obj_hp(slot, t);    /* NES Z_07.asm:5576 HP nibble */
     if (t >= 0x6Au) {               /* Z_07.asm:5581 JMP InitCave */
@@ -1579,26 +1582,26 @@ static void enemy_loop_arm_fix_probe(void)
     unsigned char room    = arm[8];
 
     /* Pin determinism cells. */
-    RAM(0x0015u) = 0u;        /* FrameCounter */
-    RAM(0x0060u) = 1u;        /* ChaseTarget toggle (Z_07.asm:1873) */
-    RAM(0x0018u) = 0u;        /* Random[0] */
-    RAM(0x0019u) = 1u;        /* Random[1] */
-    RAM(0x001Au) = 2u;        /* Random[2] */
-    RAM(0x00EBu) = room;      /* RoomId */
-    RAM(0x004Au) = 8u;        /* ChaseLongTimer (non-zero suppresses toggle) */
+    F_ram_0015_R = 0u;        /* FrameCounter */
+    F_ram_0060_R = 1u;        /* ChaseTarget toggle (Z_07.asm:1873) */
+    F_ram_0018_R = 0u;        /* Random[0] */
+    F_ram_0019_R = 1u;        /* Random[1] */
+    F_ZP_RNG_B_R = 2u;        /* Random[2] */
+    F_ram_00EB_R = room;      /* RoomId */
+    F_ram_004A_R = 8u;        /* ChaseLongTimer (non-zero suppresses toggle) */
     /* Clear InvClock ($066C) — debug-boot leaves it $01 which freezes
      * walker_move CheckStunned + flyer DrawAndCheck branches → all
      * enemies static. NES Variables.inc: InvClock := $66C. */
-    RAM(0x066Cu) = 0u;
+    F_ram_066C_R = 0u;
 
     /* Habitat: OW=$89 (per ObjectRoomBoundsOW[4]), UW=$78. */
-    RAM(0x034Au) = (habitat == 0u) ? 0x89u : 0x78u;
+    F_ram_034A_R2 = (habitat == 0u) ? 0x89u : 0x78u;
 
     /* Clear FoeCounts so natural spawn rolls suppressed. */
-    RAM(0x6BA2u) = 0u;
-    RAM(0x6BA3u) = 0u;
-    RAM(0x6BA4u) = 0u;
-    RAM(0x6BA5u) = 0u;
+    F_ram_6BA2_R = 0u;
+    F_ram_6BA3_R = 0u;
+    F_ram_6BA4_R = 0u;
+    F_ram_6BA5_R = 0u;
 
     /* Clear all enemy slots. */
     {
@@ -1651,16 +1654,16 @@ static void enemy_loop_combat_force_kill_hook(void)
         return;
     }
 
-    RAM(0x0009u) = dmg_type;   /* COMBAT_DAMAGE_TYPE (ZP_TMP9) */
-    RAM(0x0007u) = dmg_amt;    /* COMBAT_DAMAGE_AMOUNT (ZP_TMP7) */
+    F_ZP_TMP9_R = dmg_type;   /* COMBAT_DAMAGE_TYPE (ZP_TMP9) */
+    F_ram_0007_R = dmg_amt;    /* COMBAT_DAMAGE_AMOUNT (ZP_TMP7) */
     combat_deal_damage((unsigned int)slot);
 
     /* SetShoveInfo equivalent (NES Z_01.asm SetShoveInfo): real
      * combat path runs shove via collision handler. Hook bypasses
      * that, so apply shove here for parity-test correctness.
      * Shove dir 0x02 (right) + dist 0x40 per NES default. */
-    RAM(0x00C0u + slot) = 0x02u;    /* ObjShoveDir */
-    RAM(0x00D3u + slot) = 0x40u;    /* ObjShoveDistance */
+    F_ram_00C0_R2(slot) = 0x02u;    /* ObjShoveDir */
+    F_ram_00D3_R2(slot) = 0x40u;    /* ObjShoveDistance */
 
     arm[0] = 0u;
     arm[1] = 0u;
@@ -1671,24 +1674,24 @@ static void enemy_loop_combat_force_kill_hook(void)
  * square ($8D..$98) in the first empty monster slot. */
 static void enemy_loop_check_zora(void)
 {
-    unsigned char room = RAM(0x00EBu);
+    unsigned char room = F_ram_00EB_R;
     unsigned char slot, y;
-    if ((RAM(0x687Eu + room) & 0x08u) == 0u) return;
-    if (RAM(0x0514u) != 0u) return;                 /* ZoraActive */
+    if ((F_ram_687E_R(room) & 0x08u) == 0u) return;
+    if (F_ENEMY_ROOM_MONSTER_FLAG_R != 0u) return;                 /* ZoraActive */
     slot = (unsigned char)enemy_find_empty_monster_slot();
     if (slot == 0u) return;
     for (y = 0x0Du; y != 0u; --y) {
-        unsigned char r = RAM(0x0018u + y);         /* Random, Y */
+        unsigned char r = F_ram_0018_R4(y);         /* Random, Y */
         unsigned char x = (unsigned char)(r & 0xF0u);
         unsigned char py = (unsigned char)(r << 4);
         unsigned char t;
-        OBJ(0x0070u, slot) = x;
+        F_ram_0070_O(slot) = x;
         if (x == 0u || x == 0xF0u) continue;
         if (py < 0x50u || py >= 0xE0u) continue;
-        OBJ(0x0084u, slot) = (unsigned char)(py | 0x0Du);
+        F_ram_0084_O(slot) = (unsigned char)(py | 0x0Du);
         t = collision_get_collidable_tile_still(slot);
         if (t < 0x8Du || t >= 0x99u) continue;
-        RAM(0x0514u) = (unsigned char)(RAM(0x0514u) + 1u);
+        F_ENEMY_ROOM_MONSTER_FLAG_R = (unsigned char)(F_ENEMY_ROOM_MONSTER_FLAG_R + 1u);
         core_set_type_and_clear_object(0x11u, slot);
         return;
     }
@@ -1754,18 +1757,22 @@ static void enemy_loop_update_statues(void)
  * (statues, secrets, shutters, doors) is run by the caller. */
 void enemy_loop_play_tail(unsigned char in_uw)
 {
-    if ((RAM(0x066Fu) & 0x0Fu) == 0u)               /* HeartValues full */
-        RAM(0x0604u) = (unsigned char)(RAM(0x0604u) | 0x40u);
+    /* Remix: the heart-warning tune plays only when the file's LOW HP
+     * BEEP option is ON (default OFF). Original keeps the NES request. */
+    if ((F_ram_066F_R & 0x0Fu) == 0u &&             /* HeartValues full */
+        (!game_profile_is_remix() || options_consumer_get_low_health_warning()))
+        F_ram_0604_R = (unsigned char)(F_ram_0604_R | 0x40u);
     if (in_uw) return;
-    if (RAM(0x0012u) == 0x05u)                      /* sea sound effect */
-        RAM(0x0603u) = (unsigned char)(RAM(0x0603u) |
-            ((RAM(0x687Eu + RAM(0x00EBu)) & 0x04u) << 3));
+    if (F_ram_0012_R == 0x05u)                      /* sea sound effect */
+        F_ram_0603_R = (unsigned char)(F_ram_0603_R |
+            ((F_ram_687E_R(F_ram_00EB_R) & 0x04u) << 3));
     enemy_loop_check_zora();
 }
 
 void enemy_loop_tick(void)
 {
     unsigned int slot;
+    unsigned char world_chase_x, world_chase_y;
     /* enemy_fix arm-hook: check magic + consume on first call only. */
     enemy_loop_arm_fix_probe();
     /* combat-death hook: check magic + invoke combat_deal_damage. */
@@ -1795,28 +1802,31 @@ void enemy_loop_tick(void)
      * NES Random+1 is at $0019 -- main.c NMI port @ScrambleRandom
      * cycles $18..$24 each frame. */
     {
-        unsigned char chase_other = (unsigned char)RAM(0x0060u);
+        unsigned char chase_other = (unsigned char)F_ram_0060_R;
         if (chase_other == 0u) {
-            RAM(0x0061u) = (unsigned char)RAM(0x0070u);  /* Chase X = Link X */
-            RAM(0x0062u) = (unsigned char)RAM(0x0084u);  /* Chase Y = Link Y */
+            F_CHASE_TARGET_X_R = (unsigned char)F_ram_0070_R;  /* Chase X = Link X */
+            F_CHASE_TARGET_Y_R = (unsigned char)F_ram_0084_R;  /* Chase Y = Link Y */
         }
         /* T-057: the food in slot $0F (UpdateBoomerangOrFood) overrides
          * the target before the ChaseLongTimer flip below. */
         roomrom_food_apply_chase_target();
-        if ((unsigned char)RAM(0x004Au) == 0u) {  /* ChaseLongTimer expired */
-            RAM(0x004Au) = (unsigned char)((unsigned char)RAM(0x0019u) & 0x07u);
+        if ((unsigned char)F_ram_004A_R == 0u) {  /* ChaseLongTimer expired */
+            F_ram_004A_R = (unsigned char)((unsigned char)F_ram_0019_R & 0x07u);
             chase_other = (unsigned char)(chase_other ^ 0x01u);
-            RAM(0x0060u) = chase_other;
+            F_ram_0060_R = chase_other;
             if (chase_other != 0u) {
                 /* Mirror swap: only if ChaseX still matches Link's X
                  * (Link hasn't moved this frame -- NES idle gate). */
-                if ((unsigned char)RAM(0x0061u) == (unsigned char)RAM(0x0070u)) {
-                    RAM(0x0061u) = (unsigned char)(RAM(0x0061u) ^ 0xFFu);
-                    RAM(0x0062u) = (unsigned char)(RAM(0x0062u) ^ 0xFFu);
+                if ((unsigned char)F_CHASE_TARGET_X_R == (unsigned char)F_ram_0070_R) {
+                    F_CHASE_TARGET_X_R = (unsigned char)(F_CHASE_TARGET_X_R ^ 0xFFu);
+                    F_CHASE_TARGET_Y_R = (unsigned char)(F_CHASE_TARGET_Y_R ^ 0xFFu);
                 }
             }
         }
     }
+
+    world_chase_x = F_CHASE_TARGET_X_R;
+    world_chase_y = F_CHASE_TARGET_Y_R;
 
     /* Step 20 DecTimers prepass. NES IsrNmi @UpdateTimers /
      * @LoopTimer (z_07.asm:1604-1616) decrements ObjTimer ($0028..)
@@ -1834,7 +1844,7 @@ void enemy_loop_tick(void)
          * ObjTimer ($0028+slot) + ObjStunTimer ($003D+slot) are ALREADY
          * decremented by main.c NES @UpdateTimers port (engine/src/main.c
          * line ~1606 loops $27..$3C/$4E). Don't double-dec here. */
-        unsigned char dec_inv = ((unsigned char)RAM(0x0015u) & 1u) == 0u;
+        unsigned char dec_inv = ((unsigned char)F_ram_0015_R & 1u) == 0u;
         if (dec_inv) {
             for (slot = ENEMY_LOOP_SLOT_FIRST; slot <= ENEMY_LOOP_SLOT_LAST; ++slot) {
                 if (ENEMY_HIT_REACTION(slot) != 0u) {
@@ -1854,6 +1864,13 @@ void enemy_loop_tick(void)
         t = (unsigned char)ENEMY_TYPE(slot);
         if (t == 0u || t >= ENEMY_LOOP_TYPE_MAX) continue;
         ENEMY_THROWER_SLOT = (unsigned char)slot;
+        /* T-251: a single pre-loop chase point cannot select different
+         * nearest players for different enemies. Keep NES world decoy/
+         * food timing once, and adapt the point at its actual consumer.
+         * Wallmaster owns its separate wall/latched-target policy. */
+        if (g_player_count > 1u && t < 0x5Du && t != 0x27u &&
+            !roomrom_food_chase_active())
+            enemy_target_party_player(slot, F_ram_0060_R);
         /* NES UpdateObject checks ObjUninitialized ($492, nonzero) before
          * metastate: room objects, shots and dropped items are all
          * initialized on their first update. The loop's wrapper then
@@ -1903,6 +1920,10 @@ void enemy_loop_tick(void)
         loop_object_wrapper(slot);
     }
 
+    if (g_player_count > 1u) {
+        F_CHASE_TARGET_X_R = world_chase_x;
+        F_CHASE_TARGET_Y_R = world_chase_y;
+    }
     if (armed) {
         enemy_loop_probe_publish_live();
     }
@@ -1914,7 +1935,7 @@ void enemy_loop_tick(void)
      * RoomAllDead / shutter trigger early). */
     ENEMY_THROWER_SLOT = 0x0Bu;
 
-    if (RAM(0x0010u) != 0u) enemy_loop_update_statues();
+    if (F_ram_0010_R != 0u) enemy_loop_update_statues();
 
     /* NES UpdateMode5Play @CheckUW: CheckUnderworldSecrets runs only with
      * CurLevel != 0 (T-171: the OW start room counted RoomAllDead up).
@@ -1922,7 +1943,7 @@ void enemy_loop_tick(void)
      * trigger (all dead, ringleader, last boss, block door, block stairs,
      * money or life, foes for item) and the room item activation; the
      * door state opens shutters from ShutterTrigger ($4CE). */
-    if ((unsigned char)RAM(0x0010u) != 0u)
+    if ((unsigned char)F_ram_0010_R != 0u)
         room_check_underworld_secrets();
 }
 
@@ -1998,9 +2019,9 @@ void enemy_loop_force_spawn_typed(unsigned int slot,
         else if (enemy_type == 0x0Cu)                            qspd = 0x28u;  /* Red Darknut */
         else if (enemy_type == 0x2Bu || enemy_type == 0x2Cu ||
                  enemy_type == 0x2Du)                            qspd = 0x40u;  /* Bubble */
-        RAM(0x03BCu + slot) = qspd;                  /* ENEMY_WALK_SPEED / ObjQSpeedFrac */
-        RAM(0x03D0u + slot) = 0x10u;                 /* ENEMY_ANIM_TIMER / ObjAnimCounter */
-        RAM(0x03E4u + slot) = 0x00u;                 /* ENEMY_DRAW_FRAME / ObjAnimFrame */
+        F_ram_03BC_R4(slot) = qspd;                  /* ENEMY_WALK_SPEED / ObjQSpeedFrac */
+        F_ram_03D0_R2(slot) = 0x10u;                 /* ENEMY_ANIM_TIMER / ObjAnimCounter */
+        F_ram_03E4_R2(slot) = 0x00u;                 /* ENEMY_DRAW_FRAME / ObjAnimFrame */
     }
 
     fn = enemy_init_fns[enemy_type];

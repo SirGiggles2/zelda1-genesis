@@ -26,8 +26,11 @@
  */
 
 #include "boss_dodongo.h"
+#include "combat/link_collision_dispatch.h"
 #include "platform_abi.h"
+#include "weapon_state.h"
 #include "enemy_state.h"
+#include "room_state.h"
 #include "world/world_dispatch.h"          /* world_get_object_middle */
 #include "combat/collision_dispatch.h"     /* collision_check_monster_sword_collision */
 #include "core/core_dispatch.h"            /* core_update_dead_dummy, core_reset_obj_metastate_and_timer */
@@ -125,7 +128,7 @@ static void boss_dodongo_state1_bloated_sub_wait(unsigned int slot)
         }
         /* substate == 0: deactivate first bomb slot ($10) +
          * bomb_hits++. */
-        OBJ(0x00ACu, 16u) = 0u;
+        shared_effect_set_state(16u, 0u);
         DODONGO_OBJ_BOMB_HITS(slot) =
             (unsigned char)(DODONGO_OBJ_BOMB_HITS(slot) + 1u);
         enrt_dodongo_dec_bloated_timer(slot);
@@ -210,4 +213,52 @@ void boss_dodongo_update(unsigned int slot)
     enrt_dodongo_check_collisions(slot);
     enrt_dodongo_check_bomb_hit(slot);
     enrt_dodongo_draw(slot);
+}
+
+/* NES source: Z_04.asm:Dodongo_CheckCollisions, base and horizontal X+16.
+ * Drained C: enemy_dodongo_runtime.c:enrt_dodongo_check_collisions.
+ * Coverage: PARTIAL extra-player body-only contexts; weapon/world unchanged.
+ * Stance: EXTEND the existing boss shape without advancing boss state. */
+void boss_dodongo_check_party_body(unsigned int slot, unsigned char player)
+{
+    const unsigned char saved_x = (unsigned char)ENEMY_X(slot);
+    link_collision_check_dodongo_part_for_player(slot, player, 3u);
+    if ((unsigned char)ENEMY_DIR(slot) < 4u) {
+        ENEMY_X(slot) = (unsigned char)(saved_x + 16u);
+        link_collision_check_dodongo_part_for_player(slot, player, 3u);
+        ENEMY_X(slot) = saved_x;
+    }
+}
+
+/* NES source: Z_04.asm:Dodongo_CheckCollisionsStandardSize/CheckCollisions.
+ * Drained C: enemy_dodongo_runtime.c collision passes and bloated_sub_die.
+ * Coverage: PARTIAL extra-player weapon/body contexts, same two source parts.
+ * Stance: EXTEND context selection; reuse protection, sword and death owners. */
+static void boss_dodongo_party_part(unsigned int slot, unsigned char player,
+                                     unsigned char context)
+{
+    ENEMY_INVINCIBILITY(slot) = 0xFFu;
+    link_collision_check_dodongo_part_for_player(slot, player, context);
+    if ((unsigned char)ENEMY_STATE_TIMER(slot) != 2u) return;
+    ENEMY_INVINCIBILITY(slot) = 0xFEu;
+    world_get_object_middle(slot);
+    collision_check_monster_sword_collision(slot, 13u);
+}
+
+void boss_dodongo_check_party_collisions(unsigned int slot, unsigned char player,
+                                        unsigned char context)
+{
+    boss_dodongo_party_part(slot, player, context);
+    if ((unsigned char)ENEMY_HIT_REACTION(slot) == 0u &&
+        (unsigned char)ENEMY_DIR(slot) < 4u) {
+        const unsigned char saved_x = (unsigned char)ENEMY_X(slot);
+        ENEMY_X(slot) = (unsigned char)(saved_x + 16u);
+        boss_dodongo_party_part(slot, player, context);
+        ENEMY_X(slot) = saved_x;
+    }
+    if ((unsigned char)ENEMY_HIT_REACTION(slot) != 0u) {
+        enrt_update_dodongo_state1_bloated_sub_die(slot);
+        ROOM_CHAIN_KILL_COUNT = 10u;
+        ROOM_CHAIN_KILL_BONUS = 10u;
+    }
 }

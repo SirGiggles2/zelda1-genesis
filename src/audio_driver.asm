@@ -667,15 +667,13 @@ music_tick:
     ; labeled rts — the call costs ~20 cycles total and lets us defer
     ; removing it to a later cleanup pass.
     ;------------------------------------------------------------------
-    ; Attract-mode-exit hook: the game's DriveAudio is NOP'd, so the
-    ; audio driver's own SilenceSong paths (via DriveTune0 → $0604 bit7
-    ; and DriveTune1 → $0602 bit7) never run.  Game logic still writes
-    ; the request bytes at state transitions.  The attract-to-file-menu
-    ; path (UpdateMode0Demo_Sub0 → SilenceAllSound in z_01.asm:4118)
-    ; sets $0604 = $80 and $0603 = $80.  Poll both $0604 and $0602 for
-    ; the silence-request bit 7 and route it into native music_silence.
-    ; Also clear $0605/$0607 (current-tune shadows) so the game's own
-    ; "nothing playing" markers stay coherent with our silenced state.
+    ; NES source: Z_00.asm DriveTune0/DriveTune1/SilenceSong.
+    ; Drained C: src/game/audio/audio_requests.c:drive_tunes.
+    ; Coverage: FULL (tune/effect request consumption); Stance: ADOPT.
+    ; The native NMI consumer owns $0602..$0604. The obsolete VBlank
+    ; silence poll stole Tune1 $80 before it could start the death PCM.
+    ; Keep only the SongRequest bridge here; never clear another owner's
+    ; pending tune/effect requests or current-tune shadows.
     ; SongRequest bridge: game writes native RAM $0600 (SongRequest) at
     ; every song change (title/gameplay/dungeon/etc.). Forward to m_song_req
     ; and clear the game-side byte so the game's own driver-absent check
@@ -688,18 +686,6 @@ music_tick:
     clr.b   $0600(A0)
     move.b  D0,(m_song_req).l
 .no_song_req_bridge:
-    move.b  $0604(A0),D0          ; Tune 0 request (SilenceAllSound)
-    bmi.s   .do_silence
-    move.b  $0602(A0),D0          ; Tune 1 request (silence-then-play)
-    bpl.s   .no_silence_req
-.do_silence:
-    clr.b   $0602(A0)
-    clr.b   $0603(A0)
-    clr.b   $0604(A0)
-    clr.b   $0605(A0)
-    clr.b   $0607(A0)
-    bsr     music_silence
-    bra.s   .done
 .no_silence_req:
     move.b  (m_song_req).l,D0
     beq.s   .no_req

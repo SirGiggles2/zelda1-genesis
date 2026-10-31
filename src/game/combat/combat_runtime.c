@@ -1,7 +1,9 @@
 /* Phase 12.2 SGDK-1 cleanup: dropped <genesis.h>; route PAL_setColors
  * through render_cram_subrange_upload(). */
 #include "combat_runtime.h"
+#include "sword_runtime.h"
 #include "../world/render/sprite_render.h"
+#include "../world/render/sprite_slots.h"
 #include "../world/bg_palette.h"  /* Phase 12.2 promoted */
 #include "../../state/inventory.h"
 #include "../options/options_consumer.h"
@@ -46,16 +48,13 @@
  * varies per facing (Link's hand position differs).
  */
 
-/* Latched per-frame sword pose for nes_ram_sync_sword (Plan v5). */
-static unsigned char  s_pub_state = 0u;
-static short          s_pub_x     = 0;
-static short          s_pub_y     = 0;
-static link_face_t    s_pub_face  = LINK_FACE_DOWN;
+/* Native per-player sword ownership; legacy slots are consumer adapters. */
+#include "../../state/weapon_state.h"
 
-unsigned char roomrom_combat_get_swing_state(void) { return s_pub_state; }
-short         roomrom_combat_get_swing_x(void)     { return s_pub_x; }
-short         roomrom_combat_get_swing_y(void)     { return s_pub_y; }
-link_face_t   roomrom_combat_get_swing_face(void)  { return s_pub_face; }
+unsigned char roomrom_combat_get_swing_state(void) { return g_player_sword[0].state; }
+short         roomrom_combat_get_swing_x(void)     { return g_player_sword[0].x; }
+short         roomrom_combat_get_swing_y(void)     { return g_player_sword[0].y; }
+link_face_t   roomrom_combat_get_swing_face(void)  { return (link_face_t)g_player_sword[0].face; }
 
 /* Sword visual Y bias; see recompute_y_bias (0 except Redux UW). */
 static short s_uw_y_bias = 0;
@@ -129,20 +128,6 @@ static void recompute_y_bias(void)
  */
 
 /* Per-face per-frame sword X/Y offsets from Link's top-left. */
-static const signed char redux_x[4][8] = {
-    /* DOWN  */ { -9, -9, -5, -3, -2, -1,  0,  1 },
-    /* UP    */ { 10, 10,  7,  6,  4,  2,  0, -1 },
-    /* LEFT  */ {  1, -1, -5, -6, -7, -8,-10,-11 },
-    /* RIGHT */ {  1,  3,  5,  6,  7,  8, 10, 11 },
-};
-
-static const signed char redux_y[4][8] = {
-    /* DOWN  */ {  3,  5,  9, 10, 11, 12, 13, 13 },
-    /* UP    */ {  2,  0, -5, -6, -7, -8, -9,-10 },
-    /* LEFT  */ {-10,-10, -9, -8, -6, -4,  2,  3 },
-    /* RIGHT */ {-10,-10, -8, -7, -5, -3,  2,  3 },
-};
-
 /* 0=vertical (8x16), 1=horizontal (16x16), 2=diagonal (16x16). */
 static const unsigned char redux_sprite[4][8] = {
     /* DOWN  */ { 1, 1, 2, 2, 2, 2, 0, 0 },
@@ -175,15 +160,10 @@ static const unsigned char redux_vflip[4][8] = {
 
 /* Weapon orientation is independent of Link facing during the sweep.
  * Rows match link_face_t (DOWN, UP, LEFT, RIGHT). */
-static const unsigned char redux_face[4][8] = {
-    {2,2,4,4,4,4,4,4}, {1,1,8,8,8,8,8,8},
-    {8,8,2,2,2,2,2,2}, {8,8,1,1,1,1,1,1}
-};
-
 void roomrom_combat_init(void)
 {
-    RAM(0x00ACu + 0x0Du) = 0u;   /* T-116: sword slot $0D */
-    s_pub_state = 0u;
+    F_ram_00B9_R = 0u;   /* T-116: sword slot $0D */
+    player_sword_reset_all();
     roomrom_sprites_clear_sword();
     sword_shot_init();           /* T-116: shot slot $0E */
 }
@@ -199,7 +179,7 @@ extern void audio_sfx_play(unsigned char sfx);
  * Without this gate Link swings through bubble-flash with sword intact. */
 static unsigned char sword_blocked_by_bubble(void)
 {
-    return (unsigned char)(RAM(0x004Cu) | RAM(0x052Eu));
+    return (unsigned char)(F_ENEMY_BUBBLE_EFFECT_R2 | F_ram_052E_R3);
 }
 
 /* ---- T-116: NES Link item-use state and sword (object slot $0D) ----
@@ -210,17 +190,40 @@ static unsigned char sword_blocked_by_bubble(void)
  * see it: Link ObjState $AC / ObjAnimCounter $3D0 / ObjAnimFrame $3E4,
  * sword ObjState $B9, counter $3DD, X $7D, Y $91, dir $A5, q-speed $3C9.
  * Redux extends this same native state machine. */
-#define L_STATE     RAM(0x00ACu)
-#define L_ANIMCNT   RAM(0x03D0u)
-#define L_ANIMFRAME RAM(0x03E4u)
-#define L_DIR       RAM(0x0098u)
+#define L_STATE     F_ram_00AC_R
+#define L_ANIMCNT   F_ram_03D0_R
+#define L_ANIMFRAME F_ram_03E4_R
+#define L_DIR       F_ram_0098_R
 #define SW_SLOT     0x0Du
-#define SW_STATE    RAM(0x00ACu + SW_SLOT)
-#define SW_CNT      RAM(0x03D0u + SW_SLOT)
-#define SW_X        RAM(0x0070u + SW_SLOT)
-#define SW_Y        RAM(0x0084u + SW_SLOT)
-#define SW_DIR      RAM(0x0098u + SW_SLOT)
-#define SW_QSPEED   RAM(0x03BCu + SW_SLOT)
+#define ROD_SLOT    0x12u
+#define SW_QSPEED   F_SW_QSPEED_R
+
+static link_face_t nes_dir_to_face(unsigned char dir)
+{
+    return (dir & 8u) ? LINK_FACE_UP :
+           (dir & 4u) ? LINK_FACE_DOWN :
+           (dir & 2u) ? LINK_FACE_LEFT : LINK_FACE_RIGHT;
+}
+
+static void publish_sword_state(const PlayerSwordState *sw)
+{
+    F_ram_00B9_P = sw->state; /* native_ram bulk:dyn_addr */
+    /* Slot $0D ObjAnimCounter is P1's cell; extra players must not write it. */
+    if (sw == &g_player_sword[0]) F_SW_SLOT_03DD_P = sw->timer; /* native_ram bulk:dyn_addr */
+}
+
+static void publish_sword_pose(const PlayerSwordState *sw)
+{
+    F_ram_007D_P = (unsigned char)sw->x; /* native_ram bulk:dyn_addr */
+    F_ram_0091_P = (unsigned char)sw->y; /* native_ram bulk:dyn_addr */
+    F_ram_00A5_P = sw->dir; /* native_ram bulk:dyn_addr */
+}
+
+static void publish_sword(const PlayerSwordState *sw)
+{
+    publish_sword_state(sw);
+    publish_sword_pose(sw);
+}
 
 /* PlayerToWeaponOffsetsX/Y: 4 states x reverse direction (up, down,
  * left, right). */
@@ -273,9 +276,9 @@ static void animate_link_obj_state(void)
  * direction held -> AnimateObjectWalking. */
 void roomrom_combat_animate_link_base(void)
 {
-    unsigned char gm = RAM(0x0012u);
+    unsigned char gm = F_ram_0012_R;
     if (L_STATE == 0u && gm != 0x04u && gm != 0x10u &&
-        (RAM(0x03F8u) & 0x0Fu) == 0u) return;
+        (F_ram_03F8_R & 0x0Fu) == 0u) return;
     L_ANIMCNT = (unsigned char)(L_ANIMCNT - 1u);
     if (L_ANIMCNT != 0u) return;
     animate_link_obj_state();
@@ -283,19 +286,38 @@ void roomrom_combat_animate_link_base(void)
     L_ANIMFRAME = (unsigned char)(L_ANIMFRAME ^ 1u);
 }
 
+/* NES source: Z_07.asm AnimateLinkBase/AnimateLinkObjState.
+ * Drained C: link_anim_state_step and animate_link_obj_state above.
+ * Coverage: FULL animation arithmetic for explicit and legacy actors.
+ * Stance: ADOPT identical byte wrap, halt and mode admission. */
+static void animate_link_state(volatile unsigned char *state,
+    volatile unsigned char *counter, volatile unsigned char *frame,
+    unsigned char mode, unsigned char input_dir)
+{
+    const unsigned char st = *state;
+    if ((st & 0xC0u) == 0x40u) return;
+    if (st == 0u && mode != 0x04u && mode != 0x10u &&
+        (input_dir & 0x0Fu) == 0u) return;
+    *counter = (unsigned char)(*counter - 1u);
+    if (*counter != 0u) return;
+    {
+        const unsigned char major = (unsigned char)(st & 0x30u);
+        if (major == 0x10u || major == 0x20u) {
+            *state = (st & 0x0Fu) ? (unsigned char)(st | 0x30u) :
+                                   (unsigned char)(st + 1u);
+            *frame = 1u;
+        } else if (major == 0x30u) {
+            *state = (unsigned char)(st & 0xC0u);
+        }
+    }
+    *counter = 6u;
+    *frame = (unsigned char)(*frame ^ 1u);
+}
+
 void link_anim_state_step(void)
 {
-    unsigned char gm = RAM(0x0012u);
-    /* UpdatePlayer returns before Link_EndMoveAndAnimate while Link is
-     * halted (ObjState & $C0 = $40, e.g. the pond fairy). */
-    if ((L_STATE & 0xC0u) == 0x40u) return;
-    if (L_STATE == 0u && gm != 0x04u && gm != 0x10u &&
-        (RAM(0x03F8u) & 0x0Fu) == 0u) return;
-    L_ANIMCNT = (unsigned char)(L_ANIMCNT - 1u);
-    if (L_ANIMCNT != 0u) return;
-    animate_link_obj_state();
-    L_ANIMCNT = 6u;
-    L_ANIMFRAME = (unsigned char)(L_ANIMFRAME ^ 1u);
+    animate_link_state(&L_STATE, &L_ANIMCNT, &L_ANIMFRAME,
+                      F_ram_0012_R, F_ram_03F8_R);
 }
 
 /* Walker_Move: Link does not move while using or catching an item. */
@@ -306,55 +328,53 @@ unsigned char link_item_use_blocks_move(void)
 }
 
 static void update_sword_or_rod(unsigned char x);
+static void update_rod(unsigned char player);
 
+void roomrom_combat_try_player_swing(unsigned char player)
+{
+    PlayerSwordState *sw;
+    if (player >= 4u) return;
+    sw = &g_player_sword[player];
+    if (F_ram_0657 == 0u || L_STATE != 0u ||
+        sword_blocked_by_bubble() != 0u || sw->state != 0u) return;
+    sword_runtime_start(sw, player, F_ram_0070_R, F_ram_0084_R, L_DIR);
+    SW_QSPEED = 0xC0u;
+    link_place_weapon_for_player_state(1u);
+    publish_sword(sw);
+    F_ram_0603 |= 0x01u;
+}
 void roomrom_combat_try_swing(link_face_t face, short link_x, short link_y)
 {
     (void)face; (void)link_x; (void)link_y;
-    if (nes_ram[0x0657u] == 0u) return;   /* T-092: NES WieldSword, no sword */
-    /* Link_HandleInput: A only in the idle state, sword not blocked. */
-    if (L_STATE != 0u) return;
-    if (sword_blocked_by_bubble() != 0u) return;
-    /* WieldSword. */
-    if (SW_STATE != 0u) return;
-    SW_CNT = 5u;
-    /* WieldWeapon(state 1): q-speed $C0, PlaceWeaponForPlayerStateAndAnim,
-     * vertical directions move the weapon right 3 pixels. */
-    SW_STATE = 1u;
-    SW_QSPEED = 0xC0u;
-    link_place_weapon_for_player_state(1u);
-    {
-        unsigned char d = L_DIR;
-        SW_DIR = d;
-        SW_X = (unsigned char)(RAM(0x0070u) + ((d & 0x01u) ? 0x10u : (d & 0x02u) ? 0xF0u : 0u));
-        SW_Y = (unsigned char)(RAM(0x0084u) + ((d & 0x04u) ? 0x10u : (d & 0x08u) ? 0xF0u : 0u));
-        if (d & 0x0Cu) SW_X = (unsigned char)(SW_X + 3u);
-    }
-    nes_ram[0x0603u] |= 0x01u;       /* WieldSword: PlayEffect $01 */
+    roomrom_combat_try_player_swing(0u);
 }
 
 /* WieldRod (Z_05.asm:3028): rod slot $12, state $31 for 5 frames, then
  * UpdateRodOrArrow runs the sword's state machine on it. */
-#define ROD_SLOT 0x12u
 void roomrom_combat_wield_rod(void)
 {
     unsigned char d;
-    if (RAM(0x00ACu + ROD_SLOT) != 0u) return;
-    RAM(0x03D0u + ROD_SLOT) = 5u;
+    if (F_ROD_SLOT_00BE_R != 0u) return;
+    F_ROD_SLOT_03E2_R = 5u;
     /* WieldWeapon($31). */
-    RAM(0x00ACu + ROD_SLOT) = 0x31u;
-    RAM(0x03BCu + ROD_SLOT) = 0xC0u;
+    F_ROD_SLOT_00BE_R = 0x31u;
+    F_ROD_SLOT_03CE_R = 0xC0u;
     link_place_weapon_for_player_state(1u);
     d = L_DIR;
-    RAM(0x0098u + ROD_SLOT) = d;
-    RAM(0x0070u + ROD_SLOT) = (unsigned char)(RAM(0x0070u) + ((d & 0x01u) ? 0x10u : (d & 0x02u) ? 0xF0u : 0u));
-    RAM(0x0084u + ROD_SLOT) = (unsigned char)(RAM(0x0084u) + ((d & 0x04u) ? 0x10u : (d & 0x08u) ? 0xF0u : 0u));
-    if (d & 0x0Cu) RAM(0x0070u + ROD_SLOT) = (unsigned char)(RAM(0x0070u + ROD_SLOT) + 3u);
+    F_ROD_SLOT_00AA_R = d;
+    F_ROD_SLOT_0082_R = (unsigned char)(F_ram_0070_R + ((d & 0x01u) ? 0x10u : (d & 0x02u) ? 0xF0u : 0u));
+    F_ROD_SLOT_0096_R = (unsigned char)(F_ram_0084_R + ((d & 0x04u) ? 0x10u : (d & 0x08u) ? 0xF0u : 0u));
+    if (d & 0x0Cu) F_ROD_SLOT_0082_R = (unsigned char)(F_ROD_SLOT_0082_R + 3u);
 }
 
 /* UpdateRodOrArrow for rod states $3x. */
 void roomrom_combat_update_rod(void)
 {
-    update_sword_or_rod(ROD_SLOT);
+    update_rod(0u);
+}
+void roomrom_combat_update_rod_for_player(unsigned char player)
+{
+    if (player < 4u) update_rod(player);
 }
 
 /* Link_EndMoveAndAnimate's AnimateLinkBase, at the end of UpdatePlayer.
@@ -364,7 +384,7 @@ void roomrom_combat_end_move_and_animate(void)
     /* Link_EndMoveAndAnimate returns while WhirlwindTeleportingState
      * ($522) != 0: no warps, no animation (Z_07.asm; T-171
      * t171_flute_whirlwind t346, ObjAnimCounter). */
-    if (nes_ram[0x0522u] != 0u) return;
+    if (F_ram_0522 != 0u) return;
     /* Both profiles use native Link attack states and animation cadence. */
     link_anim_state_step();
 }
@@ -390,7 +410,7 @@ static unsigned char sword_style_allows_beam(void)
     if (style == OPTIONS_SWORD_BEAM_ALWAYS) return 1u;
     /* VANILLA: NES MakeSwordShot: $0529 set, or full hearts (HeartValues
      * high nibble equals low nibble, HeartPartial at least half-full). */
-    if (RAM(0x0529u) != 0u) return 1u;
+    if (F_ram_0529_R != 0u) return 1u;
     {
         unsigned char hv = g_inventory.heart_values;
         unsigned char cur = heart_values_cur(hv);
@@ -417,62 +437,70 @@ void roomrom_combat_update(short link_x, short link_y, link_face_t face)
                     (unsigned char)(L_ANIMFRAME & 1u) : 0u);
     }
     update_sword_or_rod(SW_SLOT);
+    /* T378: slot18's arrow/rod dispatcher owns the rod update. Calling
+     * it here too halves the countdown and spawns magic before slot14
+     * movement, six ticks ahead of the captured NES lifecycle. */
     sword_shot_update();          /* NES order: $0D then $0E */
-    s_pub_state = (unsigned char)(SW_STATE & 0x0Fu);
-    s_pub_x     = (short)SW_X;
-    s_pub_y     = (short)SW_Y;
-    s_pub_face  = (SW_DIR & 8u) ? LINK_FACE_UP :
-                  (SW_DIR & 4u) ? LINK_FACE_DOWN :
-                  (SW_DIR & 2u) ? LINK_FACE_LEFT : LINK_FACE_RIGHT;
 }
 
-/* UpdateSwordOrRod (Z_07.asm:4351) for the sword ($0D) or the rod ($12).
- * The rod draws item slot 8 with base attribute | 1 (palette row 5) and
- * makes a magic shot at state 3; the sword makes a sword shot. */
-static void update_sword_or_rod(unsigned char x)
+/* The caller supplies the currently loaded legacy Link context. Only this
+ * adapter publishes slot $0D for unmigrated collision; the pure lifecycle/pose
+ * kernel owns each player's native sword and never borrows player zero. */
+static void clear_player_sword(unsigned char player)
 {
-    unsigned char st = (unsigned char)(RAM(0x00ACu + x) & 0x0Fu);
+    if (player == 0u) roomrom_sprites_clear_sword();
+    else roomrom_sprites_set_mp_sword(player, -32, -32, 0u, 0u);
+}
+static void draw_player_sword_nes(unsigned char player, short x, short y,
+    unsigned char wide, unsigned short attr)
+{
+    if (player == 0u) roomrom_sprites_set_sword_nes(x, y, wide, attr);
+    else roomrom_sprites_set_mp_sword(player, x, y, wide, attr);
+}
+static void update_player_sword(unsigned char player,
+    unsigned char actor_x, unsigned char actor_y, unsigned char actor_dir,
+    unsigned char actor_grid, volatile unsigned char *animation_counter)
+{
+    PlayerSwordState *sw = &g_player_sword[player];
+    unsigned char st = sw->state;
     unsigned char idx, dir, attr, tile, wide;
+    unsigned char state_changed;
     short dx;
-    if (x == SW_SLOT) enemy_render_weapon_reset(SW_SLOT);   /* right piece, redrawn below */
+    if (player == 0u) enemy_render_weapon_reset(SW_SLOT);
     if (st == 0u) return;
-    RAM(0x03D0u + x) = (unsigned char)(RAM(0x03D0u + x) - 1u);
-    if (RAM(0x03D0u + x) == 0u) {
-        /* State 2 lasts 8 frames, the later ones 1; Link's counter too. */
-        unsigned char c = (st == 1u) ? 8u : 1u;
-        L_ANIMCNT = c;
-        RAM(0x03D0u + x) = c;
-        RAM(0x00ACu + x) = (unsigned char)(RAM(0x00ACu + x) + 1u);
-        if ((RAM(0x00ACu + x) & 0x0Fu) >= 6u) {
-            RAM(0x00ACu + x) = 0u;       /* ResetObjState */
-            if (x == SW_SLOT) roomrom_sprites_clear_sword();
-            else              roomrom_sprites_clear_arrow();
+    state_changed = sword_runtime_tick(sw);
+    /* UpdateSwordOrRod DEC ObjAnimCounter,X every active tick (Z_07.asm:4360):
+     * publish the post-tick native timer to the image cell, P1 only. */
+    if (player == 0u) F_SW_SLOT_03DD_P = sw->timer; /* native_ram bulk:dyn_addr */
+    if (state_changed != 0u) {
+        *animation_counter = state_changed;
+        if (sw->state >= 6u) {
+            publish_sword_state(sw);
+            sw->state = 0u;
+            publish_sword_state(sw);
+            clear_player_sword(player);
+            publish_sword_pose(sw);
             return;
         }
     }
-    st = (unsigned char)(RAM(0x00ACu + x) & 0x0Fu);
-    if (st == 5u) {                      /* not drawn */
-        if (x == SW_SLOT) roomrom_sprites_clear_sword();
-        else              roomrom_sprites_clear_arrow();
+    if (state_changed != 0u) publish_sword_state(sw);
+    st = sw->state;
+    if (st == 5u) {
+        clear_player_sword(player);
+        publish_sword_pose(sw);
         return;
     }
-    /* Redux modifies only sword state 2; windup/retraction continue
-     * through the native owner and keep their native timer/body behavior. */
-    if (s_redux && x == SW_SLOT && st == 2u) {
-        unsigned char fr = (unsigned char)(8u - SW_CNT);
-        unsigned char fi = (L_DIR & 8u) ? LINK_FACE_UP :
-                           (L_DIR & 4u) ? LINK_FACE_DOWN :
-                           (L_DIR & 2u) ? LINK_FACE_LEFT : LINK_FACE_RIGHT;
+    sword_runtime_pose(sw, actor_x, actor_y, actor_dir, s_redux);
+    if (s_redux && st == 2u) {
+        unsigned char fr = (unsigned char)(8u - sw->timer);
+        unsigned char fi = (unsigned char)nes_dir_to_face(actor_dir);
         unsigned char kind = redux_sprite[fi][fr];
-        unsigned char pal = sword_subpal_for_items(RAM(0x0657u));
+        unsigned char pal = sword_subpal_for_items(F_ram_0657_R2);
         short sx, sy;
-        SW_X = (unsigned char)(RAM(0x0070u) + redux_x[fi][fr]);
-        SW_Y = (unsigned char)(RAM(0x0084u) + redux_y[fi][fr]);
-        SW_DIR = redux_face[fi][fr];
-        sx = (short)(SW_X + ((kind == 1u) ? 0 : 4));
-        sy = (short)((short)SW_Y + s_uw_y_bias);
+        sx = (short)(sw->x + ((kind == 1u) ? 0 : 4));
+        sy = (short)(sw->y + s_uw_y_bias);
         if (kind == 0u)
-            roomrom_sprites_set_sword_nes(sx, sy, 0u,
+            draw_player_sword_nes(player, sx, sy, 0u,
                 enemy_render_item_sat(0x20u, (unsigned char)(pal |
                     (redux_hflip[fi][fr] << 6) | (redux_vflip[fi][fr] << 7))));
         else if (kind == 1u)
@@ -480,59 +508,147 @@ static void update_sword_or_rod(unsigned char x)
         else
             roomrom_sprites_set_sword_diagonal(sx, sy, redux_hflip[fi][fr],
                                                redux_vflip[fi][fr], pal);
+        publish_sword_pose(sw);
         return;
     }
-    RAM(0x0098u + x) = L_DIR;
+    dir = (st == 1u) ? 0x08u : sw->dir;
+    idx = rdir_index(dir);
+    attr = (unsigned char)(k_rdir_base_attr[idx] + F_ram_0657 - 1u);
+    if (s_redux && idx == 1u) attr = (unsigned char)(attr | 0x40u);
+    if (idx == 2u) attr = (unsigned char)(attr | 0x40u);
+    if (st == 1u) {
+        clear_player_sword(player);
+        publish_sword_pose(sw);
+        return;
+    }
+    tile = draw_item_frame_tile(0u, k_rdir_frame[idx]);
+    wide = k_rdir_frame[idx];
+    dx = wide ? 0 : 4;
+    if (wide && player != 0u) {
+        roomrom_sprites_set_sword_horizontal(sw->x, sw->y,
+            (unsigned char)((attr >> 6) & 1u), (unsigned char)(attr & 3u));
+    } else if (wide) {
+        unsigned char l = tile, r = (unsigned char)(tile + 2u);
+        short sx = sw->x, sy = sw->y;
+        if (attr & 0x40u) { l = r; r = tile; }
+        draw_player_sword_nes(player, sx, sy, 0u, enemy_render_item_sat(l, attr));
+        enemy_render_weapon_add_item(SW_SLOT, r, attr, (unsigned char)(sx + 8), (unsigned char)sy);
+    } else {
+        draw_player_sword_nes(player, (short)(sw->x + dx), sw->y, wide,
+                                      enemy_render_item_sat(tile, attr));
+    }
+    if (st == 3u) sword_shot_make_for_player(player, sword_style_allows_beam(),
+        actor_x, actor_y, actor_dir, actor_grid);
+    publish_sword_pose(sw);
+}
+
+/* Keep the authenticated T-366 P1 combat phase hook and slot argument. */
+__attribute__((noinline, used))
+static void update_sword_or_rod(unsigned char slot)
+{
+    (void)slot;
+    update_player_sword(0u, F_ram_0070_R, F_ram_0084_R, L_DIR,
+                        F_ram_0394_R, &L_ANIMCNT);
+}
+/* NES source: Z_04.asm:Gleeok_CheckCollisions, selected Link/weapon view.
+ * Drained C: publish_sword above; native sword record remains the owner.
+ * Coverage: PARTIAL collision-only party binding at boss segment boundary.
+ * Stance: EXTEND publication without movement, animation or lifecycle ticks. */
+void roomrom_combat_publish_player_sword(unsigned char player)
+{
+    if (player < 4u) publish_sword(&g_player_sword[player]);
+}
+
+void roomrom_combat_update_player_sword(unsigned char player)
+{
+    if (player == 0u || player >= 4u) return;
+    roomrom_sprites_set_sword_slot((unsigned short)(ROOMROM_SPRITE_SLOT_MP_SWORD2 + player - 1u));
+    /* The removed sword bank cannot import stale state. This is the only
+     * extra-player publication into the remaining collision adapter. */
+    publish_sword(&g_player_sword[player]);
+    update_player_sword(player, F_ram_0070_R, F_ram_0084_R, L_DIR,
+                        F_ram_0394_R, &L_ANIMCNT);
+    roomrom_sprites_set_sword_slot(ROOMROM_SPRITE_SLOT_SWORD);
+}
+
+/* NES source: Z_07.asm AnimateLinkBase -> UpdateSwordOrRod.
+ * Drained C: the unchanged legacy wrappers above and shared native kernels.
+ * Coverage: stationary extra actors; movement/admission and beam tick stay caller-owned.
+ * Stance: EXTEND explicit actor input without borrowing slot-zero Link state. */
+void roomrom_combat_continue_stationary_player(unsigned char player,
+    PlayerState *actor, unsigned char nes_dir)
+{
+    if (player == 0u || player >= 4u || actor == 0) return;
+    if (F_ram_0522 == 0u)
+        animate_link_state(&actor->state, &actor->anim_counter, &actor->anim_frame,
+                          F_ram_0012_R, 0u);
+    roomrom_sprites_set_sword_slot((unsigned short)(ROOMROM_SPRITE_SLOT_MP_SWORD2 + player - 1u));
+    publish_sword(&g_player_sword[player]);
+    update_player_sword(player, (unsigned char)actor->x, (unsigned char)actor->y,
+                        nes_dir, (unsigned char)actor->grid_offset, &actor->anim_counter);
+    roomrom_sprites_set_sword_slot(ROOMROM_SPRITE_SLOT_SWORD);
+}
+
+/* UpdateSwordOrRod (Z_07.asm:4351) rod half. The P1 sword is native in
+ * update_sword_native; this path only serves slot $12. The rod draws item
+ * slot 8 with base attribute | 1 (palette row 5) and makes a magic shot at
+ * state 3. */
+static void update_rod(unsigned char player)
+{
+    const unsigned char x = ROD_SLOT;
+    unsigned char st = (unsigned char)(F_ram_00AC_R5(x) & 0x0Fu);
+    unsigned char idx, dir, attr, tile, wide;
+    short dx;
+
+    if (st == 0u) return;
+    F_ram_03D0_R2(x) = (unsigned char)(F_ram_03D0_R2(x) - 1u);
+    if (F_ram_03D0_R2(x) == 0u) {
+        /* State 2 lasts 8 frames, the later ones 1; Link's counter too. */
+        unsigned char c = (st == 1u) ? 8u : 1u;
+        L_ANIMCNT = c;
+        F_ram_03D0_R2(x) = c;
+        F_ram_00AC_R5(x) = (unsigned char)(F_ram_00AC_R5(x) + 1u);
+        if ((F_ram_00AC_R5(x) & 0x0Fu) >= 6u) {
+            F_ram_00AC_R5(x) = 0u;       /* ResetObjState */
+            roomrom_sprites_clear_arrow();
+            return;
+        }
+    }
+    st = (unsigned char)(F_ram_00AC_R5(x) & 0x0Fu);
+    if (st == 5u) {                      /* not drawn */
+        roomrom_sprites_clear_arrow();
+        return;
+    }
+    F_ram_0098_R3(x) = L_DIR;
     idx = (unsigned char)((st - 1u) * 4u + rdir_index(L_DIR));
-    RAM(0x0070u + x) = (unsigned char)(RAM(0x0070u) + k_pw_off_x[idx]);
-    RAM(0x0084u + x) = (unsigned char)(RAM(0x0084u) + k_pw_off_y[idx]);
+    F_ram_0070_R4(x) = (unsigned char)(F_ram_0070_R + k_pw_off_x[idx]);
+    F_ram_0084_R4(x) = (unsigned char)(F_ram_0084_R + k_pw_off_y[idx]);
     if (s_redux && st == 1u) {
         /* magic_beam_align reuses these dummy-state offset cells as
-         * sword/rod palettes. Retain the source's unrendered ObjX/Y. */
+         * rod palettes. Retain the source's unrendered ObjX/Y. */
         unsigned char di = rdir_index(L_DIR);
         unsigned char dummy = (di == 1u) ? 0xC0u : 0u;
-        RAM(0x0070u + x) = (unsigned char)(RAM(0x0070u) + dummy);
-        RAM(0x0084u + x) = (unsigned char)(RAM(0x0084u) + dummy + 1u);
+        F_ram_0070_R4(x) = (unsigned char)(F_ram_0070_R + dummy);
+        F_ram_0084_R4(x) = (unsigned char)(F_ram_0084_R + dummy + 1u);
     }
-    dir = (st == 1u) ? 0x08u : RAM(0x0098u + x);
+    dir = (st == 1u) ? 0x08u : F_ram_0098_R3(x);
     idx = rdir_index(dir);
-    /* @CalcSwordAttrs: base attribute + sword level - 1; the rod uses
-     * base attribute | 1. Left flips. */
-    if (x == SW_SLOT)
-        attr = (unsigned char)(k_rdir_base_attr[idx] + nes_ram[0x0657u] - 1u);
-    else
-        attr = (unsigned char)(k_rdir_base_attr[idx] | 0x01u);
+    /* @CalcSwordAttrs: the rod uses base attribute | 1. Left flips. */
+    attr = (unsigned char)(k_rdir_base_attr[idx] | 0x01u);
     if (s_redux && idx == 1u) attr = (unsigned char)(attr | 0x40u);
     if (idx == 2u) attr = (unsigned char)(attr | 0x40u);
     if (st == 1u) {                      /* windup: not shown */
-        if (x == SW_SLOT) roomrom_sprites_clear_sword();
-        else              roomrom_sprites_clear_arrow();
+        roomrom_sprites_clear_arrow();
         return;
     }
-    /* Anim_WriteItemSprites, item slot 0 (sword) / 8 (rod): frame 0
-     * vertical (narrow, X+4) or 1 horizontal (wide pair). */
-    tile = draw_item_frame_tile((x == SW_SLOT) ? 0u : 8u, k_rdir_frame[idx]);
+    /* Anim_WriteItemSprites, item slot 8: frame 0 vertical (narrow, X+4)
+     * or 1 horizontal (wide pair). */
+    tile = draw_item_frame_tile(8u, k_rdir_frame[idx]);
     wide = k_rdir_frame[idx];
     dx = wide ? 0 : 4;
-    if (x == SW_SLOT && wide) {
-        /* Anim_WriteSpecificItemSprites writes the pair as two 8x16 sprites;
-         * the second takes a late OAM index, so the shot's pieces (made at
-         * state 3, same tick) cover it. Left flips: right piece first. */
-        unsigned char l = tile, r = (unsigned char)(tile + 2u);
-        short sx = (short)RAM(0x0070u + x), sy = (short)RAM(0x0084u + x);
-        if (attr & 0x40u) { l = r; r = tile; }
-        roomrom_sprites_set_sword_nes(sx, sy, 0u, enemy_render_item_sat(l, attr));
-        enemy_render_weapon_add_item(SW_SLOT, r, attr, (unsigned char)(sx + 8), (unsigned char)sy);
-    } else if (x == SW_SLOT)
-        roomrom_sprites_set_sword_nes((short)(RAM(0x0070u + x) + dx),
-                                      (short)RAM(0x0084u + x), wide,
-                                      enemy_render_item_sat(tile, attr));
-    else
-        roomrom_sprites_set_arrow_nes((short)(RAM(0x0070u + x) + dx),
-                                      (short)RAM(0x0084u + x), wide,
-                                      enemy_render_item_sat(tile, attr));
-    if (st == 3u) {
-        if (x == SW_SLOT) sword_shot_make(sword_style_allows_beam());   /* MakeSwordShot */
-        else              magic_shot_make();                            /* @MakeMagicShot */
-    }
+    roomrom_sprites_set_arrow_nes((short)(F_ram_0070_R4(x) + dx),
+                                  (short)F_ram_0084_R4(x), wide,
+                                  enemy_render_item_sat(tile, attr));
+    if (st == 3u) magic_shot_make_for_player(player, F_ram_0070_R, F_ram_0084_R,
+        L_DIR, F_ram_0394_R);     /* @MakeMagicShot */
 }

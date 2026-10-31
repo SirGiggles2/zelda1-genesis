@@ -7,11 +7,11 @@
  * OAM layout: 64 sprites * 4 bytes, starting at NES_OAM_BASE.
  *   [0] y, [1] tile, [2] attr, [3] x
  */
-#define OAM_BYTE(i)        RAM(NES_OAM_BASE + (unsigned short)(i))
-#define OAM_SPRITE_Y(n)    RAM(NES_OAM_BASE + ((unsigned short)(n) * 4) + 0)
-#define OAM_SPRITE_TILE(n) RAM(NES_OAM_BASE + ((unsigned short)(n) * 4) + 1)
-#define OAM_SPRITE_ATTR(n) RAM(NES_OAM_BASE + ((unsigned short)(n) * 4) + 2)
-#define OAM_SPRITE_X(n)    RAM(NES_OAM_BASE + ((unsigned short)(n) * 4) + 3)
+#define OAM_BYTE(i)        F_ram_0200_R5((unsigned short)(i))
+#define OAM_SPRITE_Y(n)    F_ram_0200_R6(((unsigned short)(n) * 4))
+#define OAM_SPRITE_TILE(n) F_ram_0201_R3(((unsigned short)(n) * 4))
+#define OAM_SPRITE_ATTR(n) F_ram_0202_R4(((unsigned short)(n) * 4))
+#define OAM_SPRITE_X(n)    F_ram_0203_R4(((unsigned short)(n) * 4))
 
 #define OAM_SPRITE_COUNT   64
 

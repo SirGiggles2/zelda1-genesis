@@ -21,6 +21,11 @@
  * src/game/ + src/frontend/ are forbidden from direct SGDK. Used by
  * the Window-plane HUD wrappers below. */
 #include <genesis.h>
+#include "frame_pipeline.h"
+
+/* T-393: every main-thread VDP port access first lets a committed frame
+ * publish (V-Int), keeping publish order and port ownership exclusive. */
+#define FP_SYNC() frame_pipeline_wait()
 #include "platform_abi.h"  /* function-like RAM replaces SGDK's RAM constant */
 
 /* VDP MMIO addresses used by all helpers below. */
@@ -70,6 +75,7 @@ static void render_set_autoinc_word(void)
 
 void render_display_enable(unsigned char on)
 {
+    FP_SYNC();
     if (on && s_circle_black_hold) return;
     /* Reg 1: $8134 = display OFF (VBlank IRQ, DMA, M5); $8174 = display ON. */
     VDP_CTRL_WORD = on ? (unsigned short)0x8174 : (unsigned short)0x8134;
@@ -77,6 +83,7 @@ void render_display_enable(unsigned char on)
 
 void render_vscroll_set(unsigned short value)
 {
+    FP_SYNC();
     /* VSRAM write to slot 0 (plane A vscroll). */
     VDP_CTRL_LONG = 0x40000010UL;
     VDP_DATA_WORD = value;
@@ -84,6 +91,7 @@ void render_vscroll_set(unsigned short value)
 
 void render_vscroll_reset(void)
 {
+    FP_SYNC();
     /* Both planes' full-screen vscroll words (VSRAM slots 0 = A, 1 = B),
      * with interrupts off so a VBlank handler cannot move the VDP address
      * between the control and data writes. */
@@ -97,6 +105,7 @@ void render_vscroll_reset(void)
 
 void render_scene_scroll_set(short horizontal, short vertical)
 {
+    FP_SYNC();
     VDP_setHorizontalScroll(BG_A, horizontal);
     VDP_setHorizontalScroll(BG_B, horizontal);
     VDP_setVerticalScroll(BG_A, vertical);
@@ -106,6 +115,7 @@ void render_scene_scroll_set(short horizontal, short vertical)
 void render_plane_write_row(unsigned short plane_base, unsigned short row,
                             const unsigned short *cells, unsigned short count)
 {
+    FP_SYNC();
     /* plane_base = $C000 (A) or $E000 (B). */
     unsigned short addr = (unsigned short)(plane_base + row * s_plane_row_stride_bytes);
     VDP_CTRL_LONG = 0x40000000UL
@@ -116,6 +126,7 @@ void render_plane_write_row(unsigned short plane_base, unsigned short row,
 
 void render_mode_set_v32(void)
 {
+    FP_SYNC();
     /* VDP Reg 16 = $9000 (H32 x V32). Row stride = 64 bytes. */
     s_plane_row_stride_bytes = 64u;
     VDP_CTRL_WORD = 0x9000;
@@ -123,6 +134,7 @@ void render_mode_set_v32(void)
 
 void render_mode_set_v64(void)
 {
+    FP_SYNC();
     /* VDP Reg 16 = $9011 (H64 x V64). Matches gameplay default. */
     s_plane_row_stride_bytes = 128u;
     VDP_CTRL_WORD = 0x9011;
@@ -130,6 +142,7 @@ void render_mode_set_v64(void)
 
 void render_mode_set_h64v32(void)
 {
+    FP_SYNC();
     /* VDP Reg 16 = $9001 (H64 x V32). engine PR-2 64x32 plane mode:
      * 64-wide stride (128 B/row) but 4 KB plane size, freeing 192 tiles
      * vs V64. */
@@ -151,6 +164,7 @@ void render_z80_bus_release(void)
 
 void render_irq_mask(void)
 {
+    FP_SYNC();
     __asm__ volatile ("ori.w #0x0700,%sr");
 }
 
@@ -170,6 +184,7 @@ void render_wait_vblank(void)
 
 void render_window_v_set(unsigned char value)
 {
+    FP_SYNC();
     /* VDP Reg 18: window vertical position byte. value=0 disables the
      * Window plane vertically; non-zero sets row count (high bit chooses
      * up vs down direction). genesis_shell.asm uses 0x9208 for 8-row top
@@ -179,6 +194,7 @@ void render_window_v_set(unsigned char value)
 
 void render_sat_clear(void)
 {
+    FP_SYNC();
     /* SAT lives at VRAM $FC00 in our genesis_shell.asm boot (VDP reg 5 =
      * $7E for H32 mode, 80 sprite slots * 8 bytes each = 640 bytes).
      * Zero every slot. Slot 0 with y=0 link=0 attr=0 x=0 is the standard
@@ -231,12 +247,16 @@ static unsigned short cram_out(unsigned short w)
 static unsigned short s_cram_dma[64];
 static unsigned char s_cram_defer = 0u;
 static unsigned long s_cram_queued_vt = 0xFFFFFFFFul;
+static unsigned long s_cram_queued_gen;
 
 static void cram_queue(void)
 {
-    if (s_cram_queued_vt == vtimer) return;
+    /* T-393: a frame-pipeline commit empties the queue inside one vtimer;
+     * the generation makes the next update queue its colors again. */
+    if (s_cram_queued_vt == vtimer && s_cram_queued_gen == frame_pipeline_commits) return;
     DMA_queueDma(DMA_CRAM, s_cram_dma, 0u, 64u, 2u);
     s_cram_queued_vt = vtimer;
+    s_cram_queued_gen = frame_pipeline_commits;
 }
 
 /* Store count colors from start_slot: shadow always; the VDP now
@@ -253,6 +273,7 @@ static void cram_store(unsigned short start_slot, const unsigned short *src,
         cram_queue();
         return;
     }
+    FP_SYNC();
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0xC0000000UL
                   | (((unsigned long)(start_slot * 2u) & 0x3FFFu) << 16);
@@ -271,6 +292,7 @@ static void cram_resend_all(void)
         cram_queue();
         return;
     }
+    FP_SYNC();
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0xC0000000UL;
     for (i = 0u; i < 64u; i++) VDP_DATA_WORD = cram_out(s_cram_shadow[i]);
@@ -304,6 +326,7 @@ void render_cram_fade_capture(void)
         for (i = 0; i < 64u; i++) s_fade_snapshot[i] = s_cram_shadow[i];
         return;
     }
+    FP_SYNC();
     VDP_CTRL_LONG = 0x00000020UL;
     for (i = 0; i < 64u; i++) {
         s_fade_snapshot[i] = VDP_DATA_WORD;
@@ -340,6 +363,7 @@ void render_cram_read(unsigned short *dst, unsigned short count)
         while (count--) *dst++ = s_cram_shadow[i++ & 0x3Fu];
         return;
     }
+    FP_SYNC();
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0x00000020UL;
     while (count--) *dst++ = VDP_DATA_WORD;
@@ -357,6 +381,7 @@ void render_cram_read(unsigned short *dst, unsigned short count)
 static void vram_dma_upload(const unsigned char *bytes, unsigned short dst,
                             unsigned short len)
 {
+    FP_SYNC();
     SYS_disableInts();
 
     /* T-118: word-aligned sources (nearly all CHR blobs) go through a
@@ -414,6 +439,7 @@ static unsigned char s_pd_on;
 
 static void plane_word_now(unsigned short addr, unsigned short word)
 {
+    FP_SYNC();
     VDP_CTRL_LONG = 0x40000000UL
                   | ((unsigned long)(addr & 0x3FFFu) << 16)
                   | ((addr >> 14) & 0x0003u);
@@ -433,6 +459,7 @@ static void startup_triangle_flush(void);
 
 void render_plane_defer_flush(void)
 {
+    FP_SYNC();
     unsigned char i;
     if (s_wm_pending) window_move_flush();
     if (s_ps_pending) pause_scene_flush();
@@ -508,6 +535,7 @@ void render_chr_upload(unsigned short vram_addr,
  * (same formula intro_title.c used in its local vram_write_open). */
 void render_vram_open_write(unsigned short vram_addr)
 {
+    FP_SYNC();
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0x40000000UL
                   | ((unsigned long)(vram_addr & 0x3FFFu) << 16)
@@ -531,6 +559,7 @@ void render_vram_write_words(const unsigned short *src, unsigned short count)
  * slot is the palette-color index (0..63). */
 void render_cram_open_write(unsigned short slot)
 {
+    FP_SYNC();
     unsigned long addr = (unsigned long)slot * 2u;
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0xC0000000UL
@@ -580,6 +609,7 @@ void render_cram_subrange_upload(unsigned short start_slot,
  * VRAM scanning. */
 unsigned short render_vram_read_word(unsigned short vram_addr)
 {
+    FP_SYNC();
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0x00000000UL
                   | ((unsigned long)(vram_addr & 0x3FFFu) << 16)
@@ -643,12 +673,14 @@ void render_set_window_word(unsigned short col, unsigned short row,
                    ((row & 31u) << windowWidthSft)) << 1)), word);
         return;
     }
+    FP_SYNC();
     VDP_setTileMapXY(WINDOW, word, col, row);
 }
 
 void render_clear_window_rect(unsigned short col, unsigned short row,
                               unsigned short w, unsigned short h)
 {
+    FP_SYNC();
     if (s_mask_active && col + w <= 32u && row + h <= 7u) {
         VDP_clearTileMapRect(BG_A, (u16)(s_mask_col + col), row, w, h);
         return;
@@ -660,11 +692,13 @@ void render_clear_window_rect(unsigned short col, unsigned short row,
  * placement. NES Z1 gameplay HUD top; inventory subscreen HUD bottom. */
 void render_set_window_on_top(unsigned short rows)
 {
+    FP_SYNC();
     VDP_setWindowOnTop(rows);
 }
 
 void render_set_window_on_bottom(unsigned short rows)
 {
+    FP_SYNC();
     VDP_setWindowOnBottom(rows);
 }
 
@@ -693,6 +727,22 @@ void render_pause_frame_deferred(unsigned short sat_base, short vertical,
         VDP_setVerticalScrollVSync(BG_B,vertical);
     }
     s_pf_count=sprite_count;
+}
+
+void render_pause_hscroll_deferred(short horizontal)
+{
+    VDP_setHorizontalScrollVSync(BG_A, horizontal);
+    VDP_setHorizontalScrollVSync(BG_B, horizontal);
+}
+
+void render_pause_scene_recopy(void) { s_ps_pending = 1u; }
+
+void render_pause_scene_cols(unsigned short *menu_col, unsigned short *room_col,
+                             unsigned short *room_row)
+{
+    *menu_col = s_ps_col;
+    *room_col = s_ps_room_col;
+    *room_row = s_ps_room_row;
 }
 
 void render_pause_scene_deferred(unsigned short menu_col,
@@ -744,6 +794,10 @@ static void pause_scene_flush(void)
  * BG_A/B share C000; snapshot at columns 32..63 leaves the room untouched.
  * Window replaces BG_A over all 28 rows, and its transparent hole shows BG_B.
  * Highest existing dynamic pattern is 1439; tables begin at tile 1536. */
+/* Mask pixels use PAL3[4]: black in every gameplay sprite-palette load
+ * (bg_palette.c). PAL3[15] is the T-317 pale-green rupee entry, and a
+ * palette reload during the reveal turned the whole mask green. */
+#define MASK_CRAM_SLOT 52u
 static const unsigned long *s_tri_patterns;
 static const unsigned short *s_tri_map;
 static unsigned short s_tri_count, s_tri_color;
@@ -767,7 +821,7 @@ static void mask_scene_copy(short horizontal, short vertical)
     const unsigned short first = col > 32u ? (unsigned short)(64u - col) : 32u;
     s_tri_h = horizontal;
     s_tri_v = vertical;
-    s_tri_color = PAL_getColor(63u);
+    s_tri_color = PAL_getColor(MASK_CRAM_SLOT);
     /* Entrances only fire at settled scroll origins (columns 0 or 32).
      * Put the snapshot in the opposite half, including after OW scrolling. */
     s_mask_col = (unsigned short)((col ^ 32u) & 32u);
@@ -800,7 +854,7 @@ static void mask_scene_copy(short horizontal, short vertical)
 
 static void mask_scene_activate(void)
 {
-    PAL_setColor(63u, 0u);
+    PAL_setColor(MASK_CRAM_SLOT, 0u);
     VDP_setHorizontalScroll(BG_B, s_mask_col ? -256 : 0);
     VDP_setVerticalScroll(BG_B, 0);
     VDP_setWindowOnTop(28u);
@@ -903,7 +957,7 @@ static void startup_triangle_flush(void)
             DMA_waitCompletion();
         }
         s_mask_active = 0u;
-        PAL_setColor(63u, s_tri_color);
+        PAL_setColor(MASK_CRAM_SLOT, s_tri_color);
         VDP_setWindowOnTop(7u);
         render_scene_scroll_set(s_tri_h, s_tri_v);
         if (s_tri_pending != 2u) circle_sprites(0u);
@@ -951,6 +1005,7 @@ static void window_move_flush(void)
  * slot is the VSRAM word index (0..39). */
 void render_vsram_open_write(unsigned short slot)
 {
+    FP_SYNC();
     unsigned long addr = (unsigned long)slot * 2u;
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0x40000010UL
@@ -1002,6 +1057,7 @@ void render_plane_a_write_col(unsigned short col, unsigned short row,
                               const unsigned short *cells, unsigned short count,
                               unsigned short plane_rows)
 {
+    FP_SYNC();
     const unsigned short stride = s_plane_row_stride_bytes;
     while (count) {
         unsigned short run = (unsigned short)(plane_rows - row);
@@ -1031,6 +1087,7 @@ void render_plane_a_write_col(unsigned short col, unsigned short row,
 void render_plane_a_write_run(unsigned short col, unsigned short row,
                               const unsigned short *cells, unsigned short count)
 {
+    FP_SYNC();
     const unsigned short addr = (unsigned short)(PLANE_A_BASE +
         row * s_plane_row_stride_bytes + col * 2u);
     volatile unsigned long *const port = (volatile unsigned long *)0xC00000;
@@ -1059,6 +1116,7 @@ void render_plane_a_write_col_strided(unsigned short col, unsigned short row,
                                       unsigned short plane_rows,
                                       unsigned short src_stride)
 {
+    FP_SYNC();
     const unsigned short stride = s_plane_row_stride_bytes;
     while (count) {
         unsigned short run = (unsigned short)(plane_rows - row);
@@ -1084,6 +1142,7 @@ void render_plane_a_write_col_strided(unsigned short col, unsigned short row,
 void render_plane_clear_full_rows(unsigned char plane_b, unsigned short row,
                                   unsigned short rows, unsigned short width)
 {
+    FP_SYNC();
     const unsigned short addr = (unsigned short)(
         (plane_b ? PLANE_B_BASE : PLANE_A_BASE) + row * s_plane_row_stride_bytes);
     const unsigned long len = (unsigned long)rows * s_plane_row_stride_bytes;
@@ -1104,6 +1163,7 @@ void render_plane_fill_row(unsigned char plane_b, unsigned short col,
                            unsigned short row, unsigned short count,
                            unsigned short word)
 {
+    FP_SYNC();
     const unsigned short addr = (unsigned short)(
         (plane_b ? PLANE_B_BASE : PLANE_A_BASE) +
         row * s_plane_row_stride_bytes + col * 2u);
@@ -1134,6 +1194,20 @@ unsigned char render_plane_a_queue_row(unsigned short row, unsigned short col,
     return DMA_queueDmaFast(DMA_VRAM, (void *)cells, addr, count, 2) ? 1u : 0u;
 }
 
+/* Native MP pose staging. SGDK copies the caller's bytes before returning;
+ * the queued DMA reads its managed buffer, never a returned stack frame. */
+unsigned char render_chr_queue_copy(unsigned short vram_addr,
+                                     const unsigned char *src,
+                                     unsigned short byte_count)
+{
+    if (byte_count == 0u) return 1u;
+    if (src == 0 || ((vram_addr | byte_count) & 1u) != 0u) return 0u;
+    if (!DMA_copyAndQueueDma(DMA_VRAM, (void *)src, vram_addr,
+                            (unsigned short)(byte_count >> 1), 2)) return 0u;
+    dma_stats_record((unsigned long)byte_count);
+    return 1u;
+}
+
 unsigned char render_vram_queue_words(unsigned short vram_addr,
                                       const unsigned short *src,
                                       unsigned short word_count)
@@ -1145,6 +1219,7 @@ unsigned char render_vram_queue_words(unsigned short vram_addr,
 void render_vram_read_run(unsigned short vram_addr, unsigned short *dst,
                           unsigned short count)
 {
+    FP_SYNC();
     SYS_disableInts();
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0x00000000UL
@@ -1178,6 +1253,7 @@ void render_vram_read_run(unsigned short vram_addr, unsigned short *dst,
  * Same CD encoding as render_cram_open_write but skips the *2 step. */
 void render_cram_open_write_byte(unsigned short byte_addr)
 {
+    FP_SYNC();
     unsigned long addr = (unsigned long)byte_addr;
     render_set_autoinc_word();
     VDP_CTRL_LONG = 0xC0000000UL
@@ -1192,6 +1268,7 @@ void render_sat_write(unsigned short sat_base, unsigned char entry,
                       unsigned short y, unsigned short size_link,
                       unsigned short tile_attr, unsigned short x)
 {
+    FP_SYNC();
     unsigned short addr = (unsigned short)(sat_base + (unsigned short)entry * 8u);
     VDP_CTRL_LONG = 0x40000000UL
                   | ((unsigned long)(addr & 0x3FFFu) << 16)
@@ -1262,5 +1339,13 @@ void render_dma_stats_frame_end(void)
  * no new .bss, heap or gameplay state. Called after mandatory blank work. */
 void render_vblank_work_end(void)
 {
-    RAM(0x01FCu) = (unsigned char)GET_VCOUNTER;
+    F_ram_01FC_R = (unsigned char)GET_VCOUNTER;
+}
+
+/* T-393: nothing waits for render_plane_defer_flush (frame pipeline gate). */
+unsigned char render_present_idle(void)
+{
+    return (unsigned char)(s_pd_count == 0u && !s_wm_pending && !s_ps_pending &&
+                           s_pf_count == 0u && !s_menu_restore_pending &&
+                           s_tri_pending == 0u);
 }

@@ -133,6 +133,9 @@ BANNED_EXTENSIONS = (
 # Always allow these (override prefix-bans).
 ALLOWLIST = (
     "data/.gitkeep",
+    # User-authored mix/instrument parameters only; note events and rendered
+    # VGMs are regenerated from the supplied ROM, never distributed here.
+    "data/music/builder_mix.json",
     # Authenticated room coordinates and hashes only; no payload bytes.
     "data/graphics/verified_uw_layout_aliases.json",
     # Hand-written layout constants for the extract_rooms.py blobs: offsets

@@ -66,7 +66,7 @@ void dungeon_roundtrip_probe_run(void)
     unsigned char saved_quest = roomrom_main_current_quest();
     unsigned char saved_level = roomrom_uw_room_render_get_level();
     unsigned char saved_render_quest = roomrom_uw_room_render_get_quest();
-    unsigned char saved_cur_level = nes_ram[0x0010u];
+    unsigned char saved_cur_level = F_ram_0010;
 
     /* Clear magic so Lua sees "not yet published". */
     block[0] = 0u;
@@ -266,7 +266,7 @@ void dungeon_roundtrip_probe_run(void)
     } else {
         level_info_install_uw(saved_level, saved_render_quest);
     }
-    nes_ram[0x0010u] = saved_cur_level;
+    F_ram_0010 = saved_cur_level;
     roomrom_uw_room_render_set_level(saved_level);
     roomrom_uw_room_render_set_quest(saved_render_quest);
     roomrom_main_set_quest(saved_quest);

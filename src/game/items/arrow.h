@@ -17,6 +17,7 @@
 void roomrom_arrow_init(void);
 void roomrom_arrow_fire(link_face_t face, short link_x, short link_y);
 void roomrom_arrow_update(void);
+void roomrom_arrow_update_for_player(unsigned char player);
 unsigned char roomrom_arrow_active(void);
 
 #endif

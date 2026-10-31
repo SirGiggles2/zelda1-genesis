@@ -9,5 +9,7 @@
 #define MODE_CONTINUE_QUESTION_H
 
 void mode8_continue_question_update(void);
+/* Leave as if selection sel (0 Continue, 1 Save, 2 Retry) was chosen. */
+void mode8_continue_question_commit(unsigned char sel);
 
 #endif

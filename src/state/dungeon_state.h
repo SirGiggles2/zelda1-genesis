@@ -23,7 +23,7 @@
  * Use DUNGEON_CUR_QUEST(slot) for the active save slot, or
  * DUNGEON_QUEST_NUMBER for the live working-RAM copy (same cell when slot 0).
  */
-#define DUNGEON_QUEST_NUMBER(slot)   RAM(0x062D + (unsigned char)(slot))
+#define DUNGEON_QUEST_NUMBER(slot)   F_ram_062D_R3((unsigned char)(slot))
 
 /* ---- Triforce / compass / map ownership -----------------------------------
  * NES Variables.inc:
@@ -34,12 +34,12 @@
  *   InvMap9       = $66A — map owned per level (second quest)
  *   InvKeys       = $66E — current key count
  */
-#define DUNGEON_INV_TRIFORCE         RAM(0x0671)
-#define DUNGEON_INV_COMPASS          RAM(0x0667)
-#define DUNGEON_INV_MAP              RAM(0x0668)
-#define DUNGEON_INV_COMPASS9         RAM(0x0669)
-#define DUNGEON_INV_MAP9             RAM(0x066A)
-#define DUNGEON_INV_KEYS             RAM(0x066E)
+#define DUNGEON_INV_TRIFORCE         F_ram_0671_R
+#define DUNGEON_INV_COMPASS          F_ram_0667_R
+#define DUNGEON_INV_MAP              F_ram_0668_R
+#define DUNGEON_INV_COMPASS9         F_ram_0669_R
+#define DUNGEON_INV_MAP9             F_ram_066A_R
+#define DUNGEON_INV_KEYS             F_ram_066E_R
 
 /* ---- Room visit / clear / door flags (WorldFlags) -------------------------
  * NES $067F: WorldFlags[128] — one byte per room, packed:
@@ -54,11 +54,9 @@
  * WorldKillCount ($627): running kill count for the current OW/UW world.
  * LevelKillCounts ($560): per-level kill counts (10 bytes, one per level).
  */
-#define DUNGEON_WORLD_FLAGS(room)    RAM(0x067F + (unsigned char)(room))
-#define DUNGEON_WORLD_KILL_COUNT     RAM(0x0627)
-#define DUNGEON_LEVEL_KILL_COUNT(lv) RAM(0x0560 + (unsigned char)(lv))
-#define DUNGEON_ROOM_FLAGS_PTR_LO    RAM(NES_SRAM_ROOM_FLAGS_PTR_LO)
-#define DUNGEON_ROOM_FLAGS_PTR_HI    RAM(NES_SRAM_ROOM_FLAGS_PTR_LO + 1u)
+#define DUNGEON_WORLD_FLAGS(room)    F_ram_067F_R((unsigned char)(room))
+#define DUNGEON_WORLD_KILL_COUNT     F_ram_0627_R
+#define DUNGEON_LEVEL_KILL_COUNT(lv) F_ram_0560_R2((unsigned char)(lv))
 
 /* World-flags bit masks */
 #define DUNGEON_WFLAG_VISITED        0x20u
@@ -79,11 +77,11 @@
  *   LevelInfo_WorldFlagsAddr hi   = $6BB0
  *   LevelInfo_LevelNumber         = $6BB1
  */
-#define DUNGEON_LEVEL_FOE_COUNTS(i)  RAM(0x6BA2 + (unsigned char)(i))
-#define DUNGEON_LEVEL_START_Y        RAM(0x6BA6)
-#define DUNGEON_LEVEL_START_ROOM     RAM(0x6BAD)
-#define DUNGEON_LEVEL_TRIFORCE_ROOM  RAM(0x6BAE)
-#define DUNGEON_LEVEL_NUMBER         RAM(0x6BB1)
+#define DUNGEON_LEVEL_FOE_COUNTS(i)  F_ram_6BA2_R2((unsigned char)(i))
+#define DUNGEON_LEVEL_START_Y        F_DUNGEON_LEVEL_START_Y_R
+#define DUNGEON_LEVEL_START_ROOM     F_ram_6BAD_R
+#define DUNGEON_LEVEL_TRIFORCE_ROOM  F_ram_6BAE_R
+#define DUNGEON_LEVEL_NUMBER         F_ram_6BB1_R
 
 /* ---- LevelBlockAttrs cache ------------------------------------------------
  * LevelBlockAttrsByteF ($04CD per Variables.inc:135): cached byte from
@@ -106,7 +104,7 @@
  * table at runtime; the dispatch fn is safe to call only on host
  * environments with full NES SRAM mapped.
  */
-#define DUNGEON_ATTRS_BYTE_F         RAM(0x04CD)
+#define DUNGEON_ATTRS_BYTE_F         F_ram_04CD_R2
 #define DUNGEON_ATTRS_E_BASE         0x0A7Eu
 #define DUNGEON_ATTRS_E_DARK_BIT     0x80u
 
@@ -116,9 +114,9 @@
  *   RoomObjTemplateType = $35F — object template type (first object type)
  *   SpawnCycle         = $524 — cycling index into spawn position list
  */
-#define DUNGEON_ROOM_OBJ_COUNT       RAM(0x034E)
-#define DUNGEON_ROOM_TEMPLATE_TYPE   RAM(0x035F)
-#define DUNGEON_SPAWN_CYCLE          RAM(0x0524)
+#define DUNGEON_ROOM_OBJ_COUNT       F_ram_034E_R
+#define DUNGEON_ROOM_TEMPLATE_TYPE   F_DUNGEON_ROOM_TEMPLATE_TYPE_R
+#define DUNGEON_SPAWN_CYCLE          F_DUNGEON_SPAWN_CYCLE_R
 
 /* ---- Door / transition state ----------------------------------------------
  * Variables.inc:
@@ -134,15 +132,15 @@
  * and TriggeredDoorDir already have aliases in room_state.h.  Listed here
  * for cross-reference completeness.
  */
-#define DUNGEON_DOORWAY_DIR          RAM(0x0053)
-#define DUNGEON_UNDERGROUND_EXIT     RAM(0x005A)
+#define DUNGEON_DOORWAY_DIR          F_ram_0053_R
+#define DUNGEON_UNDERGROUND_EXIT     F_ram_005A_R2
 
 /* ---- Dark room / candle state --------------------------------------------
  * Variables.inc:
  *   BrighteningRoom = $51E — set when candle/lantern has been used in room
  *   CandleState     = $51F — candle animation state (same cell as ROOM_SCROLL_STATE)
  */
-#define DUNGEON_BRIGHTENING_ROOM     RAM(0x051E)
+#define DUNGEON_BRIGHTENING_ROOM     F_ram_051E_R
 
 /* ---- Save file SRAM layout (per slot) ------------------------------------
  * World-flags SRAM base per save slot, first quest:
@@ -172,12 +170,12 @@
  * LevelBlockAttrsE = $6A7E — room item type
  * LevelBlockAttrsF = $6AFE — general flags (dark room bit 4, edge-spawn bit 3, …)
  */
-#define DUNGEON_LBA_A(room)          RAM(0x687Eu + (unsigned char)(room))
-#define DUNGEON_LBA_B(room)          RAM(0x68FEu + (unsigned char)(room))
-#define DUNGEON_LBA_C(room)          RAM(0x697Eu + (unsigned char)(room))
-#define DUNGEON_LBA_D(room)          RAM(0x69FEu + (unsigned char)(room))
-#define DUNGEON_LBA_E(room)          RAM(0x6A7Eu + (unsigned char)(room))
-#define DUNGEON_LBA_F(room)          RAM(0x6AFEu + (unsigned char)(room))
+#define DUNGEON_LBA_A(room)          F_ram_687E_R((unsigned char)(room))
+#define DUNGEON_LBA_B(room)          F_ram_68FE_R((unsigned char)(room))
+#define DUNGEON_LBA_C(room)          F_ram_697E_R((unsigned char)(room))
+#define DUNGEON_LBA_D(room)          F_ram_69FE_R((unsigned char)(room))
+#define DUNGEON_LBA_E(room)          F_ram_6A7E_R2((unsigned char)(room))
+#define DUNGEON_LBA_F(room)          F_NES_SRAM_BASE_6AFE_R((unsigned char)(room))
 
 /* ---- engine bridge state ------------------------------------------------
  * engine (engine/src/main.c) maintains its own scene/room/redux state:

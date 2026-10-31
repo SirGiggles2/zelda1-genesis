@@ -25,6 +25,7 @@
 #include "boss_gohma.h"
 #include "platform_abi.h"
 #include "enemy_state.h"
+#include "combat/link_collision_dispatch.h"
 #include "world/draw_dispatch.h"          /* draw_object_*_with_frame */
 #include "world/sprite_dispatch.h"        /* sprite_anim_* */
 
@@ -94,6 +95,24 @@ void c_gohma_check_collisions(unsigned int slot)
     ENEMY_FRAME_FLAGS = 5u;
     do {
         c_check_monster_collisions(slot);
+        ENEMY_X(slot) = (unsigned char)(ENEMY_X(slot) + 8u);
+        ENEMY_FRAME_FLAGS = (unsigned char)(ENEMY_FRAME_FLAGS - 1u);
+    } while (ENEMY_FRAME_FLAGS != 0u);
+    ENEMY_X(slot) = saved_x;
+}
+
+/* NES source: Z_04.asm:Gohma_CheckCollisions, parts5..1, X-16..X+16.
+ * Drained C: c_gohma_check_collisions above; existing native battery.
+ * Coverage: PARTIAL loaded party weapon/body contexts; world unchanged.
+ * Stance: EXTEND the boss-owned shape without a second enemy update. */
+void boss_gohma_check_party_collisions(unsigned int slot, unsigned char player,
+                                      unsigned char context)
+{
+    const unsigned char saved_x = (unsigned char)ENEMY_X(slot);
+    ENEMY_X(slot) = (unsigned char)(saved_x - 0x10u);
+    ENEMY_FRAME_FLAGS = 5u;
+    do {
+        link_collision_check_gohma_part_for_player(slot, player, context);
         ENEMY_X(slot) = (unsigned char)(ENEMY_X(slot) + 8u);
         ENEMY_FRAME_FLAGS = (unsigned char)(ENEMY_FRAME_FLAGS - 1u);
     } while (ENEMY_FRAME_FLAGS != 0u);

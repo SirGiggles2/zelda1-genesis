@@ -30,6 +30,10 @@ Spec file (JSON): {"name": "...", "file_name": "LINK", "quest": 0,
   the B item in a C static (b_item_t: 1 boomerang, 2 arrow, 3 bomb,
   4 candle, 5 rod), so a stage writing SelectedItemSlot $656 mirrors the
   selection with gen_b_item.
+  wrn(name, v) / rdn(name) write/read a cell by field name (tools/native_ram/
+  fields.json "name", e.g. "ROOM_ID"): they follow the field wherever the
+  layout puts it. wr(off, v) raises once a field leaves the NES image
+  (DETACHED); use wrn then.
   gen_link_pos(x, y, nes_dir) places Genesis Link (players[0]), whose
   position is mirrored into $70/$84 rather than read from them; a stage
   that moves Link on NES ($70/$84/$98, grid offset $394) calls it too.
@@ -133,7 +137,8 @@ def build(spec: dict) -> dict:
     if md:
         while len(gen) < 0x908:
             gen.append(0)
-        header = [ord("M"), ord("D"), 2, int(md.get("mode", 1)),
+        mode = int(md.get("mode", 1))
+        header = [ord("M"), ord("D"), int(md.get("version", 2 if mode else 1)), mode,
                   int(md.get("flags", 0)), int(md.get("players", 1)), 0, 0]
         for i in range(7):
             header[7] ^= header[i]
@@ -149,10 +154,37 @@ def build(spec: dict) -> dict:
             # (GameMode $05/$09/$0B), so a load the Genesis finishes in
             # fewer ticks than the NES does not shift later inputs.
             "clock": spec.get("clock", "tick"),
+            # Semantic scripts use NES A=sword, B=item. Non-Remix profiles
+            # swap the physical pad (T-252, effective_ab_swap): see gen_swap_ab_of.
+            "gen_swap_ab": gen_swap_ab_of(spec),
             # T-013: NES-only route bot (tools/lockstep/bot.lua).
             "bot": spec.get("bot"),
+            # T-366: optional generated semantic field/event config.
+            "semantic_config": spec.get("semantic_config"),
             # T-141: gate allow entries [addr, nes, gen, first, last, "T-###"]
             "allow": spec.get("allow", [])}
+
+
+def gen_swap_ab_of(spec: dict) -> bool:
+    """Whether the GEN input script must swap A/B to deliver NES-semantic buttons.
+
+    engine/src/main.c effective_ab_swap() = options A/B swap || !game_profile_is_remix():
+    every non-Remix profile (Original, i.e. no md_header or md_header mode 0) reads
+    physical B as NES A (sword) and physical A as NES B (item); Remix (md_header mode 1)
+    keeps the pad as is. Presets do not set the options swap bit. An explicit
+    "gen_swap_ab" in the spec wins. The NES side never swaps.
+    """
+    if "gen_swap_ab" in spec:
+        return bool(spec["gen_swap_ab"])
+    md = spec.get("md_header")
+    if md and int(md.get("mode", 1)) == 1:
+        return False
+    # Pad 2 has no swap (main.c nes_pad2_read; the Lua swap is per preset, not per
+    # pad): a script whose only A/B presses are on pad 2 (t013 menu "|UA") stays raw.
+    if not spec.get("bot") and not any(
+            set(str(btn).partition("|")[0]) & {"A", "B"} for _, btn in spec.get("script", [])):
+        return False
+    return True
 
 
 def stages_of(spec: dict) -> list:
@@ -190,7 +222,7 @@ def to_lua(p: dict) -> str:
            f'PRESET.stages = {{}}\n')
     for i, (at, body) in enumerate(p.get("stages", []), 1):
         out += (f'PRESET.stages[{i}] = {{at={at}, fn=function(rd, wr, log, sys, '
-                f'gen_b_item, gen_link_pos)\n{body}\nend}}\n')
+                f'gen_b_item, gen_link_pos, wrn, rdn)\n{body}\nend}}\n')
     # T-141: gate tables (tools/lockstep/gate.py) for the Genesis fail-fast.
     out += gate.lua_tables(p.get("allow", []))
     if p.get("bot"):
@@ -215,6 +247,10 @@ def to_lua(p: dict) -> str:
         out += "PRESET.postscript = " + lua_value(p["postscript"]) + "\n"
     if p.get("post_expect_save"):
         out += "PRESET.post_expect_save = " + lua_value(p["post_expect_save"]) + "\n"
+    if p.get("semantic_config"):
+        out += "PRESET.semantic_config = " + lua_value(str(p["semantic_config"])) + "\n"
+    if p.get("gen_swap_ab"):
+        out += "PRESET.gen_swap_ab = true\n"
     return out
 
 

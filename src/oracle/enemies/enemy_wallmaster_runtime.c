@@ -5,14 +5,14 @@
  * ENEMY_SCRATCH_X/Y/ENEMY_ATTR_SCRATCH etc. but we name them explicitly
  * here to match the NES comments.
  */
-#define WALLMASTER_MINOR_MAJOR_MIN     RAM(0x0000)  /* minor init minor coord (min) */
-#define WALLMASTER_MAJOR_MINOR_MIN     RAM(0x0001)  /* major coord minimum value  */
-#define WALLMASTER_INSTR_AXIS          RAM(0x0002)  /* axis-decrease direction bit */
-#define WALLMASTER_INSTR_MINOR_MIN     RAM(0x0003)  /* init minor distance (major min) */
-#define WALLMASTER_INIT_MINOR_COORD    RAM(0x0004)  /* initial minor coord result */
+#define WALLMASTER_MINOR_MAJOR_MIN     F_ram_0000_R3  /* minor init minor coord (min) */
+#define WALLMASTER_MAJOR_MINOR_MIN     F_ram_0001_R2  /* major coord minimum value  */
+#define WALLMASTER_INSTR_AXIS          F_ram_0002_R2  /* axis-decrease direction bit */
+#define WALLMASTER_INSTR_MINOR_MIN     F_ram_0003_R3  /* init minor distance (major min) */
+#define WALLMASTER_INIT_MINOR_COORD    F_ram_0004_R2  /* initial minor coord result */
 
 /* Room-state alias needed by enrt_wallmaster_calc_start_position. */
-#define ROOM_INPUT_DIR                 RAM(0x03F8)
+#define ROOM_INPUT_DIR                 F_ram_03F8_R2
 
 /*
  * Wallmaster family — scratch/draw helpers shared between state init and
@@ -106,11 +106,11 @@ unsigned int enrt_wallmaster_calc_start_position(unsigned int instr_offset,
 void enrt_wallmaster_put_sprite_behind_bg_if_needed(unsigned int sprite_byte_off) {
     int i;
     for (i = 1; i >= 0; --i) {
-        unsigned char sx = RAM(0x0203 + sprite_byte_off);
+        unsigned char sx = F_ram_0203_R3(sprite_byte_off);
         unsigned char probe = (unsigned char)(sx + WallmasterSpriteRelExtents[i]);
         if (probe >= 0xE9 || probe < 0x18) {
-            unsigned char attr = RAM(0x0202 + sprite_byte_off);
-            RAM(0x0202 + sprite_byte_off) = (unsigned char)(attr | 0x20);
+            unsigned char attr = F_ram_0202_R3(sprite_byte_off);
+            F_ram_0202_R3(sprite_byte_off) = (unsigned char)(attr | 0x20);
         }
     }
 }

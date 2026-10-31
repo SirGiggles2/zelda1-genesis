@@ -17,8 +17,8 @@
  * `objrt_reset_moving_dir_if_mask`. */
 static inline void object_reset_moving_dir_if_mask(unsigned char dir_bit)
 {
-    if (RAM(NES_OBJ_DIR) & dir_bit) {
-        RAM(NES_OBJ_DIR) = 0u;
+    if (F_ram_000F_R2 & dir_bit) {
+        F_ram_000F_R2 = 0u;
     }
 }
 
@@ -28,21 +28,21 @@ __attribute__((always_inline)) void object_bound_direction_horizontally(unsigned
 {
     /* NES BoundDirectionHorizontally (Z_01.asm:3312). drain at
      * src/oracle/world/object_runtime.c:74-87. */
-    const unsigned char x = (unsigned char)RAM(NES_OBJ_X + slot);
+    const unsigned char x = (unsigned char)F_ram_0070_R5(slot);
     unsigned char sample = x;
     const unsigned char shifted = (unsigned char)(slot != 0u &&
-        (slot >= 0x0Du || RAM(NES_OBJ_TYPE + slot) == 0x5Cu));
-    RAM(NES_TMP0) = sample;
+        (slot >= 0x0Du || F_ram_034F_R5(slot) == 0x5Cu));
+    F_ram_0000_R2 = sample;
 
     /* For non-Link objects in slot >= $0D or type == $5C (boomerang),
      * shift collision-test X by +$0B for the left-bound test. */
     if (shifted) {
         sample = (unsigned char)(sample + 0x0Bu);
-        RAM(NES_TMP0) = sample;
+        F_ram_0000_R2 = sample;
     }
 
     /* Left bound. */
-    if (sample < RAM(NES_BOUND_LEFT)) {
+    if (sample < F_NES_BOUND_LEFT_R) {
         object_reset_moving_dir_if_mask(2u);  /* $02 = left direction */
         return;
     }
@@ -52,11 +52,11 @@ __attribute__((always_inline)) void object_bound_direction_horizontally(unsigned
      * -$0C from original x.) */
     if (shifted) {
         sample = (unsigned char)(sample - 0x17u);
-        RAM(NES_TMP0) = sample;
+        F_ram_0000_R2 = sample;
     }
 
     /* Right bound. */
-    if (sample >= RAM(NES_BOUND_RIGHT)) {
+    if (sample >= F_NES_BOUND_RIGHT_R) {
         object_reset_moving_dir_if_mask(1u);  /* $01 = right direction */
     }
 }
@@ -67,28 +67,28 @@ __attribute__((always_inline)) void object_bound_direction_vertically(unsigned i
      * object_runtime.c:89-102. Same shape as horizontal but on Y axis
      * with $0F (top) / $21 (bottom) shifts and $08 (up) / $04 (down)
      * direction bits. */
-    const unsigned char y = (unsigned char)RAM(NES_OBJ_Y + slot);
+    const unsigned char y = (unsigned char)F_ram_0084_R5(slot);
     unsigned char sample = y;
     const unsigned char shifted = (unsigned char)(slot != 0u &&
-        (slot >= 0x0Du || RAM(NES_OBJ_TYPE + slot) == 0x5Cu));
-    RAM(NES_TMP0) = sample;
+        (slot >= 0x0Du || F_ram_034F_R5(slot) == 0x5Cu));
+    F_ram_0000_R2 = sample;
 
     if (shifted) {
         sample = (unsigned char)(sample + 0x0Fu);
-        RAM(NES_TMP0) = sample;
+        F_ram_0000_R2 = sample;
     }
 
-    if (sample < RAM(NES_BOUND_TOP)) {
+    if (sample < F_NES_BOUND_TOP_R) {
         object_reset_moving_dir_if_mask(8u);  /* $08 = up direction */
         return;
     }
 
     if (shifted) {
         sample = (unsigned char)(sample - 0x21u);
-        RAM(NES_TMP0) = sample;
+        F_ram_0000_R2 = sample;
     }
 
-    if (sample >= RAM(NES_BOUND_BOTTOM)) {
+    if (sample >= F_NES_BOUND_BOTTOM_R) {
         object_reset_moving_dir_if_mask(4u);  /* $04 = down direction */
     }
 }
@@ -103,7 +103,7 @@ __attribute__((always_inline)) unsigned char object_bound_by_room(unsigned int s
      *   RTS */
     object_bound_direction_horizontally(slot);
     object_bound_direction_vertically(slot);
-    return (unsigned char)RAM(NES_OBJ_DIR);
+    return (unsigned char)F_ram_000F_R2;
 }
 
 /* T-172 option A: inlined into its callers (call overhead). */
@@ -112,7 +112,7 @@ __attribute__((always_inline)) unsigned char object_bound_by_room_with_dir(unsig
 {
     /* NES sets $0F = direction before JSR BoundByRoom; drain wrapper
      * at object_runtime.c:110 captures that pattern. */
-    RAM(NES_OBJ_DIR) = direction;
+    F_ram_000F_R2 = direction;
     return object_bound_by_room(slot);
 }
 
@@ -144,10 +144,10 @@ __attribute__((always_inline)) void object_move_object(unsigned short slot)
         pos_limit = 0x10u;
         neg_limit = 0xF0u;
     }
-    RAM(NES_POS_GRID_LIMIT) = pos_limit;
-    RAM(NES_NEG_GRID_LIMIT) = neg_limit;
+    F_NES_POS_GRID_LIMIT_R = pos_limit;
+    F_NES_NEG_GRID_LIMIT_R = neg_limit;
 
-    const unsigned char dir = (unsigned char)RAM(NES_OBJ_DIR);
+    const unsigned char dir = (unsigned char)F_ram_000F_R2;
     if (dir == 0u) {
         return;
     }
@@ -159,8 +159,8 @@ __attribute__((always_inline)) void object_move_object(unsigned short slot)
     const unsigned char positive = (unsigned char)((dir & 0x01u) ||
         (!(dir & 0x03u) && (dir & 0x04u)));
     const unsigned short axis = (dir & 0x03u) ? NES_OBJ_X : NES_OBJ_Y;
-    const unsigned char speed = (unsigned char)OBJ(NES_OBJ_QSPD_FRAC, slot);
-    unsigned char frac = (unsigned char)OBJ(NES_OBJ_POS_FRAC, slot);
+    const unsigned char speed = (unsigned char)F_ram_03BC_O(slot);
+    unsigned char frac = (unsigned char)F_ram_03A8_O(slot);
     const unsigned short full_speed = (unsigned short)((unsigned short)speed << 2);
     unsigned char steps, to_pos_limit, to_neg_limit;
     if (positive) {
@@ -174,10 +174,10 @@ __attribute__((always_inline)) void object_move_object(unsigned short slot)
         steps = (unsigned char)(borrow_sum >> 8);
         frac = (unsigned char)(frac - full_speed);
     }
-    OBJ(NES_OBJ_POS_FRAC, slot) = frac;
+    F_ram_03A8_O(slot) = frac;
     if (!steps) return; /* No integer motion: grid and position stay intact. */
-    unsigned char grid = (unsigned char)OBJ(NES_OBJ_GRID_OFFSET, slot);
-    unsigned char pos = (unsigned char)OBJ(axis, slot);
+    unsigned char grid = (unsigned char)F_ram_0394_O(slot);
+    unsigned char pos = (unsigned char)OBJ(axis, slot); /* native_ram bulk:dyn_obj_axis */
     if (positive) {
         to_pos_limit = (unsigned char)(pos_limit - grid);
         to_neg_limit = (unsigned char)(neg_limit - grid);
@@ -190,8 +190,8 @@ __attribute__((always_inline)) void object_move_object(unsigned short slot)
     if (!positive) steps = (unsigned char)(0u - steps);
     grid = (unsigned char)(grid + steps);
     pos = (unsigned char)(pos + steps);
-    OBJ(NES_OBJ_GRID_OFFSET, slot) = grid;
-    OBJ(axis, slot) = pos;
+    F_ram_0394_O(slot) = grid;
+    OBJ(axis, slot) = pos; /* native_ram bulk:dyn_obj_axis */
 }
 
 unsigned int object_add_q_speed_to_position_fraction(unsigned int slot)
@@ -202,16 +202,16 @@ unsigned int object_add_q_speed_to_position_fraction(unsigned int slot)
      * CARRY_SET if the integer step happened (carry survived the
      * grid-limit clear). */
     const unsigned int sum =
-        (unsigned int)RAM(NES_OBJ_POS_FRAC + slot) +
-        (unsigned int)RAM(NES_OBJ_QSPD_FRAC + slot);
-    RAM(NES_OBJ_POS_FRAC + slot) = (unsigned char)sum;
+        (unsigned int)F_ram_03A8_R4(slot) +
+        (unsigned int)F_ram_03BC_R5(slot);
+    F_ram_03A8_R4(slot) = (unsigned char)sum;
     unsigned int carry = (sum >> 8) & 0x01u;
-    const unsigned char grid = (unsigned char)RAM(NES_OBJ_GRID_OFFSET + slot);
-    if (grid == RAM(NES_POS_GRID_LIMIT) ||
-        grid == RAM(NES_NEG_GRID_LIMIT)) {
+    const unsigned char grid = (unsigned char)F_ram_0394_R4(slot);
+    if (grid == F_NES_POS_GRID_LIMIT_R ||
+        grid == F_NES_NEG_GRID_LIMIT_R) {
         carry = 0u;
     }
-    RAM(NES_OBJ_GRID_OFFSET + slot) =
+    F_ram_0394_R4(slot) =
         (unsigned char)(grid + (unsigned char)carry);
     return carry ? CARRY_SET : 0u;
 }
@@ -222,16 +222,16 @@ unsigned int object_sub_q_speed_from_position_fraction(unsigned int slot)
      * Returns the NES carry: CARRY_SET when no pixel step (no borrow, or
      * grid offset at a limit: the NES forces C=1 there), 0 on a step.
      * T-171 asm_equiv: the drain returned 0 at the limit (a step). */
-    const unsigned int frac    = (unsigned int)RAM(NES_OBJ_POS_FRAC + slot);
-    const unsigned int sub_val = (unsigned int)RAM(NES_OBJ_QSPD_FRAC + slot);
+    const unsigned int frac    = (unsigned int)F_ram_03A8_R4(slot);
+    const unsigned int sub_val = (unsigned int)F_ram_03BC_R5(slot);
     const unsigned int borrow  = (frac < sub_val) ? 1u : 0u;
-    RAM(NES_OBJ_POS_FRAC + slot) = (unsigned char)(frac - sub_val);
-    const unsigned char grid = (unsigned char)RAM(NES_OBJ_GRID_OFFSET + slot);
-    if (grid == RAM(NES_POS_GRID_LIMIT) ||
-        grid == RAM(NES_NEG_GRID_LIMIT)) {
+    F_ram_03A8_R4(slot) = (unsigned char)(frac - sub_val);
+    const unsigned char grid = (unsigned char)F_ram_0394_R4(slot);
+    if (grid == F_NES_POS_GRID_LIMIT_R ||
+        grid == F_NES_NEG_GRID_LIMIT_R) {
         return CARRY_SET;
     }
-    RAM(NES_OBJ_GRID_OFFSET + slot) =
+    F_ram_0394_R4(slot) =
         (unsigned char)(grid - (unsigned char)borrow);
     return borrow ? 0u : CARRY_SET;
 }
@@ -250,19 +250,19 @@ void object_move_shot(unsigned char direction, unsigned int slot)
     const unsigned char dir_result =
         object_bound_by_room_with_dir(direction, slot);
     if (dir_result == 0u) {
-        RAM(NES_SHOT_COLLISION_FLAG) = 0x80u;
+        F_ram_000E_R = 0x80u;
         return;
     }
     const unsigned char saved_offset =
-        (unsigned char)RAM(NES_OBJ_GRID_OFFSET + slot);
-    RAM(NES_OBJ_GRID_OFFSET + slot) = 0u;
+        (unsigned char)F_ram_0394_R4(slot);
+    F_ram_0394_R4(slot) = 0u;
     object_move_object((unsigned short)slot);
     const unsigned char new_offset =
-        (unsigned char)RAM(NES_OBJ_GRID_OFFSET + slot);
-    if (RAM(NES_SHOT_COLLISION_FLAG) == 0u) {
-        RAM(NES_OBJ_GRID_OFFSET + slot) =
+        (unsigned char)F_ram_0394_R4(slot);
+    if (F_ram_000E_R == 0u) {
+        F_ram_0394_R4(slot) =
             (unsigned char)(saved_offset + new_offset);
     } else {
-        RAM(NES_OBJ_GRID_OFFSET + slot) = saved_offset;
+        F_ram_0394_R4(slot) = saved_offset;
     }
 }

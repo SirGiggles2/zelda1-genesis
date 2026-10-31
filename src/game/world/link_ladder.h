@@ -30,6 +30,8 @@
  * ObjDir: the ladder object goes into that slot (LadderSlot $64).
  * Call after Link moved (ObjGridOffset truncated), before AnimateLinkBase. */
 void link_ladder_end_move(void);
+/* Select the already-loaded actor at the existing party context boundary. */
+void link_ladder_set_player(unsigned char player);
 
 /* CheckLadder: Walker_Move for Link after Walker_CheckTileCollision,
  * before MoveObject. [0F] is the moving direction in and out. Puts the

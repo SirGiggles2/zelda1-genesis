@@ -7,6 +7,8 @@
 #include "../../state/game_profile.h"
 #include <stdint.h>
 #include "platform_abi.h"
+#include "../../state/weapon_state.h"
+#include "../items/sword_shot.h"
 #include "world_state.h"       /* CUR_ROOM_ID */
 #include "progress_state.h"    /* CUR_LEVEL, SAVEFILE_PTR_LO/HI, SUBMODE_VALUE,
                                 * MODE_VALUE */
@@ -17,6 +19,7 @@
                                 * LINK_STUN_TIMER */
 #include "link_state.h"        /* LINK_HALT_FLAG */
 #include "item_state.h"        /* ITEM_SFX_SECONDARY */
+#include "../player/player_runtime.h"
 #include "core/core_dispatch.h" /* core_get_opposite_dir,
                                   * core_compare_hearts_to_containers */
 #include "hud/hud_dispatch.h"   /* hud_world_change_rupees */
@@ -63,14 +66,14 @@ unsigned char room_get_room_flags(void)
      * SRAM ROOM_FLAGS_PTR_LO/HI at $6BAF/$6BB0; deref + read at
      * CUR_ROOM_ID offset. Stashes ptr to SAVEFILE_PTR_LO/HI. */
     const unsigned char ptr_lo =
-        nes_ram[NES_SRAM_BASE + NES_SRAM_ROOM_FLAGS_PTR_LO];
+        F_ram_6BAF_N;
     const unsigned char ptr_hi =
-        nes_ram[NES_SRAM_BASE + NES_SRAM_ROOM_FLAGS_PTR_HI];
+        F_ram_6BB0_N;
     SAVEFILE_PTR_LO = ptr_lo;
     SAVEFILE_PTR_HI = ptr_hi;
     const unsigned short ptr =
         (unsigned short)(((unsigned short)ptr_hi << 8) | ptr_lo);
-    return (unsigned char)nes_ram[ptr + CUR_ROOM_ID];
+    return (unsigned char)nes_ram[ptr + CUR_ROOM_ID]; /* native_ram bulk:dyn_ptr_table */
 }
 
 unsigned int room_split_room_id(void)
@@ -88,14 +91,14 @@ unsigned char room_is_dark_room(unsigned int col)
     if (CUR_LEVEL == 0u) {
         return 0u;
     }
-    return (unsigned char)(nes_ram[NES_SRAM_BASE + 0x0A7Eu + (col & 0xFFu)] & 0x80u);
+    return (unsigned char)(F_ram_6A7E_X2((col & 0xFFu)) & 0x80u);
 }
 
 void room_silence_sound(void)
 {
     /* drain at room_runtime.c:120-123. */
-    RAM(0x0604u) = 0x80u;  /* ROOM_SFX_MAIN */
-    RAM(0x0603u) = 0x80u;  /* ROOM_SFX_AUX */
+    F_ram_0604_R = 0x80u;  /* ROOM_SFX_MAIN */
+    F_ram_0603_R = 0x80u;  /* ROOM_SFX_AUX */
 }
 
 void room_check_has_living_monsters(void)
@@ -135,7 +138,7 @@ void room_hide_all_sprites(void)
 {
     /* drain at room_runtime.c:273-276. */
     for (unsigned char i = 0u; i < 64u; ++i) {
-        RAM(0x0200u + (unsigned short)((unsigned short)i * 4u)) = 0xF8u;
+        F_ram_0200_R2((unsigned short)((unsigned short)i * 4u)) = 0xF8u;
     }
 }
 
@@ -143,7 +146,7 @@ unsigned char room_get_unique_room_id(void)
 {
     /* drain at room_runtime.c:278-281. */
     const unsigned char room = (unsigned char)CUR_ROOM_ID;
-    return (unsigned char)(nes_ram[NES_SRAM_BASE +
+    return (unsigned char)(nes_ram[NES_SRAM_BASE + /* native_ram bulk:dyn_addr */
                                    NES_SRAM_ROOM_UNIQUE_ID_BASE + room] &
                            0x3Fu);
 }
@@ -153,9 +156,9 @@ void room_clear_room_history(void)
     /* NES ClearRoomHistory (Z_07.asm:1387): [$0529] = 0, then RoomHistory
      * $621-$626; CurRoomHistoryIndex $620 is left alone (T-013: the drain
      * cleared $620 instead of $0529). */
-    RAM(0x0529u) = 0u;
+    F_ram_0529_R = 0u;
     for (signed char i = 5; i >= 0; --i) {
-        RAM(NES_ROOM_HISTORY_BASE + (unsigned char)i) = 0u;
+        F_NES_ROOM_HISTORY_BASE_R((unsigned char)i) = 0u;
     }
 }
 
@@ -196,7 +199,7 @@ void room_mark_room_visited(void)
     const unsigned short ptr =
         (unsigned short)(((unsigned short)(unsigned char)SAVEFILE_PTR_HI << 8) |
                          (unsigned char)SAVEFILE_PTR_LO);
-    nes_ram[ptr + CUR_ROOM_ID] = (uint8_t)(flags | 0x20u);
+    nes_ram[ptr + CUR_ROOM_ID] = (uint8_t)(flags | 0x20u); /* native_ram bulk:dyn_ptr_table */
     /* NES source: Z_07 MarkRoomVisited; Redux dungeon_automap checkmap.
      * Drained C: room_mark_room_visited / HUD map cue consumer.
      * Coverage: FULL first-visit map invalidation; Stance: EXTEND.
@@ -236,19 +239,19 @@ void room_copy_column_to_tilebuf(void)
         (unsigned char)((unsigned char)CUR_ROOM_FLAGS_PTR - 1u);
     const unsigned char buf = (unsigned char)TRANSFER_BUF_POS;
 
-    RAM(0x0302u + buf) = 33u;             /* TRANSFER_BUF_BYTE(buf) */
-    RAM(0x0303u + buf) = col;
+    F_ram_0302_R2(buf) = 33u;             /* TRANSFER_BUF_BYTE(buf) */
+    F_M8_DYN_TILE_BUF_0303_R3(buf) = col;
 
     unsigned short src =
         (unsigned short)(ROOM_PLAY_AREA_BASE +
                          (unsigned short)col * ROOM_COL_STRIDE);
 
-    RAM(0x0304u + buf) = 0x96u;
-    RAM(0x031Bu + buf) = 0xFFu;
+    F_ram_0304_R2(buf) = 0x96u;
+    F_ram_031B_R(buf) = 0xFFu;
 
     unsigned char dst = buf;
     for (unsigned char i = 0u; i < 22u; ++i) {
-        RAM(0x0305u + dst) = nes_ram[src + i];
+        F_M8_DYN_TILE_BUF_0305_R4(dst) = nes_ram[src + i]; /* native_ram bulk:dyn_addr */
         ++dst;
     }
     src = (unsigned short)(src + 22u);
@@ -272,7 +275,7 @@ void room_go_to_next_mode_reset_grid_offset(void)
 {
     /* drain at room_mode_runtime.c:267-270. */
     room_go_to_next_mode();
-    RAM(0x0394u) = 0u;
+    F_ram_0394_R = 0u;
 }
 
 void room_go_to_next_mode_play_level_song(void)
@@ -283,7 +286,7 @@ void room_go_to_next_mode_play_level_song(void)
      * constrained to 0..9 by gameplay — table sized 10. */
     ITEM_SFX_SECONDARY = k_level_song_ids[level];
     room_go_to_next_mode();
-    RAM(0x0394u) = 0u;
+    F_ram_0394_R = 0u;
 }
 
 void room_go_to_next_mode_from_play(void)
@@ -292,10 +295,10 @@ void room_go_to_next_mode_from_play(void)
     MODE_VALUE = (uint8_t)((unsigned char)MODE_VALUE + 1u);
     SUBMODE_VALUE = 0u;
     ROOM_MODE_TIMER = 0u;
-    RAM(0x000Fu) = 0u;
+    F_ram_000F_R = 0u;
     LINK_ACTION_TIMER = 0u;
-    RAM(0x00C0u) = 0u;
-    RAM(0x00D3u) = 0u;
+    F_ram_00C0_R = 0u;
+    F_ram_00D3_R = 0u;
     LINK_STUN_TIMER = 0u;
 }
 
@@ -344,7 +347,7 @@ void room_turn_off_all_video(void)
      * Per debate 007 synthesis: Sonnet flagged that pure shadow write
      * is insufficient — without VDP Reg 1 disable, mode transitions
      * display stale VRAM (tearing). Both writes required. */
-    RAM(NES_PPU_MASK_SHADOW) = 0u;
+    F_ram_00FE_R3 = 0u;
     render_display_enable(0u);
 }
 
@@ -362,11 +365,11 @@ void room_world_fill_hearts(void)
         /* CompareHeartsToContainers installs the container count in $00
          * before comparing it with the full-heart count. */
         unsigned char whole_hearts = core_compare_hearts_to_containers();
-        if (whole_hearts == (unsigned char)RAM(0x0000u)) {
+        if (whole_hearts == (unsigned char)F_ram_0000_R) {
             LINK_PARTIAL_HEART = 0xFFu;
-            RAM(0x052Eu) = 0u;             /* ROOM_SWORD_BLOCKED_FLAG */
+            F_ram_052E_R3 = 0u;             /* ROOM_SWORD_BLOCKED_FLAG */
             ROOM_HEART_FILL_STATE = 0u;
-            RAM(0x00E0u) = 0u;             /* ROOM_PAUSED_FLAG */
+            F_ram_00E0_R = 0u;             /* ROOM_PAUSED_FLAG */
             return;
         }
         LINK_HEARTS = (uint8_t)((unsigned char)LINK_HEARTS + 1u);
@@ -470,9 +473,9 @@ void room_patch_level_palette_link_color(void)
 {
     const unsigned char slot = (unsigned char)SAVE_SLOT_INDEX;
     const unsigned char row_off = SaveSlotToPaletteRowOffset[slot & 3u];
-    const unsigned char ring = nes_ram[0x0662u];
+    const unsigned char ring = F_ram_0662;
     if (ring < 3u) MenuPalettesTransferBuf[20u + row_off] = room_link_tunic_color(ring);
-    nes_ram[NES_SRAM_BASE + 0x0B92u] = MenuPalettesTransferBuf[20u + row_off];
+    F_ram_6B92_N2 = MenuPalettesTransferBuf[20u + row_off];
 }
 
 void room_patch_and_cue_level_palettes_transfer(void)
@@ -498,22 +501,22 @@ void room_init_mode5_play_palette_row7(void)
     static const unsigned char k_boss_selectors[9] = {
         0x08u, 0x36u, 0x0Au, 0x0Au, 0x0Au, 0x0Au, 0x7Cu, 0x7Cu, 0x7Cu };
     unsigned char x;
-    if (nes_ram[0x0010u] != 0u) {                     /* CurLevel: UW */
-        const unsigned char t = nes_ram[0x0350u];      /* ObjType+1 */
+    if (F_ram_0010 != 0u) {                     /* CurLevel: UW */
+        const unsigned char t = F_CAVE_ROOM_TYPE;      /* ObjType+1 */
         signed char y;
         x = 0x06u;                                     /* @UseLevelPalette */
         for (y = 8; y >= 0; --y) {
             if (t == k_boss_types[(unsigned char)y]) { x = k_boss_selectors[(unsigned char)y]; break; }
         }
     } else {
-        const unsigned char t = nes_ram[0x035Au];      /* ObjType+11 */
+        const unsigned char t = F_ROOM_OBJECT_SLOT_TYPE;      /* ObjType+11 */
         x = 0x20u;
         if (t != 0x65u) {
             if (t != 0x66u && t != 0x62u) {
                 x = 0x7Au;                             /* @UseRedArmosPalette */
             } else {
                 if (t == 0x62u) x = 0x24u;
-                if ((nes_ram[NES_SRAM_BASE + 0x08FEu + nes_ram[0x00EBu]] & 1u) == 0u)
+                if ((F_ram_68FE_X4(F_ram_00EB) & 1u) == 0u)
                     x = 0x22u;                         /* LevelBlockAttrsB even */
             }
         }
@@ -527,7 +530,7 @@ void room_init_mode3_sub1(void)
     unsigned char room_id;
     if ((unsigned char)CUR_LEVEL != 0u ||
         (unsigned char)ROOM_ID_ALT == 0xFFu) {
-        room_id = nes_ram[NES_SRAM_BASE + 0x0BADu];
+        room_id = F_ram_6BAD_N;
     } else {
         room_id = (unsigned char)ROOM_ID_ALT;
     }
@@ -541,9 +544,21 @@ void room_init_mode3_sub1(void)
 void room_reset_inv_obj_state(void)
 {
     /* drain at room_load_runtime.c:25-30. */
-    RAM(0x0064u) = 0u;                    /* ROOM_INV_OBJ_ACTIVE */
+    F_ram_0064_R = 0u;                    /* ROOM_INV_OBJ_ACTIVE */
+    /* Retire native P1 owners at the same room-clear phase as their slots.
+     * Position/timer bytes retain their existing lifetimes. */
+    g_player_sword[0].state = 0u;
+    for (unsigned char player = 0u; player < 4u; ++player) {
+        g_player_beam[player].state = 0u;
+        if (player != 0u) sword_shot_hide_player(player);
+    }
+    g_player_boomerang.state = 0u;
     for (signed char i = 5; i >= 0; --i) {
-        RAM(0x00B9u + (unsigned char)i) = 0u;  /* ROOM_INV_OBJ_STATE */
+        const unsigned char slot = (unsigned char)(13u + (unsigned char)i);
+        if (slot == 16u || slot == 17u)
+            shared_effect_set_state(slot, 0u);
+        else
+            F_ram_00B9_R2((unsigned char)i) = 0u;  /* ROOM_INV_OBJ_STATE */
     }
 }
 
@@ -566,7 +581,7 @@ static unsigned char room_has_item_by_level(unsigned char base_offset)
         offset = (unsigned char)(offset + 2u);
     }
     const unsigned char bit_idx = (unsigned char)(idx & 7u);
-    return (unsigned char)(RAM(0x0657u + offset) &
+    return (unsigned char)(F_ram_0657_R4(offset) &
                            k_room_level_masks[bit_idx]);
 }
 
@@ -593,7 +608,7 @@ void room_update_triforce_position_marker(void)
         return;
     }
     progress_update_position_marker(
-        nes_ram[NES_SRAM_BASE + 0x0BAEu], 4u);
+        F_ram_6BAE_N2, 4u);
 }
 
 /* roomld_obj_room_bounds[10]: 5 OW bounds + 5 UW bounds.
@@ -609,10 +624,10 @@ void room_setup_obj_room_bounds(void)
     unsigned char base = 5u;
     if ((unsigned char)CUR_LEVEL == 0u) {
         base = 0u;
-        RAM(0x0053u) = 0u;  /* ROOM_IN_DOORWAY_FLAG */
+        F_ram_0053_R2 = 0u;  /* ROOM_IN_DOORWAY_FLAG */
     }
     for (unsigned char i = 0u; i < 5u; ++i) {
-        RAM(0x0346u + i) = k_obj_room_bounds[base + i];
+        F_NES_BOUND_LEFT_R2(i) = k_obj_room_bounds[base + i];
     }
 }
 
@@ -624,9 +639,9 @@ static const unsigned char k_sprite0_descriptor[4] = {
 void room_write_and_enable_sprite0(void)
 {
     /* drain at room_load_runtime.c:13-18. */
-    RAM(0x00E3u) = 1u;  /* ROOM_SPRITE0_ENABLED */
+    F_ram_00E3_R = 1u;  /* ROOM_SPRITE0_ENABLED */
     for (signed char i = 3; i >= 0; --i) {
-        RAM(0x0200u + (unsigned char)i) =
+        F_ram_0200_R2((unsigned char)i) =
             k_sprite0_descriptor[(unsigned char)i];
     }
 }
@@ -634,8 +649,8 @@ void room_write_and_enable_sprite0(void)
 void room_put_link_behind_background(void)
 {
     /* drain at room_load_runtime.c:20-23. */
-    RAM(0x024Au) = (uint8_t)(RAM(0x024Au) | 0x20u);
-    RAM(0x024Eu) = (uint8_t)(RAM(0x024Eu) | 0x20u);
+    F_ROOM_LINK_BG_ATTR_A_R2 = (uint8_t)(F_ROOM_LINK_BG_ATTR_A_R2 | 0x20u);
+    F_ROOM_LINK_BG_ATTR_B_R2 = (uint8_t)(F_ROOM_LINK_BG_ATTR_B_R2 | 0x20u);
 }
 
 /* roomld_palette_to_nt_attr[4] (room_load_runtime.c:7). */
@@ -647,13 +662,13 @@ void room_fill_play_area_attrs(unsigned int room_id)
 {
     /* drain at room_load_runtime.c:32-56. */
     const unsigned char outer_sel =
-        (unsigned char)(nes_ram[NES_SRAM_BASE + 0x087Eu + room_id] & 0x03u);
+        (unsigned char)(F_ram_687E_X5(room_id) & 0x03u);
     const unsigned char outer_attr = k_palette_to_nt_attr[outer_sel];
     for (unsigned char d3 = 0u; d3 < 48u; ++d3) {
-        RAM(0x0530u + d3) = outer_attr;
+        F_ram_0530_R(d3) = outer_attr;
     }
     const unsigned char inner_sel =
-        (unsigned char)(nes_ram[NES_SRAM_BASE + 0x08FEu + room_id] & 0x03u);
+        (unsigned char)(F_ram_68FE_X4(room_id) & 0x03u);
     const unsigned char inner_attr = k_palette_to_nt_attr[inner_sel];
     for (unsigned char d3 = 9u; d3 < 0x27u; ++d3) {
         const unsigned char mod = (unsigned char)(d3 & 0x07u);
@@ -661,11 +676,11 @@ void room_fill_play_area_attrs(unsigned int room_id)
             continue;
         }
         if (d3 >= 0x21u) {
-            const unsigned char cur = (unsigned char)RAM(0x0530u + d3);
-            RAM(0x0530u + d3) =
+            const unsigned char cur = (unsigned char)F_ram_0530_R(d3);
+            F_ram_0530_R(d3) =
                 (uint8_t)((inner_attr & 0x0Fu) | (cur & 0xF0u));
         } else {
-            RAM(0x0530u + d3) = inner_attr;
+            F_ram_0530_R(d3) = inner_attr;
         }
     }
 }
@@ -675,27 +690,27 @@ void room_init_link_speed(void)
     /* drain at room_load_runtime.c:69-81. */
     unsigned char speed = 96u;
     if ((unsigned char)CUR_LEVEL != 0u) {
-        RAM(0x03BCu) = speed;  /* ROOM_LINK_SPEED */
+        F_ram_03BC_R = speed;  /* ROOM_LINK_SPEED */
         return;
     }
-    const unsigned char tile = (unsigned char)RAM(0x049Eu);
+    const unsigned char tile = (unsigned char)F_ram_049E_R2;
     if (tile == 0x74u || tile == 0x75u) {
         speed = 48u;
-        if ((unsigned char)RAM(0x03BCu) != 48u) {
-            RAM(0x03A8u) = 0u;  /* ROOM_LINK_SPEED_FRAC */
+        if ((unsigned char)F_ram_03BC_R != 48u) {
+            F_ram_03A8_R2 = 0u;  /* ROOM_LINK_SPEED_FRAC */
         }
     }
-    RAM(0x03BCu) = speed;
+    F_ram_03BC_R = speed;
 }
 
 void room_init_mode10(void)
 {
     /* drain at room_object_runtime.c:7-15. */
     (void)collision_get_collidable_tile_still(0u);
-    if ((unsigned char)RAM(0x049Eu) == 0x24u) {  /* ROOM_COLLIDABLE_TILE */
-        RAM(0x0619u) = 0u;                       /* ROOM_TRIFORCE_HOLD_FLAG */
-        RAM(0x0603u) = 8u;                       /* ROOM_SFX_AUX */
-        RAM(0x0412u) =
+    if ((unsigned char)F_ram_049E_R2 == 0x24u) {  /* ROOM_COLLIDABLE_TILE */
+        F_ROOM_TRIFORCE_HOLD_FLAG_R2 = 0u;                       /* ROOM_TRIFORCE_HOLD_FLAG */
+        F_ram_0603_R = 8u;                       /* ROOM_SFX_AUX */
+        F_ram_0412_R =
             (uint8_t)((unsigned char)LINK_Y + 0x10u);  /* ROOM_PUSH_TIMER */
     }
     ROOM_MODE_TIMER = (uint8_t)((unsigned char)ROOM_MODE_TIMER + 1u);
@@ -706,10 +721,10 @@ void room_end_prepare_mode(void)
     /* drain at room_object_runtime.c:50-58. */
     SUBMODE_VALUE = 0u;
     ROOM_MODE_TIMER = 0u;
-    RAM(0x000Fu) = 0u;     /* COMBAT_PART_INDEX (ZP_TMPF) */
+    F_ram_000F_R = 0u;     /* COMBAT_PART_INDEX (ZP_TMPF) */
     LINK_ACTION_TIMER = 0u;
-    RAM(0x00C0u) = 0u;     /* MON_SHOVE_DIR(0) */
-    RAM(0x00D3u) = 0u;     /* MON_SHOVE_TIMER(0) */
+    F_ram_00C0_R = 0u;     /* MON_SHOVE_DIR(0) */
+    F_ram_00D3_R = 0u;     /* MON_SHOVE_TIMER(0) */
     LINK_STUN_TIMER = 0u;
 }
 
@@ -721,13 +736,13 @@ void room_setup_tile_object_ow(void)
         (unsigned char)CUR_ROOM_ID == 0x55u) {
         type = 97u;
     } else {
-        RAM(0x007Bu) = (unsigned char)RAM(0x052Cu);  /* X_SCRATCH = TILE_OBJ_1 */
-        RAM(0x008Fu) = (unsigned char)RAM(0x052Du);  /* Y_SCRATCH = TILE_OBJ_2 */
-        type = (unsigned char)RAM(0x052Bu);          /* TILE_OBJ_0 */
+        F_ROOM_OBJECT_X_SCRATCH_R2 = (unsigned char)F_ROOM_TILE_OBJ_1_R;  /* X_SCRATCH = TILE_OBJ_1 */
+        F_ROOM_OBJECT_Y_SCRATCH_R2 = (unsigned char)F_ROOM_TILE_OBJ_2_R;  /* Y_SCRATCH = TILE_OBJ_2 */
+        type = (unsigned char)F_ROOM_TILE_OBJ_0_R;          /* TILE_OBJ_0 */
     }
-    RAM(0x035Au) = type;     /* ROOM_OBJECT_SLOT_TYPE */
+    F_ROOM_OBJECT_SLOT_TYPE_R2 = type;     /* ROOM_OBJECT_SLOT_TYPE */
     progress_reset_room_tile_obj_info();
-    RAM(0x00B7u) = 0u;        /* ROOM_OBJECT_INIT_DONE */
+    F_ROOM_OBJECT_INIT_DONE_R2 = 0u;        /* ROOM_OBJECT_INIT_DONE */
 }
 
 /* --------------------------------------------------------------- */
@@ -756,20 +771,20 @@ void room_init_mode4_go_to_sub0(void)
 {
     /* room_mode_runtime.c:23-26. */
     SUBMODE_VALUE = 0u;
-    RAM(0x056Eu) = 0u;  /* ROOM_SCROLL_STATE */
+    F_ram_056E_R = 0u;  /* ROOM_SCROLL_STATE */
 }
 
 void room_update_mode11_death_sub6(void)
 {
     /* room_mode_runtime.c:28-31. */
-    RAM(0x00FFu) = (uint8_t)((unsigned char)RAM(0x00FFu) & 0xFEu);
+    F_ram_00FF_R = (uint8_t)((unsigned char)F_ram_00FF_R & 0xFEu);
     room_inc_submode();
 }
 
 void room_reset_vscroll_lo(void)
 {
     /* room_mode_runtime.c:33-36. */
-    RAM(0x00E2u) = 0u;
+    F_ram_00E2_R = 0u;
     room_inc_submode();
 }
 
@@ -784,21 +799,21 @@ void room_select_transfer_buf_and_inc_state(unsigned int val)
 {
     /* room_mode_runtime.c:43-46. */
     ROOM_TRANSFER_BUF_SELECT = (uint8_t)val;
-    RAM(0x00E1u) =
-        (uint8_t)((unsigned char)RAM(0x00E1u) + 1u);  /* ROOM_STATE_INDEX */
+    F_ROOM_STATE_INDEX_R2 =
+        (uint8_t)((unsigned char)F_ROOM_STATE_INDEX_R2 + 1u);  /* ROOM_STATE_INDEX */
 }
 
 void room_set_fade_cycle_and_advance_submode(unsigned int val)
 {
     /* room_mode_runtime.c:65-68. */
-    RAM(0x051Cu) = (uint8_t)val;  /* WORLD_FADE_STEP */
+    F_ram_051C_R = (uint8_t)val;  /* WORLD_FADE_STEP */
     room_inc_submode();
 }
 
 void room_switch_to_nt1(void)
 {
     /* room_mode_runtime.c:129-131. */
-    RAM(0x005Fu) = 1u;  /* ROOM_NAMETABLE_SELECT */
+    F_ROOM_NAMETABLE_SELECT_R2 = 1u;  /* ROOM_NAMETABLE_SELECT */
 }
 
 void room_update_menu_common2(void)
@@ -841,7 +856,7 @@ void room_update_mode11_death_sub4(void)
 void room_update_mode11_death_sub5(void)
 {
     /* room_mode_runtime.c:142-145. */
-    RAM(0x00E3u) = 0u;  /* ROOM_SPRITE0_ENABLED */
+    F_ram_00E3_R = 0u;  /* ROOM_SPRITE0_ENABLED */
     room_select_transfer_buf(94u);
 }
 
@@ -849,21 +864,21 @@ void room_update_mode11_death_sub9(void)
 {
     /* room_mode_runtime.c:147-151. */
     ROOM_TRANSFER_BUF_SELECT = 44u;
-    RAM(0x00E5u) = 15u;  /* ROOM_MENU_SCROLL_TIMER */
+    F_ram_00E5_R = 15u;  /* ROOM_MENU_SCROLL_TIMER */
     room_update_mode11_death_set_timer_inc_submode(24u);
 }
 
 void room_start_filling_hearts(void)
 {
     /* room_mode_runtime.c:157-160. */
-    RAM(0x0064u) = 2u;  /* ROOM_INV_OBJ_ACTIVE */
+    F_ram_0064_R = 2u;  /* ROOM_INV_OBJ_ACTIVE */
     room_inc_submode();
 }
 
 void room_init_mode7_finish(void)
 {
     /* room_mode_runtime.c:123-127. */
-    CUR_ROOM_ID = (uint8_t)RAM(0x00ECu);  /* PREV_ROOM_ID */
+    CUR_ROOM_ID = (uint8_t)F_PREV_ROOM_ID_R2;  /* PREV_ROOM_ID */
     room_write_and_enable_sprite0();
     core_begin_update_mode();
 }
@@ -887,14 +902,14 @@ void room_copy_row_to_tilebuf(void)
     for (signed char r = (signed char)row; r >= 0; r--)
         vram += 0x20u;
     TRANSFER_BUF_BYTE(0) = (unsigned char)((vram >> 8) & 0xFFu);
-    RAM(0x0303u) = (unsigned char)(vram & 0xFFu);
+    F_M8_DYN_TILE_BUF_0303_R2 = (unsigned char)(vram & 0xFFu);
 
-    RAM(0x0304u) = 32u;
-    RAM(0x0325u) = 0xFFu;
+    F_ram_0304_R = 32u;
+    F_ram_0325_R = 0xFFu;
 
     unsigned short s = 0x6530u + row;
     for (unsigned char i = 0u; i < 32u; i++) {
-        RAM(0x0305u + i) = nes_ram[s];
+        F_M8_DYN_TILE_BUF_0305_R4(i) = nes_ram[s]; /* native_ram bulk:dyn_addr */
         s += 0x16u;
     }
 
@@ -995,20 +1010,8 @@ void room_player_set_moving_dir_and_switch_to_player_slot(unsigned int dir)
 /* room_player_runtime.c:28-43. NES LinkModifyDirInDoorway. */
 void room_player_link_modify_dir_in_doorway(void)
 {
-    if (ROOM_IN_DOORWAY_FLAG == 0u)
-        return;
-    if (ROOM_INPUT_DIR == 0u)
-        return;
-    if (LINK_DIR & ROOM_INPUT_DIR) {
-        ROOM_INPUT_DIR = LINK_DIR;
-        return;
-    }
-    WORLD_TMP0 = (unsigned char)core_get_opposite_dir(LINK_DIR);
-    if (WORLD_TMP0 & ROOM_INPUT_DIR) {
-        ROOM_INPUT_DIR = WORLD_TMP0;
-        return;
-    }
-    ROOM_INPUT_DIR = LINK_DIR;
+    ROOM_INPUT_DIR = player_runtime_filter_doorway_input(
+        ROOM_IN_DOORWAY_FLAG, ROOM_INPUT_DIR, LINK_DIR);
 }
 
 /* room_runtime.c:47-59. NES CalcOpenDoorwayMask. */
@@ -1045,7 +1048,7 @@ void room_set_door_flag(unsigned int dir_idx)
     const unsigned short ptr =
         (unsigned short)(((unsigned short)SAVEFILE_PTR_HI << 8) | SAVEFILE_PTR_LO);
     flags = (unsigned char)(flags | k_room_level_masks[dir_idx & 7u]);
-    nes_ram[ptr + CUR_ROOM_ID] = flags;
+    nes_ram[ptr + CUR_ROOM_ID] = flags; /* native_ram bulk:dyn_ptr_table */
 }
 
 /* room_runtime.c:91-100. NES ResetDoorFlag. */
@@ -1056,8 +1059,8 @@ void room_reset_door_flag(unsigned int dir_idx)
         (unsigned short)(((unsigned short)SAVEFILE_PTR_HI << 8) | SAVEFILE_PTR_LO);
     const unsigned char mask =
         (unsigned char)(k_room_level_masks[dir_idx & 7u] ^ 0xFFu);
-    const unsigned char flags = nes_ram[ptr + CUR_ROOM_ID];
-    nes_ram[ptr + CUR_ROOM_ID] = (unsigned char)(flags & mask);
+    const unsigned char flags = nes_ram[ptr + CUR_ROOM_ID]; /* native_ram bulk:dyn_ptr_table */
+    nes_ram[ptr + CUR_ROOM_ID] = (unsigned char)(flags & mask); /* native_ram bulk:dyn_ptr_table */
 }
 
 /* room_runtime.c:125-130. NES SetEnteringDoorway. */
@@ -1078,8 +1081,8 @@ void room_save_kill_count_ow(unsigned int slot)
     const unsigned short ptr =
         (unsigned short)(((unsigned short)SAVEFILE_PTR_HI << 8) | SAVEFILE_PTR_LO);
     const unsigned char cell =
-        (unsigned char)(nes_ram[ptr + (unsigned char)slot] & 0xF8u);
-    nes_ram[ptr + (unsigned char)slot] = cell;
+        (unsigned char)(nes_ram[ptr + (unsigned char)slot] & 0xF8u); /* native_ram bulk:dyn_ptr_table */
+    nes_ram[ptr + (unsigned char)slot] = cell; /* native_ram bulk:dyn_ptr_table */
     const unsigned char cur_count = ROOM_OW_CUR_KILL_TOTAL;
     const unsigned char max_count = ROOM_OW_KILL_COUNT;
     unsigned char new_kill;
@@ -1090,7 +1093,7 @@ void room_save_kill_count_ow(unsigned int slot)
         if (new_kill >= 7u)
             new_kill = 7u;
     }
-    nes_ram[ptr + (unsigned char)slot] = (unsigned char)(cell | new_kill);
+    nes_ram[ptr + (unsigned char)slot] = (unsigned char)(cell | new_kill); /* native_ram bulk:dyn_ptr_table */
 }
 
 /* NES source: Z_05.asm:SaveKillCountUW ($4036 source listing).
@@ -1105,22 +1108,22 @@ void room_save_kill_count_uw(void)
     unsigned short ptr = (unsigned short)(((unsigned short)SAVEFILE_PTR_HI << 8) |
                                          SAVEFILE_PTR_LO);
     unsigned char room = (unsigned char)CUR_ROOM_ID;
-    unsigned char count = (unsigned char)RAM(0x034Eu);
-    unsigned char killed = (unsigned char)RAM(0x034Fu);
-    unsigned char type = (unsigned char)RAM(0x035Fu);
+    unsigned char count = (unsigned char)F_ram_034E_R2;
+    unsigned char killed = (unsigned char)F_ram_034F_R;
+    unsigned char type = (unsigned char)F_DUNGEON_ROOM_TEMPLATE_TYPE_R2;
     unsigned char total;
     if (count == 0u || killed >= count ||
         (killed != 0u && type >= 0x32u && type != 0x3Au &&
          type != 0x3Bu && type < 0x49u)) {
-        RAM(0x0560u + room) = 0x0Fu;
+        F_ram_0560_R(room) = 0x0Fu;
         flags |= 0xC0u;
     } else {
-        total = (unsigned char)(killed + RAM(0x0560u + room));
-        RAM(0x0560u + room) = total;
+        total = (unsigned char)(killed + F_ram_0560_R(room));
+        F_ram_0560_R(room) = total;
         if (total > 2u) total = 2u;
         flags |= (unsigned char)(total << 6);
     }
-    nes_ram[ptr + room] = flags;
+    nes_ram[ptr + room] = flags; /* native_ram bulk:dyn_ptr_table */
 }
 
 /* room_runtime.c:157-160. NES TriggerOpenDoor. */
@@ -1208,8 +1211,8 @@ unsigned int room_check_secret_trigger_block_stairs(void)
     if (pushed == 0u || (pushed & 1u) == 0u)
         return 0u;
     ROOM_BLOCK_SECRET_FLAG = (uint8_t)(pushed + 1u);
-    RAM(0x0070u + 11u) = 0xD0u;                  /* ObjX+11 */
-    RAM(0x0084u + 11u) = 0x60u;                  /* ObjY+11 */
+    F_ROOM_OBJECT_X_SCRATCH_R3 = 0xD0u;                  /* ObjX+11 */
+    F_ROOM_OBJECT_Y_SCRATCH_R3 = 0x60u;                  /* ObjY+11 */
     dyn_tile_change_tile_obj_tiles(0x70u, 11u);
     roomrom_uw_room_render_refresh_square(0xD0u >> 3, (unsigned char)((0x60u - 0x40u) >> 3));
     return CARRY_SET;
@@ -1224,7 +1227,7 @@ void room_check_underworld_secrets(void)
     unsigned int met;
     unsigned char trigger;
     room_check_has_living_monsters();
-    trigger = (unsigned char)((unsigned char)RAM(0x04CDu) & 0x07u);
+    trigger = (unsigned char)((unsigned char)F_ram_04CD_R & 0x07u);
     switch (trigger) {
     case 1u: case 7u: met = room_check_secret_trigger_all_dead(); break;
     case 2u:          met = room_check_secret_trigger_ringleader(); break;
@@ -1236,12 +1239,12 @@ void room_check_underworld_secrets(void)
     }
     if (!met || trigger != 7u)
         return;
-    if ((unsigned char)RAM(0x00ACu + 19u) == 0u)  /* ObjState+19: item active */
+    if ((unsigned char)F_ram_00BF_R == 0u)  /* ObjState+19: item active */
         return;
     if (progress_get_room_flag_uw_item_state() != 0u)
         return;
-    RAM(0x00ACu + 19u) = 0u;
-    RAM(0x0602u) = 0x02u;                        /* Tune1Request: item appears */
+    F_ram_00BF_R = 0u;
+    F_ram_0602_R = 0x02u;                        /* Tune1Request: item appears */
 }
 
 /* room_runtime.c:215-230. NES CheckSecretTriggerRingleader. */
@@ -1499,26 +1502,26 @@ void room_end_game_mode12(void)
 /* Coverage: FULL for types $62-$67. Stance: GREENFIELD per asm.    */
 /* --------------------------------------------------------------- */
 
-#define TO_OBJ_X(s)          RAM(0x0070u + (s))
-#define TO_OBJ_Y(s)          RAM(0x0084u + (s))
-#define TO_OBJ_DIR(s)        RAM(0x0098u + (s))
-#define TO_OBJ_STATE(s)      RAM(0x00ACu + (s))
-#define TO_OBJ_TIMER(s)      RAM(0x0028u + (s))
-#define TO_OBJ_TYPE(s)       RAM(0x034Fu + (s))
-#define TO_OBJ_GRID(s)       RAM(0x0394u + (s))
-#define TO_OBJ_META(s)       RAM(0x0405u + (s))
-#define TO_OBJ_UNINIT(s)     RAM(0x0492u + (s))
-#define TO_OBJ_ATTR(s)       RAM(0x04BFu + (s))
-#define TO_OBJ_INV(s)        RAM(0x04F0u + (s))
-#define TO_OBJ_SHOVE_DIR(s)  RAM(0x00C0u + (s))
-#define TO_OBJ_SHOVE_DIST(s) RAM(0x00D3u + (s))
-#define TO_TILE_OBJ_ROOM(s)  RAM(0x0412u + (s))   /* TileObjRoomId */
-#define TO_OBJ_INPUT_DIR     RAM(0x03F8u)
-#define TO_INV_BRACELET      RAM(0x0665u)
-#define TO_LBA_BYTE_F        RAM(0x04CDu)         /* LevelBlockAttrsByteF */
-#define TO_QUEST_NUMBERS(i)  RAM(0x062Du + (i))
-#define TO_CUR_SAVE_SLOT     RAM(0x0016u)
-#define TO_RETURN_TO_BANK4   RAM(0x00F7u)
+#define TO_OBJ_X(s)          F_ram_0070_R4((s))
+#define TO_OBJ_Y(s)          F_ram_0084_R4((s))
+#define TO_OBJ_DIR(s)        F_ram_0098_R3((s))
+#define TO_OBJ_STATE(s)      F_ram_00AC_R5((s))
+#define TO_OBJ_TIMER(s)      F_ram_0028_R4((s))
+#define TO_OBJ_TYPE(s)       F_ram_034F_R4((s))
+#define TO_OBJ_GRID(s)       F_ram_0394_R3((s))
+#define TO_OBJ_META(s)       F_NES_OBJ_METASTATE_BASE_R((s))
+#define TO_OBJ_UNINIT(s)     F_ram_0492_R2((s))
+#define TO_OBJ_ATTR(s)       F_ram_04BF_R((s))
+#define TO_OBJ_INV(s)        F_ram_04F0_R3((s))
+#define TO_OBJ_SHOVE_DIR(s)  F_ram_00C0_R2((s))
+#define TO_OBJ_SHOVE_DIST(s) F_ram_00D3_R2((s))
+#define TO_TILE_OBJ_ROOM(s)  F_ram_0412_R3((s))   /* TileObjRoomId */
+#define TO_OBJ_INPUT_DIR     F_ram_03F8_R
+#define TO_INV_BRACELET      F_ram_0665_R
+#define TO_LBA_BYTE_F        F_ram_04CD_R         /* LevelBlockAttrsByteF */
+#define TO_QUEST_NUMBERS(i)  F_ram_062D_R2((i))
+#define TO_CUR_SAVE_SLOT     F_ram_0016_R
+#define TO_RETURN_TO_BANK4   F_ram_00F7_R
 
 static const unsigned char k_rock_push_dirs[2] = { 0x08u, 0x04u };
 /* SecretQuestNumbers {0,0,1}; index 3 would read the next ROM byte, the
@@ -1575,16 +1578,16 @@ static void tile_obj_reveal_and_flag(unsigned char tile, unsigned int slot)
     flags = room_get_room_flags();
     ptr = (unsigned short)(((unsigned short)(unsigned char)SAVEFILE_PTR_HI << 8) |
                            (unsigned char)SAVEFILE_PTR_LO);
-    nes_ram[ptr + (unsigned char)CUR_ROOM_ID] = (uint8_t)(flags | 0x80u);
+    nes_ram[ptr + (unsigned char)CUR_ROOM_ID] = (uint8_t)(flags | 0x80u); /* native_ram bulk:dyn_ptr_table */
 }
 
 /* CheckTileObjWeaponCollision: weapon middle -> [04]/[05], tile object
  * middle -> [02]/[03], threshold $10. */
 static unsigned char tile_obj_weapon_collides(unsigned int slot, unsigned char weapon)
 {
-    RAM(0x0000u) = weapon;
-    RAM(0x0004u) = (uint8_t)((unsigned char)TO_OBJ_X(weapon) + 8u);
-    RAM(0x0005u) = (uint8_t)((unsigned char)TO_OBJ_Y(weapon) + 8u);
+    F_ram_0000_R = weapon;
+    F_ram_0004_R = (uint8_t)((unsigned char)TO_OBJ_X(weapon) + 8u);
+    F_ram_0005_R = (uint8_t)((unsigned char)TO_OBJ_Y(weapon) + 8u);
     world_get_object_middle(slot);
     return collision_do_objects_collide(0x10u);
 }
@@ -1621,11 +1624,11 @@ void room_update_rock_or_gravestone(unsigned int slot)
     }
 
     /* State 1: move, draw one pixel above the object. */
-    RAM(NES_OBJ_DIR) = (unsigned char)TO_OBJ_DIR(slot);
+    F_ram_000F_R2 = (unsigned char)TO_OBJ_DIR(slot);
     object_move_object((unsigned short)slot);
-    RAM(0x0000u) = (unsigned char)TO_OBJ_X(slot);      /* Anim_FetchObjPos... */
-    RAM(0x0001u) = (uint8_t)((unsigned char)TO_OBJ_Y(slot) - 1u);   /* DEC $01 */
-    RAM(0x000Fu) = 0u;
+    F_ram_0000_R = (unsigned char)TO_OBJ_X(slot);      /* Anim_FetchObjPos... */
+    F_ram_0001_R = (uint8_t)((unsigned char)TO_OBJ_Y(slot) - 1u);   /* DEC $01 */
+    F_ram_000F_R = 0u;
     draw_object_not_mirrored(0u, slot);
     {
         unsigned char g = (unsigned char)TO_OBJ_GRID(slot);
@@ -1670,17 +1673,17 @@ static const unsigned char k_pond_cycle_colors[12] = {
 void room_cue_pond_palette_row(unsigned char y)
 {
     unsigned char i;
-    for (i = 0u; i < 8u; ++i) RAM((unsigned short)(0x0302u + i)) = k_water_palette_row[i];
-    RAM(0x0308u) = k_pond_cycle_colors[y];       /* DynTileBuf+6 */
-    if (y == 0x0Au) RAM(0x034Au) = 0x99u;         /* ObjectFirstUnwalkableTile */
+    for (i = 0u; i < 8u; ++i) F_ram_0302_R3(i) = k_water_palette_row[i];
+    F_ram_0308_R = k_pond_cycle_colors[y];       /* DynTileBuf+6 */
+    if (y == 0x0Au) F_ram_034A_R2 = 0x99u;         /* ObjectFirstUnwalkableTile */
 }
 
 void room_update_flute_secret(unsigned int slot)
 {
-    const unsigned char y = (unsigned char)RAM(0x051Au);   /* SecretColorCycle */
+    const unsigned char y = (unsigned char)F_ram_051A_R;   /* SecretColorCycle */
     if (y >= 0x0Cu) return;
-    if (((unsigned char)RAM(0x0015u) & 0x07u) != 0x04u) return;
-    RAM(0x051Au) = (uint8_t)(y + 1u);
+    if (((unsigned char)F_ram_0015_R & 0x07u) != 0x04u) return;
+    F_ram_051A_R = (uint8_t)(y + 1u);
     if (y == 0x0Bu) {                                       /* RevealPondStairs */
         TO_OBJ_X(slot) = 0x60u;
         TO_OBJ_Y(slot) = 0x90u;
@@ -1693,9 +1696,9 @@ void room_update_flute_secret(unsigned int slot)
 /* AnimatePond: InitMode7_Sub0 while SecretColorCycle != 0. */
 void room_animate_pond(void)
 {
-    if (((unsigned char)RAM(0x0015u) & 0x04u) == 0u) return;
-    RAM(0x051Au) = (uint8_t)((unsigned char)RAM(0x051Au) - 1u);
-    room_cue_pond_palette_row((unsigned char)RAM(0x051Au));
+    if (((unsigned char)F_ram_0015_R & 0x04u) == 0u) return;
+    F_ram_051A_R = (uint8_t)((unsigned char)F_ram_051A_R - 1u);
+    room_cue_pond_palette_row((unsigned char)F_ram_051A_R);
 }
 
 /* NES source: Z_04:UpdateRockWall; Redux visible_secrets.asm:$8F08.
@@ -1726,7 +1729,7 @@ void room_update_tree(unsigned int slot)
         w = 0x11u;
         if ((unsigned char)TO_OBJ_STATE(w) != 0x22u) return;
     }
-    RAM(0x0000u) = w;                   /* NES @FoundFire: STY $00 (T-171) */
+    F_ram_0000_R = w;                   /* NES @FoundFire: STY $00 (T-171) */
     if ((unsigned char)TO_OBJ_TIMER(w) >= 0x02u) return;
     if (!tile_obj_weapon_collides(slot, w)) return;
     tile_obj_reveal_and_flag(0x70u, slot);

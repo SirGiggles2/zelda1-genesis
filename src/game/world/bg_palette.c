@@ -74,8 +74,8 @@ void roomrom_bg_palette_load_sprite_only(const unsigned char *palram32)
      * here all hold the green $29, so a ring left Link green (t121_ring1:
      * NES $32, Genesis $29). The level palette byte is the source. */
     for (i = 0; i < 16; i++) spr[i] = palram32[16 + i];
-    if (nes_ram[LEVEL_PALETTE_LINK_COLOR] != 0u)
-        spr[1] = nes_ram[LEVEL_PALETTE_LINK_COLOR];
+    if (F_ram_6B92_N != 0u)
+        spr[1] = F_ram_6B92_N;
     load_slot16(1, spr);
     /* Cache the 16 sprite-palram CRAM words. Retained for the beam
      * pal-cycle path (which reads sub-pal CRAM words to validate PAL2/3
@@ -115,12 +115,14 @@ void roomrom_bg_palette_load_sprite_only(const unsigned char *palram32)
         pal3[1] = roomrom_bg_palette_nes_to_cram(palram32[16 + 9]);   /* $3F19 */
         pal3[2] = roomrom_bg_palette_nes_to_cram(palram32[16 + 10]);  /* $3F1A */
         pal3[3] = roomrom_bg_palette_nes_to_cram(palram32[16 + 11]);  /* $3F1B */
-        /* T-317: free high entries for the green world-rupee tile. NES-
+        /* T-317: free high entries for the green and red world-rupee tiles. NES-
          * derived sprites use indices 0..3, so 13/14 do not collide. */
-        pal3[GREEN_RUPEE_PAL_BODY] =
-            roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_BODY);
-        pal3[GREEN_RUPEE_PAL_SHADE] =
-            roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_SHADE);
+        pal3[GREEN_RUPEE_PAL_SHADE] = roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_SHADE);
+        pal3[GREEN_RUPEE_PAL_BODY] = roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_BODY);
+        pal3[GREEN_RUPEE_PAL_LIGHT] = roomrom_bg_palette_nes_to_cram(GREEN_RUPEE_NES_LIGHT);
+        pal3[RED_RUPEE_PAL_SHADE] = roomrom_bg_palette_nes_to_cram(RED_RUPEE_NES_SHADE);
+        pal3[RED_RUPEE_PAL_BODY] = roomrom_bg_palette_nes_to_cram(RED_RUPEE_NES_BODY);
+        pal3[RED_RUPEE_PAL_LIGHT] = roomrom_bg_palette_nes_to_cram(RED_RUPEE_NES_LIGHT);
         render_load_palette(3u, pal3);
     }
 
@@ -149,7 +151,7 @@ void roomrom_bg_palette_refresh_link_color(void)
         render_cram_write_color(17u, roomrom_bg_palette_nes_to_cram(0x29u));
         return;
     }
-    const unsigned char c = nes_ram[LEVEL_PALETTE_LINK_COLOR];
+    const unsigned char c = F_ram_6B92_N;
     if (c == 0u) return;
     s_sprite_palram_cram[1] = roomrom_bg_palette_nes_to_cram(c);
     render_cram_write_color(17u, s_sprite_palram_cram[1]);   /* $3F11 */
@@ -200,7 +202,7 @@ void roomrom_ppu_mask_grayscale_init(void)
 
 void roomrom_ppu_mask_grayscale_sync(void)
 {
-    unsigned char want = (unsigned char)(nes_ram[NES_CUR_PPU_MASK] & 0x01u);
+    unsigned char want = (unsigned char)(F_ram_00FE_N & 0x01u);
     if (want == s_gray_active) return;
     render_cram_set_grayscale(want ? k_gray_by_word : (const unsigned short *)0);
     s_gray_active = want;

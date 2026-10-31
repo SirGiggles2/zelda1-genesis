@@ -15,34 +15,34 @@
 #define SAVEFILE_MASK_LO                ZP_TMP8
 #define SAVEFILE_MASK_HI                ZP_TMP9
 
-#define CUR_LEVEL                      RAM(0x0010)
-#define FRAME_COUNTER                  RAM(0x0015)
-#define MODE_VALUE                     RAM(0x0012)
-#define SUBMODE_VALUE                  RAM(0x0013)
-#define CUR_ROOM_FLAGS_PTR             RAM(0x00E8)
-#define MAP_FLASH_ATTR                 RAM(0x0256)
+#define CUR_LEVEL                      F_ram_0010_R2
+#define FRAME_COUNTER                  F_ram_0015_R3
+#define MODE_VALUE                     F_ram_0012_R3
+#define SUBMODE_VALUE                  F_ram_0013_R3
+#define CUR_ROOM_FLAGS_PTR             F_ram_00E8_R
+#define MAP_FLASH_ATTR                 F_MAP_FLASH_ATTR_R
 
-#define ROOM_TILE_OBJ_0                RAM(0x052B)
-#define ROOM_TILE_OBJ_1                RAM(0x052C)
-#define ROOM_TILE_OBJ_2                RAM(0x052D)
-#define PLAYER_MARKER_DISABLE          RAM(0x0522)
-#define POWER_TRIFORCE_FANFARE_FLAG    RAM(0x0509)
+#define ROOM_TILE_OBJ_0                F_ROOM_TILE_OBJ_0_R2
+#define ROOM_TILE_OBJ_1                F_ROOM_TILE_OBJ_1_R2
+#define ROOM_TILE_OBJ_2                F_ROOM_TILE_OBJ_2_R2
+#define PLAYER_MARKER_DISABLE          F_ram_0522_R2
+#define POWER_TRIFORCE_FANFARE_FLAG    F_POWER_TRIFORCE_FANFARE_FLAG_R
 /* NES Variables.inc:LastBossDefeated. The old drain called this HUD_DIRTY_FLAG;
  * keep that alias for oracle compatibility, but gameplay uses this name. */
-#define LAST_BOSS_DEFEATED             RAM(0x0672)
+#define LAST_BOSS_DEFEATED             F_LAST_BOSS_DEFEATED_R
 #define HUD_DIRTY_FLAG                 LAST_BOSS_DEFEATED
-#define CURTAIN_LEFT_COL               RAM(0x007C)
-#define CURTAIN_RIGHT_COL              RAM(0x007D)
-#define CURTAIN_TIMER                  RAM(0x0028)
-#define CUR_INV_TILE                   RAM(0x00FE)
+#define CURTAIN_LEFT_COL               F_ram_007C_R2
+#define CURTAIN_RIGHT_COL              F_ram_007D_R2
+#define CURTAIN_TIMER                  F_ram_0028_R2
+#define CUR_INV_TILE                   F_ram_00FE_R2
 
-#define MAP_MARKER_Y(idx)              RAM(0x0254 + (idx))
-#define MAP_MARKER_TILE(idx)           RAM(0x0255 + (idx))
-#define MAP_MARKER_ATTR(idx)           RAM(0x0256 + (idx))
-#define MAP_MARKER_X(idx)              RAM(0x0257 + (idx))
+#define MAP_MARKER_Y(idx)              F_ram_0254_R((idx))
+#define MAP_MARKER_TILE(idx)           F_ram_0255_R((idx))
+#define MAP_MARKER_ATTR(idx)           F_MAP_FLASH_ATTR_R2((idx))
+#define MAP_MARKER_X(idx)              F_ram_0257_R((idx))
 
 /* ---- Plan W: save / progress cells -------------------------------------- */
-#define PROG_CUR_LEVEL           RAM(NES_CUR_LEVEL)
-#define PROG_ITEMS_BY_LEVEL(off) RAM(NES_ITEMS_BY_LEVEL_BASE + (unsigned short)(off))
+#define PROG_CUR_LEVEL           F_ram_0010_R3
+#define PROG_ITEMS_BY_LEVEL(off) F_ram_0657_R7((unsigned short)(off))
 
 #endif

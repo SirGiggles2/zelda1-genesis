@@ -74,11 +74,11 @@ static void install_redux_hud_metadata(unsigned char level, unsigned char quest)
 {
     const unsigned char *record;
     if (!game_profile_is_remix()) return;
-    if (level == 0u) { RAM(0x6BACu) = 0xA0u; return; }
+    if (level == 0u) { F_NES_SRAM_BASE_6BAC_R = 0xA0u; return; }
     if (level > 9u || quest < 1u || quest > 2u) return;
     record = &core_redux_dungeon_hud[((quest - 1u) * 9u + level - 1u) * 48u];
-    RAM(0x6BACu) = record[0];
-    for (unsigned char i = 0u; i < record[1]; ++i) RAM(0x6BCDu + i) = record[2u + i];
+    F_NES_SRAM_BASE_6BAC_R = record[0];
+    for (unsigned char i = 0u; i < record[1]; ++i) F_ram_6BCD_R(i) = record[2u + i];
 }
 
 /* Blob offsets per data/rooms/MANIFEST.json. */
@@ -99,7 +99,7 @@ static void copy_to_nes_ram(unsigned short dst_nes_addr,
 {
     /* T-172: block copy (the byte loop was 6k instructions of every level
      * load, mode 3 Sub8 7 frames vs NES 4). */
-    sgdk_memcpy(&nes_ram[dst_nes_addr], src, (unsigned short)bytes);
+    sgdk_memcpy(&nes_ram[dst_nes_addr], src, (unsigned short)bytes); /* native_ram bulk:src/game/world/level_info_install.c:102 */
 }
 
 /* NES Z_06.asm UpdateMode2Load_Full @PatchQ2Rooms: 8 LevelBlockAttrsB
@@ -145,7 +145,7 @@ static unsigned char is_q2_ow_patch_cell(unsigned short k)
  * 4 frames vs NES 3). */
 static unsigned char lba_differs(const unsigned char *src, unsigned char skip_q2_cells)
 {
-    const unsigned long *a = (const unsigned long *)(unsigned long)&nes_ram[NES_LBA_A_BASE];
+    const unsigned long *a = (const unsigned long *)(unsigned long)&nes_ram[NES_LBA_A_BASE]; /* native_ram bulk:src/game/world/level_info_install.c:148 */
     const unsigned long *b = (const unsigned long *)(const void *)src;
     const unsigned long *const end = a + NES_LBA_BLOCK_BYTES / 4u;
     if ((unsigned long)src & 1u) return 1u;
@@ -155,7 +155,7 @@ static unsigned char lba_differs(const unsigned char *src, unsigned char skip_q2
             unsigned short k;
             if (!skip_q2_cells) return 1u;
             for (k = (unsigned short)(w * 4u); k < (unsigned short)(w * 4u + 4u); ++k)
-                if (nes_ram[NES_LBA_A_BASE + k] != src[k] && !is_q2_ow_patch_cell(k))
+                if (F_ram_687E_X(k) != src[k] && !is_q2_ow_patch_cell(k))
                     return 1u;
         }
         ++a;
@@ -172,13 +172,13 @@ void level_info_apply_q2_ow_patch(void)
     signed char i;
     for (i = 7; i >= 0; --i) {
         const unsigned short a = (unsigned short)(NES_LBA_A_BASE + 0x80u + offs[i]);
-        if (nes_ram[a] != vals[i]) changed = 1u;
-        nes_ram[a] = vals[i];                               /* AttrsB $68FE */
+        if (nes_ram[a] != vals[i]) changed = 1u; /* native_ram bulk:dyn_addr */
+        nes_ram[a] = vals[i];                               /* AttrsB $68FE */ /* native_ram bulk:dyn_addr */
     }
     for (i = 0; i < (signed char)Q2_OW_FIXED_CELLS; ++i) {
         const unsigned short a = (unsigned short)(NES_LBA_A_BASE + k_q2_ow_fixed_off[i]);
-        if (nes_ram[a] != k_q2_ow_fixed_val[i]) changed = 1u;
-        nes_ram[a] = k_q2_ow_fixed_val[i];   /* AttrsD+11/60/116, A+60/116, F+60/116 */
+        if (nes_ram[a] != k_q2_ow_fixed_val[i]) changed = 1u; /* native_ram bulk:dyn_addr */
+        nes_ram[a] = k_q2_ow_fixed_val[i];   /* AttrsD+11/60/116, A+60/116, F+60/116 */ /* native_ram bulk:dyn_addr */
     }
     if (changed) lba_changed();
 }

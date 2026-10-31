@@ -49,22 +49,22 @@
 #include "../../../engine/src/engine_state.h"  /* quest selector */
 
 /* NES RAM aliases. */
-#define M13_GAME_SUBMODE          RAM(0x0013u)
-#define M13_GAME_MODE             RAM(0x0012u)
-#define M13_OBJ_TIMER_0           RAM(0x0028u)
-#define M13_ITEM_LIFT_TIMER       RAM(0x0506u)
-#define M13_ENDING_FLASH_TIMER    RAM(0x004Du)
-#define M13_PEACE_DELAY           RAM(0x0412u)
-#define M13_PEACE_CHAR_INDEX      RAM(0x0413u)
-#define M13_TUNE0_REQUEST         RAM(0x0604u)
-#define M13_TILE_BUF_SELECTOR     RAM(0x0014u)
-#define M13_BUTTONS_PRESSED       RAM(0x00F8u)
-#define M13_CREDITS_TILE_OFFSET   RAM(0x050Bu)
-#define M13_VSCROLL_ADDR_HI       RAM(0x0058u)
-#define M13_VSCROLL_ADDR_LO       RAM(0x00E2u)
-#define M13_CUR_VSCROLL           RAM(0x00FCu)
-#define M13_SWITCH_NT_REQ         RAM(0x005Cu)
-#define M13_DYN_TILE_BUF(off)     RAM((unsigned short)(0x0302u + (off)))
+#define M13_GAME_SUBMODE          F_ram_0013_R
+#define M13_GAME_MODE             F_ram_0012_R
+#define M13_OBJ_TIMER_0           F_ram_0028_R
+#define M13_ITEM_LIFT_TIMER       F_ram_0506_R
+#define M13_ENDING_FLASH_TIMER    F_ram_004D_R
+#define M13_PEACE_DELAY           F_ram_0412_R
+#define M13_PEACE_CHAR_INDEX      F_ram_0413_R
+#define M13_TUNE0_REQUEST         F_ram_0604_R
+#define M13_TILE_BUF_SELECTOR     F_ram_0014_R
+#define M13_BUTTONS_PRESSED       F_ram_00F8_R
+#define M13_CREDITS_TILE_OFFSET   F_M13_CREDITS_TILE_OFFSET_R
+#define M13_VSCROLL_ADDR_HI       F_M13_VSCROLL_ADDR_HI_R
+#define M13_VSCROLL_ADDR_LO       F_ram_00E2_R
+#define M13_CUR_VSCROLL           F_M13_CUR_VSCROLL_R
+#define M13_SWITCH_NT_REQ         F_M13_SWITCH_NT_REQ_R
+#define M13_DYN_TILE_BUF(off)     F_ram_0302_R3((off))
 
 /* NES SRAM. */
 #define M13_NES_SRAM_BASE                  0x6000u
@@ -93,25 +93,25 @@ static void mode13_hide_all_sprites(void)
 {
     unsigned short i;
     enemy_render_reset_oam();
-    for (i = 0u; i < 256u; i += 4u) RAM(0x0200u + i) = 0xF8u;
+    for (i = 0u; i < 256u; i += 4u) F_ram_0200_R2(i) = 0xF8u;
     enemy_render_weapon_reset_all();
     s_draw_link = 0u;
 }
 static void mode13_draw_link_zelda_triforces(void)
 {
-    RAM(0x0083u) = RAM(0x0070u);
-    RAM(0x0097u) = (unsigned char)(RAM(0x0084u) - 0x10u);
-    RAM(0x0340u) = 0u; /* Native cache publication owner, not NES scratch. */
+    F_ram_0083_R = F_ram_0070_R;
+    F_ram_0097_R = (unsigned char)(F_ram_0084_R - 0x10u);
+    F_ram_0340_R = 0u; /* Native cache publication owner, not NES scratch. */
     draw_link_ending_pose();
     s_draw_link = 1u;
-    RAM(0x0340u) = 0x13u;
+    F_ram_0340_R = 0x13u;
     draw_animate_item_object(0x1Bu, 0x13u);
-    RAM(0x0340u) = 1u;
+    F_ram_0340_R = 1u;
     (void)sprite_anim_fetch_obj_pos(1u);
     draw_object_mirrored(1u, 1u);
-    RAM(0x0072u) = RAM(0x0071u);
-    RAM(0x0086u) = (unsigned char)(RAM(0x0085u) - 0x10u);
-    RAM(0x0340u) = 2u;
+    F_ram_0072_R = F_ENEMY_GLEEOK_BASE_X_R;
+    F_ram_0086_R = (unsigned char)(F_ENEMY_GLEEOK_BASE_Y_R - 0x10u);
+    F_ram_0340_R = 2u;
     draw_animate_item_object(0x1Bu, 2u);
 }
 static unsigned short s_credit_rows;
@@ -155,11 +155,11 @@ static void mode13_remix_staff_row(unsigned char row)
  * records; ending_render consumes them at the normal transfer boundary. */
 static void mode13_draw_credits(void)
 {
-    const unsigned char row = RAM(0x050Au);
-    const unsigned char page = RAM(0x050Cu);
-    const unsigned char line = RAM(0x050Du);
-    const unsigned char idx = RAM(0x050Eu);
-    const unsigned char quest = RAM(0x062Du + RAM(0x0016u));
+    const unsigned char row = F_ram_050A_R;
+    const unsigned char page = F_ram_050C_R;
+    const unsigned char line = F_ram_050D_R;
+    const unsigned char idx = F_ram_050E_R;
+    const unsigned char quest = F_ram_062D_R2(F_ram_0016_R);
     unsigned char i;
     for (i = 0u; i < 32u; ++i) M13_DYN_TILE_BUF(3u + i) = 0x24u;
     if (row == 1u || row == 0x2Eu)
@@ -186,20 +186,20 @@ static void mode13_draw_credits(void)
             for (i = 0u; i < len; ++i)
                 M13_DYN_TILE_BUF(3u + col + i) = nes_frontend_credits[off + 2u + i];
             if (idx == 0x11u) {
-                const unsigned char slot = RAM(0x0016u);
+                const unsigned char slot = F_ram_0016_R;
                 for (i = 0u; i < 8u; ++i)
-                    M13_DYN_TILE_BUF(12u + i) = RAM(0x0638u + 8u * slot + i);
-                cave_format_decimal_byte(RAM(0x0630u + slot));
-                for (i = 0u; i < 3u; ++i) M13_DYN_TILE_BUF(22u + i) = RAM(1u + i);
+                    M13_DYN_TILE_BUF(12u + i) = F_NES_SLOTINFO_NAMES_R(8u * slot, i);
+                cave_format_decimal_byte(F_ram_0630_R2(slot));
+                for (i = 0u; i < 3u; ++i) M13_DYN_TILE_BUF(22u + i) = F_ram_0001_R3(i);
             }
         }
-        ++RAM(0x050Eu);
+        ++F_ram_050E_R;
     }
     if (game_profile_is_remix()) mode13_remix_staff_row(row);
-    ++RAM(0x050Du);
-    if (RAM(0x050Du) == ((page & 3u) == 3u ? 6u : 8u)) {
-        RAM(0x050Du) = 0u;
-        RAM(0x050Cu) = (page == 11u) ? 0u : (unsigned char)(page + 1u);
+    ++F_ram_050D_R;
+    if (F_ram_050D_R == ((page & 3u) == 3u ? 6u : 8u)) {
+        F_ram_050D_R = 0u;
+        F_ram_050C_R = (page == 11u) ? 0u : (unsigned char)(page + 1u);
     }
     if ((row & 3u) == 0u) {
         M13_DYN_TILE_BUF(38u) = M13_DYN_TILE_BUF(45u) = 0u;
@@ -210,19 +210,19 @@ static void mode13_draw_credits(void)
     }
     i = (unsigned char)(row + 1u);
     if ((i & 31u) >= 30u) i = (unsigned char)(i + 2u);
-    RAM(0x050Au) = i;
+    F_ram_050A_R = i;
 }
 
 extern void roomrom_mode8_blank(void);
 static void mode13_end_game_mode(void)
 {
     unsigned short i;
-    RAM(0x0011u) = M13_GAME_SUBMODE = 0u; /* EndGameMode. */
+    F_ram_0011_R = M13_GAME_SUBMODE = 0u; /* EndGameMode. */
     M13_GAME_MODE = 0x0Du;
     roomrom_mode8_blank();
-    M13_CUR_VSCROLL = RAM(0x00FDu) = 0u; /* ResetPpuRegisters. */
-    RAM(0x00FFu) = 0x30u;
-    RAM(0x00FEu) &= 0xE7u; /* TurnOffAllVideo. */
+    M13_CUR_VSCROLL = F_ram_00FD_R = 0u; /* ResetPpuRegisters. */
+    F_ram_00FF_R = 0x30u;
+    F_ram_00FE_R &= 0xE7u; /* TurnOffAllVideo. */
     (void)core_silence_all_sound();
     /* Preserve completed quest and its statistics before the ending
      * changes the live profile. Unlock belongs only to CurSaveSlot. */
@@ -231,8 +231,8 @@ static void mode13_end_game_mode(void)
      * RAM owns the reset; save mode persists through the existing codec.
      * Other slots, this slot's name and death count remain intact. */
     (void)i;
-    (void)save_game_select_quest(RAM(0x0016u),1u);
-    (void)save_game_load_slot(RAM(0x0016u));
+    (void)save_game_select_quest(F_ram_0016_R,1u);
+    (void)save_game_load_slot(F_ram_0016_R);
     roomrom_main_set_quest(2u);
     inventory_sync_from_native();
     mode13_hide_all_sprites();
@@ -248,14 +248,14 @@ static void mode13_init(void)
     s_draw_link = 3u; /* Preserve sprites until the source redraws them. */
     switch (M13_GAME_SUBMODE) {
     case 0u:
-        if (M13_OBJ_TIMER_0 == 0u && RAM(0x0609u) == 0u) {
-            const unsigned char dec = RAM(0x007Cu), inc = RAM(0x007Du);
+        if (M13_OBJ_TIMER_0 == 0u && F_ram_0609_R == 0u) {
+            const unsigned char dec = F_ram_007C_R, inc = F_ram_007D_R;
             progress_update_world_curtain_effect_bank2();
-            if (RAM(0x007Cu) != dec) {
+            if (F_ram_007C_R != dec) {
                 if (inc < 32u) roomrom_mode12_blank_column(inc);
                 if (dec < 32u) roomrom_mode12_blank_column(dec);
             }
-            if (RAM(0x007Cu) < 0x11u) {
+            if (F_ram_007C_R < 0x11u) {
                 M13_OBJ_TIMER_0 = 0x80u;
                 ++M13_GAME_SUBMODE;
             }
@@ -265,21 +265,21 @@ static void mode13_init(void)
         goto draw_story;
     case 1u:
         for (i = 0u; i < 5u; ++i) M13_DYN_TILE_BUF(i) = nes_frontend_text[i];
-        RAM(0x045Fu) = 0xA4u;
-        RAM(0x0416u) = 0u;
-        RAM(0x00ADu) = 0u;
+        F_CAVE_TEXT_LINE_ADDR_LO_R = 0xA4u;
+        F_ram_0416_R = 0u;
+        F_CAVE_PERSON_STATE_R = 0u;
         ++M13_GAME_SUBMODE;
         return;
     case 2u:
-        if (RAM(0x0029u) == 0u) {
+        if (F_ram_0029_R == 0u) {
             unsigned char ch, idx, flags;
-            RAM(0x0029u) = 6u;
+            F_ram_0029_R = 6u;
             for (i = 0u; i < 5u; ++i)
                 M13_DYN_TILE_BUF(i) = nes_frontend_text[43u + i];
             do {
-                M13_DYN_TILE_BUF(1u) = RAM(0x045Fu);
-                ++RAM(0x045Fu);
-                idx = RAM(0x0416u)++;
+                M13_DYN_TILE_BUF(1u) = F_CAVE_TEXT_LINE_ADDR_LO_R;
+                ++F_CAVE_TEXT_LINE_ADDR_LO_R;
+                idx = F_ram_0416_R++;
                 if (idx >= 38u) return;
                 ch = nes_frontend_text[5u + idx];
             } while ((ch & 0x3Fu) == 0x25u);
@@ -288,21 +288,21 @@ static void mode13_init(void)
             flags = (unsigned char)(ch & 0xC0u);
             if (flags != 0u) {
                 i = (flags == 0xC0u) ? 2u : (flags == 0x40u) ? 1u : 0u;
-                RAM(0x045Fu) = nes_frontend_text[48u + i];
-                if (i == 2u) { ++RAM(0x00ADu); RAM(0x00ACu) = 0u; }
+                F_CAVE_TEXT_LINE_ADDR_LO_R = nes_frontend_text[48u + i];
+                if (i == 2u) { ++F_CAVE_PERSON_STATE_R; F_ram_00AC_R = 0u; }
             }
         }
-        if (RAM(0x00ADu) != 0u) { RAM(0x0029u) = 0x50u; ++M13_GAME_SUBMODE; }
+        if (F_CAVE_PERSON_STATE_R != 0u) { F_ram_0029_R = 0x50u; ++M13_GAME_SUBMODE; }
 draw_story:
-        RAM(0x03D0u) = 6u; /* Link_EndMoveAndDraw_Bank4. */
+        F_ram_03D0_R = 6u; /* Link_EndMoveAndDraw_Bank4. */
         roomrom_main_link_end_move_from_object();
         s_draw_link = 2u;
-        RAM(0x0340u) = 1u;
+        F_ram_0340_R = 1u;
         (void)sprite_anim_fetch_obj_pos(1u);
         draw_object_mirrored(0u, 1u);
         return;
     case 3u:
-        if (RAM(0x0029u) != 0u) return;
+        if (F_ram_0029_R != 0u) return;
         M13_TUNE0_REQUEST = 0x80u; /* SilenceSong through existing owner. */
         ++M13_GAME_SUBMODE;
         return;
@@ -310,7 +310,7 @@ draw_story:
         s_credit_rows = 0u;
         ending_render_reset();
         M13_CREDITS_TILE_OFFSET = 8u;
-        RAM(0x0011u) = 1u; /* BeginUpdateMode. */
+        F_ram_0011_R = 1u; /* BeginUpdateMode. */
         M13_GAME_SUBMODE = 0u;
         M13_PEACE_DELAY = M13_PEACE_CHAR_INDEX = 0u;
         mode13_hide_all_sprites();
@@ -329,7 +329,7 @@ static void mode13_sub0_flash(void)
     unsigned char timer = M13_ITEM_LIFT_TIMER;
 
     if (timer == 0xC0u) {
-        RAM(0x0600u) = 0x10u;  /* NES @AdvanceSubmode SongRequest. */
+        F_ram_0600_R = 0x10u;  /* NES @AdvanceSubmode SongRequest. */
         M13_OBJ_TIMER_0          = 0x40u;
         M13_ENDING_FLASH_TIMER   = 0x40u;
         M13_GAME_SUBMODE         = (unsigned char)(M13_GAME_SUBMODE + 1u);
@@ -342,7 +342,7 @@ static void mode13_sub0_flash(void)
     }
 
     for (unsigned char i = 0u; i <= 0x23u; ++i) {
-        M13_DYN_TILE_BUF(i) = nes_ram[M13_NES_SRAM_BASE +
+        M13_DYN_TILE_BUF(i) = nes_ram[M13_NES_SRAM_BASE + /* native_ram bulk:dyn_addr */
                                       M13_LEVEL_INFO_PALETTES_TRANSFER + i];
     }
     M13_DYN_TILE_BUF(19u) = k_ending_flash_colors[timer & 0x03u];
@@ -472,11 +472,11 @@ static void mode13_sub3_credits(void)
 static void mode13_sub4_finalize(void)
 {
     mode13_hide_all_sprites();
-    RAM(0x0072u) = 0x78u;
-    RAM(0x0086u) = 0x88u;
-    RAM(0x0340u) = 2u;
+    F_ram_0072_R = 0x78u;
+    F_ram_0086_R = 0x88u;
+    F_ram_0340_R = 2u;
     draw_animate_item_object(0x0Eu, 2u);
-    RAM(0x0351u) = 0x3Eu;
+    F_ram_0351_R = 0x3Eu;
     (void)sprite_anim_fetch_obj_pos(2u);
     draw_object_not_mirrored(0x0Bu, 2u);
 
@@ -494,7 +494,7 @@ static void mode13_sub4_finalize(void)
 
 void mode13_wingame_update(void)
 {
-    if (RAM(0x0011u) == 0u) { mode13_init(); return; }
+    if (F_ram_0011_R == 0u) { mode13_init(); return; }
     unsigned char submode = M13_GAME_SUBMODE;
     if (submode >= 3u)
         ending_render_scroll((unsigned short)((unsigned short)M13_VSCROLL_ADDR_LO * 240u +

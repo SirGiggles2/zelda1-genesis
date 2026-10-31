@@ -30,5 +30,7 @@
 
 void boss_gleeok_init(unsigned int slot);
 void boss_gleeok_update_head(unsigned int slot);
+void boss_gleeok_check_head_party_collisions(unsigned int slot, unsigned char player,
+                                             unsigned char context);
 
 #endif /* GAME_ENEMIES_BOSSES_BOSS_GLEEOK_H */

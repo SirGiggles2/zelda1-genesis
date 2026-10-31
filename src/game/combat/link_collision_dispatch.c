@@ -20,14 +20,23 @@
                                 * MON_STATUS_FLAGS, MON_HIT_REACTION,
                                 * MON_SHOVE_DIR, MON_SHOVE_TIMER, MON_SUBSTATE,
                                 * LINK_STUN_TIMER, OBJ_GRID_OFFSET */
+#include "player_state.h"
+#include "enemy_state.h"
 #include "object_state.h"      /* OBJ_X, OBJ_Y, OBJ_DIR */
 #include "progress_state.h"    /* MODE_VALUE */
 #include "link_state.h"              /* LINK_HALT_FLAG */
+#include "enemies/enemy_dispatch.h"
+#include "enemies/bosses/boss_patra.h"
+#include "enemies/bosses/boss_gohma.h"
+#include "enemies/bosses/boss_gleeok.h"
+#include "enemies/bosses/boss_dodongo.h"
 #include "core/core_dispatch.h"      /* core_play_sample, core_get_opposite_dir */
 #include "room/room_dispatch.h"      /* room_end_game_mode */
 #include "combat/collision_dispatch.h" /* collision_do_objects_collide_with_thresholds,
                                         * collision_check_monster_*_collision battery */
 #include "world/world_dispatch.h"      /* world_get_object_middle */
+#include "../items/sword_shot.h"
+#include "../../oracle/enemies/enemy_runtime.h"
 /* COMBAT_COLLIDED, MON_STUN_TIMER, LINK_DAMAGE_DISABLE_FLAG,
  * LINK_SHIELD_BLOCK_FLAG, SFX_COMBAT, ROOM_MONSTER_COLLISION_COUNT —
  * already in combat_state.h. */
@@ -261,15 +270,59 @@ __attribute__((always_inline)) void link_collision_check_link_collision(unsigned
     link_collision_check_link_collision_preinit(monster_slot);
 }
 
-/* T-172 option A: inlined into its callers (call overhead). */
-__attribute__((always_inline)) void link_collision_check_monster_collisions(unsigned int monster_slot)
+/* NES source: Z_04.asm:UpdateWallmaster/Burrower_AnimateDrawAndCheckCollisions.
+ * Drained C: enrt_update_wallmaster / enemy_burrower_collisions_enabled.
+ * Coverage: extra body/full/melee/beam collision admission.
+ * Stance: EXTEND owner phase gates before any collision effects. */
+static inline unsigned char party_monster_phase_is_inactive(unsigned int slot,
+                                                           unsigned char player)
 {
-    /* drain at link_collision_runtime.c:100-128. */
+    const unsigned char type = MON_TYPE(slot);
+    if (player == 0u) return 0u;
+    if (!((type == 0x27u && (OBJ_STATE(slot) == 0u ||
+                            enemy_capture_player(slot) == player)) ||
+          ((type == 0x0Fu || type == 0x10u || type == 0x11u) &&
+           !enemy_burrower_collisions_enabled(slot)))) return 0u;
+    ROOM_MONSTER_COLLISION_COUNT = 0u;
+    COMBAT_COLLIDED = 0u;
+    COMBAT_HARM_FLAG = 0u;
+    return 1u;
+}
+
+/* NES source: projectile-specific Link-contact phase gates.
+ * Drained C: enemy_projectile_runtime.c held arrow / boomerang spin gate.
+ * Coverage: PARTIAL extra body checks; P1 retains its world updater.
+ * Stance: EXTEND the per-player collision boundary without a second tick. */
+static inline void check_party_link_collision(unsigned int slot, unsigned char player)
+{
+    const unsigned char type = MON_TYPE(slot);
+    if (party_monster_phase_is_inactive(slot, player)) return;
+    if (player != 0u &&
+        ((type == 0x5Bu && F_ram_0028_O(slot) != 0u) ||
+         (type == 0x5Cu && OBJ_ANIM_TIMER(slot) == 1u))) {
+        ROOM_MONSTER_COLLISION_COUNT = 0u;
+        COMBAT_COLLIDED = 0u;
+        COMBAT_HARM_FLAG = 0u;
+        return;
+    }
+    link_collision_check_link_collision(slot);
+    if (player != 0u) enemy_finish_party_projectile_contact(slot);
+}
+
+/* T-172 option A: inlined into its callers (call overhead). */
+/* NES source: Z_01.asm:CheckMonsterCollisions weapon battery.
+ * Drained C: the existing battery below, unchanged call order.
+ * Coverage: world/party weapons plus user-approved carrying-hand rescue.
+ * Stance: EXTEND composition; weapon-only rescue never touches a captive. */
+static inline __attribute__((always_inline)) unsigned char check_monster_weapon_collisions(
+    unsigned int monster_slot, unsigned char melee_only, unsigned char player)
+{
     world_get_object_middle(monster_slot);
     if (!((unsigned char)MON_STATUS_FLAGS(monster_slot) & 0x20u)) {
         if ((unsigned char)MON_HIT_REACTION(monster_slot)) {
-            return;
+            return 0u;
         }
+        if (melee_only != 1u) {
         /* NES source: CheckMonsterCollisions + weapon-state rejection in
          * Z_01. Drained C: the same battery below; prior all-inactive gate.
          * Coverage: sword/beam, boomerang/food, bomb/fire named consumers.
@@ -282,7 +335,9 @@ __attribute__((always_inline)) void link_collision_check_monster_collisions(unsi
          * (CheckMonsterSlenderWeaponCollision copies $0D to $0E), bomb/fire $0D=$0E.
          * Replay those threshold stores in call order so the scratch matches NES
          * (T-292 C5: rod windup tick leaves $0D=$0E, $0E=$0C). */
-        if ((unsigned char)OBJ_STATE(15u)) {
+        /* Shared boomerang/food collision runs once in the world/P1 battery,
+         * including P2 throws. Extra batteries own only their weapons. */
+        if (melee_only == 0u && player == 0u && (unsigned char)OBJ_STATE(15u)) {
             collision_check_monster_boomerang_or_food_collision(monster_slot, 15u);
         } else {
             COMBAT_THRESHOLD_X = 10u;
@@ -290,36 +345,92 @@ __attribute__((always_inline)) void link_collision_check_monster_collisions(unsi
         }
         if ((unsigned char)OBJ_STATE(14u)) {
             collision_check_monster_sword_shot_or_magic_shot_collision(monster_slot, 14u);
+            /* NES source: Z_01:CheckMonsterCollisions/HandleShotBlocked.
+             * Drained C: the call immediately above. Coverage: state/dir
+             * collision outputs; Stance: EXTEND native owner handoff.
+             * Commit before any later slot/battery can observe the result. */
+            sword_shot_commit_collision(player);
         } else {
             COMBAT_THRESHOLD_X = 12u;
             COMBAT_THRESHOLD_Y = 12u;
         }
-        if ((unsigned char)OBJ_STATE(16u))
+        if (melee_only == 0u && player == 0u && (unsigned char)OBJ_STATE(16u))
             collision_check_monster_bomb_or_fire_collision(monster_slot, 16u);
         else
             COMBAT_THRESHOLD_X = 14u;
-        if ((unsigned char)OBJ_STATE(17u))
+        if (melee_only == 0u && player == 0u && (unsigned char)OBJ_STATE(17u))
             collision_check_monster_bomb_or_fire_collision(monster_slot, 17u);
         else
             COMBAT_THRESHOLD_X = 14u;
+        }
         if ((unsigned char)OBJ_STATE(13u) == 2u)
             collision_check_monster_sword_collision(monster_slot, 13u);
         /* The final check also establishes the NES scratch-cell result
          * consumed by later object work, even when its slot is empty. */
-        collision_check_monster_arrow_or_rod_collision(monster_slot, 18u);
+        if (!melee_only)
+            collision_check_monster_arrow_or_rod_collision(monster_slot, 18u);
     }
-    link_collision_check_link_collision(monster_slot);
+    return 1u;
+}
+
+static inline __attribute__((always_inline)) void check_monster_collisions(
+    unsigned int monster_slot, unsigned char melee_only, unsigned char player)
+{
+    /* drain at link_collision_runtime.c:100-128. */
+    if (party_monster_phase_is_inactive(monster_slot, player)) return;
+    /* NES source: Z_04.asm:UpdatePeahat/UpdateFlyingGhini.
+     * Drained C: enemy_flyer_bridge.c:enrt_update_peahat/flying_ghini.
+     * Coverage: FULL party weapon/body admission; P1 uses world tails.
+     * Stance: EXTEND the existing battery with the same state-5 gate. */
+    if (player != 0u &&
+        (MON_TYPE(monster_slot) == 0x22u ||
+         (MON_TYPE(monster_slot) == 0x1Au && ENEMY_AI_STATE(monster_slot) != 5u))) {
+        check_party_link_collision(monster_slot, player);
+        return;
+    }
+    /* NES source: Z_04.asm:UpdatePatra @LoopChildren/@CheckLinkCollision.
+     * Drained C: boss_patra_update / boss_patra_has_children.
+     * Coverage: extra-player full, melee and beam collision entry points.
+     * Stance: EXTEND admission to retain the boss-owned protected phase. */
+    if (player != 0u &&
+        ((unsigned char)MON_TYPE(monster_slot) == 0x47u ||
+         (unsigned char)MON_TYPE(monster_slot) == 0x48u) &&
+        boss_patra_has_children()) {
+        check_party_link_collision(monster_slot, player);
+        return;
+    }
+    /* NES source: UpdateMoldorm preserves dir/timer around its battery,
+     * then transfers a lethal segment hit to its tail. UpdateLamnola preserves
+     * direction only and uses its own tail. Drained C: enrt_update_moldorm /
+     * enrt_update_lamnola and their shared finish_collisions. Coverage: party
+     * full/melee/beam entries. Stance: EXTEND the original world tail. */
+    if (player != 0u && (MON_TYPE(monster_slot) == 0x41u ||
+        MON_TYPE(monster_slot) == 0x3Au || MON_TYPE(monster_slot) == 0x3Bu)) {
+        const unsigned char kind = MON_TYPE(monster_slot);
+        const unsigned char dir = OBJ_DIR(monster_slot);
+        const unsigned char timer = ENEMY_MOVE_TIMER(monster_slot);
+        if (!check_monster_weapon_collisions(monster_slot, melee_only, player)) return;
+        check_party_link_collision(monster_slot, player);
+        if (kind == 0x41u) ENEMY_MOVE_TIMER(monster_slot) = timer;
+        OBJ_DIR(monster_slot) = dir;
+        if (kind == 0x41u) enrt_moldorm_finish_collisions(monster_slot);
+        else enrt_lamnola_finish_collisions(monster_slot);
+        return;
+    }
+    if (!check_monster_weapon_collisions(monster_slot, melee_only, player)) return;
+    check_party_link_collision(monster_slot, player);
     {
         const unsigned char mtype = (unsigned char)MON_TYPE(monster_slot);
         const unsigned char dying = (unsigned char)MON_METASTATE(monster_slot);
         if (!dying) {
             if ((mtype == 0x27u || mtype == 0x17u) &&
                 (unsigned char)COMBAT_HARM_FLAG) {
-                MON_BOUNCE_TURNS(monster_slot) =
-                    (uint8_t)((unsigned char)MON_BOUNCE_TURNS(monster_slot) + 1u);
+                enemy_capture_contact(monster_slot, player);
             }
             return;
         }
+        if (player != 0u && mtype == 0x21u)
+            enemy_ghini_finish_collisions(monster_slot);
         if (mtype == 0x05u || mtype == 0x06u) {
             if ((unsigned char)OBJ_STATE(monster_slot) & 0x80u) {
                 const unsigned char bslot =
@@ -328,4 +439,144 @@ __attribute__((always_inline)) void link_collision_check_monster_collisions(unsi
             }
         }
     }
+}
+
+/* P1 and item contexts retain the full source battery. Sword-only contexts
+ * share every damage/contact/bookkeeping rule while leaving P1's unrelated
+ * weapon cells untouched. Skipped inactive prologues expose no gameplay output;
+ * the body path establishes its own scratch, flags and object center. */
+/* NES source: UpdateWallmaster captured draw path; explicit multiplayer rescue extension.
+ * Drained C: existing weapon battery and capture/death lifecycle.
+ * Coverage: P1 rescuing an extra captive; extra rescuers use their normal battery.
+ * Stance: EXTEND only while another party member is carried; 1P unchanged. */
+void link_collision_check_wallmaster_rescue(unsigned int slot)
+{
+    unsigned char owner;
+    if (g_player_count <= 1u || MON_TYPE(slot) != 0x27u) return;
+    owner = enemy_capture_player(slot);
+    if (owner == PLAYER_REF_NONE || owner == 0u) return;
+    (void)check_monster_weapon_collisions(slot, 0u, 0u);
+}
+
+__attribute__((always_inline))
+void link_collision_check_monster_collisions(unsigned int monster_slot)
+{
+    check_monster_collisions(monster_slot, 0u, 0u);
+}
+/* NES source: Z_04.asm:Ganon_CheckCollisions/ScenePhase2.
+ * Drained C: enemy_ganon_runtime.c boss-owned collision tail.
+ * Coverage: extra-player body, sword, beam-only and owned slot18 contexts.
+ * Stance: EXTEND only party entry points; retain the shared P1 helper. */
+static inline __attribute__((always_inline)) void check_party_monster_weapons(
+    unsigned int slot, unsigned char melee_only, unsigned char player)
+{
+    if (player >= 4u) return;
+    /* NES source: Z_04.asm:UpdateGleeokHead/reset tail.
+     * Drained C: boss_gleeok.c head collision owner.
+     * Coverage: PARTIAL extra loaded weapon contexts, preserved HP effects.
+     * Stance: EXTEND tail admission before world metastate dispatch. */
+    if (player != 0u && (unsigned char)MON_TYPE(slot) == 0x46u) {
+        boss_gleeok_check_head_party_collisions(slot, player, melee_only);
+        return;
+    }
+    /* NES source: Z_04.asm:Dodongo_CheckCollisionsStandardSize.
+     * Drained C: boss_dodongo.c party collision composition.
+     * Coverage: PARTIAL loaded extra sword/beam/owned-ranged contexts.
+     * Stance: EXTEND boss admission; shared P1 battery unchanged. */
+    if (player != 0u &&
+        ((unsigned char)MON_TYPE(slot) == 0x31u ||
+         (unsigned char)MON_TYPE(slot) == 0x32u)) {
+        boss_dodongo_check_party_collisions(slot, player, melee_only);
+        return;
+    }
+    if (player != 0u && (unsigned char)MON_TYPE(slot) == 0x3Eu) {
+        enemy_ganon_check_party_collisions(slot, melee_only == 0u ? 3u : 1u);
+        return;
+    }
+    if (player != 0u &&
+        ((unsigned char)MON_TYPE(slot) == 0x33u ||
+         (unsigned char)MON_TYPE(slot) == 0x34u)) {
+        boss_gohma_check_party_collisions(slot, player, melee_only);
+        return;
+    }
+    check_monster_collisions(slot, melee_only, player);
+}
+
+void link_collision_check_monster_collisions_for_player(unsigned int monster_slot,
+                                                       unsigned char player)
+{
+    check_party_monster_weapons(monster_slot, 0u, player);
+}
+void link_collision_check_monster_melee_collisions(unsigned int monster_slot)
+{
+    check_monster_collisions(monster_slot, 1u, 0u);
+}
+void link_collision_check_monster_melee_for_player(unsigned int slot, unsigned char player)
+{
+    check_party_monster_weapons(slot, 1u, player);
+}
+void link_collision_check_player_body(unsigned int slot, unsigned char player)
+{
+    if (player != 0u && (unsigned char)MON_TYPE(slot) == 0x46u) {
+        boss_gleeok_check_head_party_collisions(slot, player, 3u);
+        return;
+    }
+    /* NES source: Z_04.asm:Dodongo_CheckCollisions.
+     * Drained C: boss_dodongo.c:boss_dodongo_check_party_body.
+     * Coverage: PARTIAL extra idle body contexts; shared P1 battery unchanged.
+     * Stance: EXTEND party dispatch to the existing boss shape. */
+    if (player != 0u &&
+        ((unsigned char)MON_TYPE(slot) == 0x31u ||
+         (unsigned char)MON_TYPE(slot) == 0x32u)) {
+        boss_dodongo_check_party_body(slot, player);
+        return;
+    }
+    if (player != 0u && (unsigned char)MON_TYPE(slot) == 0x3Eu) {
+        enemy_ganon_check_party_collisions(slot, 0u);
+        return;
+    }
+    if (player != 0u &&
+        ((unsigned char)MON_TYPE(slot) == 0x33u ||
+         (unsigned char)MON_TYPE(slot) == 0x34u)) {
+        boss_gohma_check_party_collisions(slot, player, 3u);
+        return;
+    }
+    check_party_link_collision(slot, player);
+    if (MON_METASTATE(slot) == 0u && COMBAT_HARM_FLAG != 0u)
+        enemy_capture_contact(slot, player);
+}
+void link_collision_check_monster_sword_beam_collisions(unsigned int monster_slot,
+                                                       unsigned char player)
+{
+    check_party_monster_weapons(monster_slot, 2u, player);
+}
+
+/* NES source: Z_04.asm:Gohma_CheckCollisions/CheckMonsterCollisions.
+ * Drained C: native battery and body helper in this file.
+ * Coverage: one already-selected Gohma part, loaded party context.
+ * Stance: EXTEND callback boundary; do not re-enter boss dispatch. */
+void link_collision_check_gohma_part_for_player(unsigned int slot, unsigned char player,
+                                              unsigned char context)
+{
+    if (player >= 4u || context > 3u) return;
+    if (context == 3u) check_party_link_collision(slot, player);
+    else check_monster_collisions(slot, context, player);
+}
+
+/* Boss-selected part: context3 never reads unrelated weapon cells. */
+void link_collision_check_dodongo_part_for_player(unsigned int slot, unsigned char player,
+                                                 unsigned char context)
+{
+    if (player == 0u || player >= 4u || context > 3u) return;
+    if (context == 3u) check_party_link_collision(slot, player);
+    else check_monster_collisions(slot, context, player);
+}
+
+/* Already-selected flying-head part; no recursive boss dispatch. */
+void link_collision_check_gleeok_head_part(unsigned int slot, unsigned char player,
+                                           unsigned char context)
+{
+    if (player == 0u || player >= 4u || context > 3u) return;
+    if (context == 3u) check_party_link_collision(slot, player);
+    else check_monster_collisions(slot, context, player);
 }

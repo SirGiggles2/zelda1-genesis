@@ -67,7 +67,7 @@
  * for "sample 16", so InitGanon's roar never played; T-171). */
 static void play_sample(unsigned char sample_id)
 {
-    RAM(0x0601u) = sample_id;
+    F_ram_0601_R = sample_id;
 }
 
 /* ---------- NES static tables (verbatim bytes) ---------- */
@@ -100,34 +100,34 @@ static const unsigned char GanonColorTransferRecord[8] = {
 
 /* ---------- Ganon-specific RAM macros (per ObjVars.inc + Variables.inc) ---------- */
 
-#define GANON_SCENE_PHASE              RAM(0x0445u)
-#define GANON_OBJ_PHASE(slot)          OBJ(0x042Cu, (slot))
-#define GANON_OBJ_ANIMATION_FRAME(s)   OBJ(0x046Bu, (s))
-#define GANON_OBJ_CLOUD_DIST(slot)     OBJ(0x0478u, (slot))
-#define GANON_ITEM_TYPE_TO_LIFT        RAM(0x0505u)
-#define GANON_BRIGHTENING_ROOM         RAM(0x051Eu)
-#define GANON_FADE_CYCLE               RAM(0x051Cu)
-#define GANON_FRAME_COUNTER            RAM(0x0015u)
-#define GANON_DYNTILEBUF_LEN           RAM(0x0301u)
-#define GANON_DYNTILEBUF(idx)          RAM(0x0302u + (idx))
-#define GANON_INV_ARROW                RAM(0x0659u)
-#define GANON_CUR_OBJ_INDEX            RAM(0x0340u)
-#define GANON_SONG_REQUEST             RAM(0x0600u)
-#define GANON_TUNE1_REQUEST            RAM(0x0602u)
-#define GANON_OBJ_REM_DISTANCE(slot)   OBJ(0x0394u, (slot))
-#define GANON_OBJ_TIMER_SLOT0          RAM(0x0028u)  /* ObjTimer + 0 */
-#define GANON_OBJ_STATE_SLOT0          RAM(0x00ACu)  /* ObjState + 0 */
-#define GANON_ROOM_ITEM_STATE          OBJ(0x00ACu, 19u) /* ObjState+19 = room item */
-#define GANON_ROOM_ITEM_X              OBJ(NES_OBJ_X, 19u)
-#define GANON_ROOM_ITEM_Y              OBJ(NES_OBJ_Y, 19u)
-#define GANON_ROOM_KILL_COUNT          RAM(NES_OBJ_TYPE) /* ObjType+0 = kill counter */
-#define GANON_SHOT_OBJ_STATE_18        OBJ(0x00ACu, 18u)
+#define GANON_SCENE_PHASE              F_GANON_SCENE_PHASE_R
+#define GANON_OBJ_PHASE(slot)          F_ram_042C_O((slot))
+#define GANON_OBJ_ANIMATION_FRAME(s)   F_ram_046B_O((s))
+#define GANON_OBJ_CLOUD_DIST(slot)     F_ram_0478_O((slot))
+#define GANON_ITEM_TYPE_TO_LIFT        F_ram_0505_R
+#define GANON_BRIGHTENING_ROOM         F_ram_051E_R2
+#define GANON_FADE_CYCLE               F_ram_051C_R
+#define GANON_FRAME_COUNTER            F_ram_0015_R
+#define GANON_DYNTILEBUF_LEN           F_ram_0301_R3
+#define GANON_DYNTILEBUF(idx)          F_ram_0302_R2((idx))
+#define GANON_INV_ARROW                F_ram_0659_R
+#define GANON_CUR_OBJ_INDEX            F_ram_0340_R
+#define GANON_SONG_REQUEST             F_ram_0600_R
+#define GANON_TUNE1_REQUEST            F_ram_0602_R
+#define GANON_OBJ_REM_DISTANCE(slot)   F_ram_0394_O4((slot))
+#define GANON_OBJ_TIMER_SLOT0          F_ram_0028_R  /* ObjTimer + 0 */
+#define GANON_OBJ_STATE_SLOT0          F_ram_00AC_R  /* ObjState + 0 */
+#define GANON_ROOM_ITEM_STATE          F_ram_00AC_O(19u) /* ObjState+19 = room item */
+#define GANON_ROOM_ITEM_X              F_ram_0070_O2(19u)
+#define GANON_ROOM_ITEM_Y              F_ram_0084_O2(19u)
+#define GANON_ROOM_KILL_COUNT          F_ram_034F_R3 /* ObjType+0 = kill counter */
+#define GANON_SHOT_OBJ_STATE_18        F_ram_00AC_O(18u)
 #define GANON_SCRATCH_X                ZP_TMP0      /* [00] */
 #define GANON_SCRATCH_Y                ZP_TMP1      /* [01] */
 #define GANON_SCRATCH_03               ZP_TMP3      /* [03] sprite attrs */
-#define GANON_SCRATCH_07               RAM(0x0007u) /* [07] loop scratch */
-#define GANON_SCRATCH_0F               RAM(0x000Fu) /* [0F] H-flip flag */
-#define GANON_COLLISION_06             RAM(0x0006u) /* [06] collision result */
+#define GANON_SCRATCH_07               F_ram_0007_R /* [07] loop scratch */
+#define GANON_SCRATCH_0F               F_ram_000F_R /* [0F] H-flip flag */
+#define GANON_COLLISION_06             F_ram_0006_R /* [06] collision result */
 
 /* ---------- Forward decls ---------- */
 
@@ -143,7 +143,7 @@ static void ganon_set_up_burst_rays(unsigned int slot);
 static void ganon_draw_cloud(unsigned int slot);
 static void ganon_draw_burst(unsigned int slot);
 static void ganon_draw_ashes(unsigned int slot);
-static void ganon_check_collisions(unsigned int slot);
+static void ganon_check_collisions(unsigned int slot, unsigned char weapons);
 static void ganon_append_palette_row_transfer_record(unsigned char y_end);
 
 /* ---------- InitGanon (Z_04.asm:9599) ---------- */
@@ -159,7 +159,7 @@ void enrt_init_ganon(unsigned int slot)
 
     /* STA SampleRequest $02, then PlaySample (ORA / STA) the roar $10. */
     play_sample(0x02u);
-    RAM(0x0601u) = (unsigned char)(RAM(0x0601u) | 0x10u);
+    F_ram_0601_R = (unsigned char)(F_ram_0601_R | 0x10u);
 
     /* JMP ResetObjMetastateAndTimer. */
     core_reset_obj_metastate_and_timer(slot);
@@ -247,7 +247,7 @@ static void ganon_scene_phase2(unsigned int slot)
         return;
     }
 
-    ganon_check_collisions(slot);
+    ganon_check_collisions(slot, 3u);
     enrt_play_boss_hit_cry_if_needed(slot);
 
     if (ENEMY_STATE_TIMER(slot) != 0u) {
@@ -499,18 +499,18 @@ static void ganon_draw_ashes(unsigned int slot)
 
 /* ---------- Ganon_CheckCollisions (Z_04.asm:10838) ---------- */
 
-static void ganon_check_collisions(unsigned int slot)
+static void ganon_check_collisions(unsigned int slot, unsigned char weapons)
 {
     /* Calculate Ganon midpoint at offset (+$10, +$10) → [02]/[03]. */
-    RAM(0x0002u) = (unsigned char)(ENEMY_X(slot) + 0x10u);
-    RAM(0x0003u) = (unsigned char)(ENEMY_Y(slot) + 0x10u);
+    F_ram_0002_R = (unsigned char)(ENEMY_X(slot) + 0x10u);
+    F_ram_0003_R = (unsigned char)(ENEMY_Y(slot) + 0x10u);
 
     if (ENEMY_HIT_REACTION(0u) == 0u) {
         /* Link not invincible: init partial-collision-check return cells, run check. */
-        RAM(0x0006u) = 0x00u;
-        RAM(0x0009u) = 0x00u;
-        RAM(0x000Cu) = 0x00u;
-        RAM(0x0000u) = 0x00u;
+        F_ram_0006_R = 0x00u;
+        F_ZP_TMP9_R = 0x00u;
+        F_ram_000C_R = 0x00u;
+        F_ram_0000_R = 0x00u;
         lcrt_check_link_collision_preinit(slot);
     }
 
@@ -519,6 +519,7 @@ static void ganon_check_collisions(unsigned int slot)
         if (ENEMY_MOVE_TIMER(slot) != 0u) {
             return; /* Visible — can't be harmed. */
         }
+        if ((weapons & 1u) == 0u) return;
         colrt_check_monster_sword_collision(slot, 0x0Du);
 
         if (ENEMY_METASTATE(slot) != 0u) {
@@ -539,6 +540,7 @@ static void ganon_check_collisions(unsigned int slot)
     }
 
     /* Brown Ganon (state != 0): only silver arrow can hurt. */
+    if ((weapons & 2u) == 0u) return;
     if (GANON_INV_ARROW != 0x02u) {
         return;
     }
@@ -556,6 +558,18 @@ static void ganon_check_collisions(unsigned int slot)
     GANON_OBJ_PHASE(slot) = (unsigned char)(GANON_OBJ_PHASE(slot) + 1u);
     ENEMY_HIT_REACTION(slot) = 0x28u;
     GANON_OBJ_CLOUD_DIST(slot) = 0x08u;
+}
+
+/* NES source: Z_04.asm:UpdateGanon/ScenePhase2/Ganon_CheckCollisions.
+ * Drained C: ganon_check_collisions above (unchanged body/phase ownership).
+ * Coverage: PARTIAL party body/sword/arrow admission; no world update.
+ * Stance: EXTEND the existing boss collision tail for a loaded player.
+ * weapons: bit0 sword; bit1 slot18 arrow. Sword-only contexts must not
+ * inspect another player's unmapped slot18 bank. */
+void enrt_ganon_check_party_collisions(unsigned int slot, unsigned char weapons)
+{
+    if (GANON_SCENE_PHASE != 2u || GANON_OBJ_PHASE(slot) != 0u) return;
+    ganon_check_collisions(slot, weapons);
 }
 
 /* ---------- Ganon_AppendPaletteRowTransferRecord_{Brown,Blue,Triforce}

@@ -30,7 +30,7 @@ void roomld_reset_inv_obj_state(void) {
 }
 
 void roomld_fill_play_area_attrs(unsigned int room_id) {
-    unsigned char outer_sel = nes_ram[NES_SRAM_BASE + 0x087E + room_id] & 0x03;
+    unsigned char outer_sel = F_ram_687E_X6(room_id) & 0x03;
     unsigned char outer_attr = roomld_palette_to_nt_attr[outer_sel];
     unsigned char inner_sel;
     unsigned char inner_attr;
@@ -39,7 +39,7 @@ void roomld_fill_play_area_attrs(unsigned int room_id) {
     for (d3 = 0; d3 < 48; d3++)
         ROOM_PALETTE_ATTR(d3) = outer_attr;
 
-    inner_sel = nes_ram[NES_SRAM_BASE + 0x08FE + room_id] & 0x03;
+    inner_sel = F_ram_68FE_X5(room_id) & 0x03;
     inner_attr = roomld_palette_to_nt_attr[inner_sel];
 
     for (d3 = 9; d3 < 0x27; d3++) {
@@ -88,85 +88,85 @@ void roomld_init_link_speed(void) {
  * `level = CUR_LEVEL` reads in the Mode 2 loaders always got 16 (T-093). */
 
 static void roomld_reset_pattern_block_index(void) {
-    RAM(PATTERN_BLOCK_INDEX) = 0;
+    F_PATTERN_BLOCK_INDEX_R = 0;
 }
 
 static void roomld_fetch_pattern_block_addr_uw(void) {
     c_copy_bank_to_window(3);
-    unsigned char idx = RAM(PATTERN_BLOCK_INDEX);
+    unsigned char idx = F_PATTERN_BLOCK_INDEX_R;
     idx <<= 1;
-    RAM(0x0000) = PatternBlockSrcAddrsUW[idx];
-    RAM(0x0001) = PatternBlockSrcAddrsUW[idx + 1];
+    F_ram_0000_R3 = PatternBlockSrcAddrsUW[idx];
+    F_ram_0001_R2 = PatternBlockSrcAddrsUW[idx + 1];
 }
 
 static void roomld_fetch_pattern_block_info_ow(void) {
     c_copy_bank_to_window(3);
-    unsigned char idx = RAM(PATTERN_BLOCK_INDEX);
+    unsigned char idx = F_PATTERN_BLOCK_INDEX_R;
     idx <<= 1;
-    RAM(0x0000) = PatternBlockSrcAddrsOW[idx];
-    RAM(0x0002) = PatternBlockSizesOW[idx];
-    RAM(0x0001) = PatternBlockSrcAddrsOW[idx + 1];
-    RAM(0x0003) = PatternBlockSizesOW[idx + 1];
+    F_ram_0000_R3 = PatternBlockSrcAddrsOW[idx];
+    F_ram_0002_R2 = PatternBlockSizesOW[idx];
+    F_ram_0001_R2 = PatternBlockSrcAddrsOW[idx + 1];
+    F_ram_0003_R3 = PatternBlockSizesOW[idx + 1];
 }
 
 static void roomld_fetch_pattern_block_addr_uw_special(void) {
     c_copy_bank_to_window(3);
     unsigned char idx = CUR_LEVEL;
     idx <<= 1;
-    RAM(0x0000) = LevelPatternBlockSrcAddrs[idx];
-    RAM(0x0001) = LevelPatternBlockSrcAddrs[idx + 1];
+    F_ram_0000_R3 = LevelPatternBlockSrcAddrs[idx];
+    F_ram_0001_R2 = LevelPatternBlockSrcAddrs[idx + 1];
 }
 
 static void roomld_fetch_pattern_block_uw_boss(void) {
     c_copy_bank_to_window(3);
     unsigned char idx = CUR_LEVEL;
     idx <<= 1;
-    RAM(0x0000) = BossPatternBlockSrcAddrs[idx];
-    RAM(0x0001) = BossPatternBlockSrcAddrs[idx + 1];
+    F_ram_0000_R3 = BossPatternBlockSrcAddrs[idx];
+    F_ram_0001_R2 = BossPatternBlockSrcAddrs[idx + 1];
 }
 
 static void roomld_fetch_pattern_block_size_uw(void) {
-    unsigned char idx = RAM(PATTERN_BLOCK_INDEX);
+    unsigned char idx = F_PATTERN_BLOCK_INDEX_R;
     idx <<= 1;
-    RAM(0x0002) = PatternBlockSizesUW[idx];
-    RAM(0x0003) = PatternBlockSizesUW[idx + 1];
+    F_ram_0002_R2 = PatternBlockSizesUW[idx];
+    F_ram_0003_R3 = PatternBlockSizesUW[idx + 1];
 }
 
 static void roomld_transfer_pattern_block_bank3(void) {
-    unsigned char idx = RAM(PATTERN_BLOCK_INDEX);
+    unsigned char idx = F_PATTERN_BLOCK_INDEX_R;
     idx <<= 1;
     c_ppu_write_6(PatternBlockPpuAddrs[idx]);
     c_ppu_write_6(PatternBlockPpuAddrs[idx + 1]);
 
     for (;;) {
-        unsigned char lo = RAM(0x0000);
-        unsigned char hi = RAM(0x0001);
+        unsigned char lo = F_ram_0000_R3;
+        unsigned char hi = F_ram_0001_R2;
         unsigned short addr = ((unsigned short)hi << 8) | lo;
-        unsigned char val = nes_ram[addr];
+        unsigned char val = nes_ram[addr]; /* native_ram bulk:dyn_addr */
         c_ppu_write_7(val);
 
-        lo = RAM(0x0000);
+        lo = F_ram_0000_R3;
         lo++;
-        RAM(0x0000) = lo;
+        F_ram_0000_R3 = lo;
         if (lo == 0) {
-            hi = RAM(0x0001);
+            hi = F_ram_0001_R2;
             hi++;
-            RAM(0x0001) = hi;
+            F_ram_0001_R2 = hi;
         }
 
-        unsigned char cnt_lo = RAM(0x0003);
-        unsigned char cnt_hi = RAM(0x0002);
+        unsigned char cnt_lo = F_ram_0003_R3;
+        unsigned char cnt_hi = F_ram_0002_R2;
         if (cnt_lo == 0) {
             cnt_hi--;
-            RAM(0x0002) = cnt_hi;
+            F_ram_0002_R2 = cnt_hi;
         }
         cnt_lo--;
-        RAM(0x0003) = cnt_lo;
+        F_ram_0003_R3 = cnt_lo;
 
-        if (RAM(0x0002) == 0 && RAM(0x0003) == 0)
+        if (F_ram_0002_R2 == 0 && F_ram_0003_R3 == 0)
             break;
     }
-    RAM(PATTERN_BLOCK_INDEX)++;
+    F_PATTERN_BLOCK_INDEX_R++;
 }
 
 static void roomld_transfer_level_pattern_blocks_uw(void) {
@@ -174,7 +174,7 @@ static void roomld_transfer_level_pattern_blocks_uw(void) {
         roomld_fetch_pattern_block_addr_uw();
         roomld_fetch_pattern_block_size_uw();
         roomld_transfer_pattern_block_bank3();
-    } while (RAM(PATTERN_BLOCK_INDEX) != 2);
+    } while (F_PATTERN_BLOCK_INDEX_R != 2);
 
     roomld_fetch_pattern_block_addr_uw_special();
     roomld_fetch_pattern_block_size_uw();
@@ -200,50 +200,50 @@ void roomld_transfer_level_pattern_blocks(void) {
     do {
         roomld_fetch_pattern_block_info_ow();
         roomld_transfer_pattern_block_bank3();
-    } while (RAM(PATTERN_BLOCK_INDEX) != 2);
+    } while (F_PATTERN_BLOCK_INDEX_R != 2);
 }
 
 /* ---- Plan F: drained from z_06 (level info / Q2 patches) -------------- */
 
 static void roomld_copy_block_rom(const unsigned char *src) {
     for (;;) {
-        unsigned short dest = ((unsigned short)RAM(0x0003) << 8) | RAM(0x0002);
-        nes_ram[dest] = *src;
+        unsigned short dest = ((unsigned short)F_ram_0003_R3 << 8) | F_ram_0002_R2;
+        nes_ram[dest] = *src; /* native_ram bulk:dyn_addr */
 
-        if (RAM(0x0002) == RAM(0x0004) && RAM(0x0003) == RAM(0x0005)) {
+        if (F_ram_0002_R2 == F_ram_0004_R2 && F_ram_0003_R3 == F_ram_0005_R2) {
             SUBMODE_VALUE++;
             return;
         }
 
-        unsigned char lo = RAM(0x0002);
+        unsigned char lo = F_ram_0002_R2;
         lo++;
-        RAM(0x0002) = lo;
+        F_ram_0002_R2 = lo;
         if (lo == 0)
-            RAM(0x0003)++;
+            F_ram_0003_R3++;
 
         src++;
     }
 }
 
 static void roomld_fetch_level_block_dest_info(void) {
-    RAM(0x0002) = 0x7E;
-    RAM(0x0003) = 0x68;
-    RAM(0x0004) = 0x7D;
-    RAM(0x0005) = 0x6B;
+    F_ram_0002_R2 = 0x7E;
+    F_ram_0003_R3 = 0x68;
+    F_ram_0004_R2 = 0x7D;
+    F_ram_0005_R2 = 0x6B;
 }
 
 static void roomld_fetch_level_info_dest_info(void) {
-    RAM(0x0002) = 0x7E;
-    RAM(0x0003) = 0x6B;
-    RAM(0x0004) = 0x7D;
-    RAM(0x0005) = 0x6C;
+    F_ram_0002_R2 = 0x7E;
+    F_ram_0003_R3 = 0x6B;
+    F_ram_0004_R2 = 0x7D;
+    F_ram_0005_R2 = 0x6C;
 }
 
 static void roomld_fetch_dest_addr_for_common_data_block(void) {
-    RAM(0x0002) = 0xF0;
-    RAM(0x0003) = 0x67;
-    RAM(0x0004) = 0x7D;
-    RAM(0x0005) = 0x68;
+    F_ram_0002_R2 = 0xF0;
+    F_ram_0003_R3 = 0x67;
+    F_ram_0004_R2 = 0x7D;
+    F_ram_0005_R2 = 0x68;
 }
 
 static void roomld_init_mode2_sub0(void) {
@@ -287,15 +287,15 @@ static void roomld_patch_q2_rooms(void) {
     for (signed char i = 7; i >= 0; i--) {
         unsigned char off = LevelBlockAttrsBQ2ReplacementOffsets[i];
         unsigned char val = LevelBlockAttrsBQ2ReplacementValues[i];
-        nes_ram[NES_SRAM_BASE + 0x08FE + off] = val;
+        F_ram_68FE_X5(off) = val;
     }
-    nes_ram[NES_SRAM_BASE + 0x0A09] = 123;
-    nes_ram[NES_SRAM_BASE + 0x0A3A] = 123;
-    nes_ram[NES_SRAM_BASE + 0x0A72] = 90;
-    nes_ram[NES_SRAM_BASE + 0x08BA] = 114;
-    nes_ram[NES_SRAM_BASE + 0x08F2] = 114;
-    nes_ram[NES_SRAM_BASE + 0x0B3A] = 1;
-    nes_ram[NES_SRAM_BASE + 0x0B72] = 0;
+    F_NES_SRAM_BASE_6A09_N = 123;
+    F_NES_SRAM_BASE_6A3A_N = 123;
+    F_NES_SRAM_BASE_6A72_N = 90;
+    F_NES_SRAM_BASE_68BA_N = 114;
+    F_NES_SRAM_BASE_68F2_N = 114;
+    F_NES_SRAM_BASE_6B3A_N = 1;
+    F_NES_SRAM_BASE_6B72_N = 0;
 }
 
 void roomld_update_mode2_load_full(void) {
@@ -313,15 +313,15 @@ void roomld_update_mode2_load_full(void) {
     }
 
     unsigned char idx = level << 1;
-    RAM(0x0000) = LevelInfoUWQ2ReplacementAddrs[idx - 2];
-    RAM(0x0001) = LevelInfoUWQ2ReplacementAddrs[idx - 1];
+    F_ram_0000_R3 = LevelInfoUWQ2ReplacementAddrs[idx - 2];
+    F_ram_0001_R2 = LevelInfoUWQ2ReplacementAddrs[idx - 1];
 
     unsigned char count = LevelInfoUWQ2ReplacementSizes[level - 1];
     for (signed char i = (signed char)count; i >= 0; i--) {
-        unsigned char ptr_lo = RAM(0x0000);
-        unsigned char ptr_hi = RAM(0x0001);
+        unsigned char ptr_lo = F_ram_0000_R3;
+        unsigned char ptr_hi = F_ram_0001_R2;
         unsigned short src_addr = ((unsigned short)ptr_hi << 8) | ptr_lo;
-        unsigned char val = nes_ram[src_addr + (unsigned char)i];
-        nes_ram[NES_SRAM_BASE + 0x0BA7 + (unsigned char)i] = val;
+        unsigned char val = nes_ram[src_addr + (unsigned char)i]; /* native_ram bulk:dyn_addr */
+        F_NES_SRAM_BASE_6BA7_X2((unsigned char)i) = val;
     }
 }

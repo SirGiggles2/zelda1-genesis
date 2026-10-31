@@ -49,6 +49,9 @@ typedef struct {
 } rr_warp_save_state_t;
 
 void roomrom_world_transition_init(void);
+/* Actor-local OW tile-step observation; shared warp state is unchanged. */
+signed char roomrom_world_transition_previous_grid(void);
+void roomrom_world_transition_set_previous_grid(signed char grid);
 void roomrom_world_transition_tick(void);
 /* T-132: fill `out` with the OW return of a dungeon level exit (the latched
  * entrance); 0 when nothing was latched. */

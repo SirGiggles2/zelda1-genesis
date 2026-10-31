@@ -5,7 +5,9 @@
  */
 
 #include "collision_dispatch.h"
+#include "terrain_query.h"
 #include "../../state/game_profile.h"
+#include "../../state/weapon_state.h"
 #include <stdint.h>
 #include "platform_abi.h"
 #include "combat_state.h"      /* COMBAT_*, COMBAT_HITBOX_X/Y, COMBAT_THRESHOLD_X/Y, COMBAT_COLLIDED, COMBAT_ABS_DX/DY, COMBAT_PART_INDEX */
@@ -17,27 +19,6 @@
 #include "combat/combat_runtime.h"     /* roomrom_combat_is_redux */
 #include "combat/link_collision_dispatch.h" /* link_collision_begin_shove */
 #include "enemies/enemy_dispatch.h"    /* enemy_gohma_handle_weapon_collision */
-
-/* NES Z_07.asm PlayAreaColumnAddrs (line 336): 32 LE 16-bit pointers
- * pointing into nes_ram (SRAM range $6500..$67DA). Baked inline. */
-static const unsigned char k_play_area_column_addrs[64] = {
-    0x30u, 0x65u, 0x46u, 0x65u, 0x5Cu, 0x65u, 0x72u, 0x65u,
-    0x88u, 0x65u, 0x9Eu, 0x65u, 0xB4u, 0x65u, 0xCAu, 0x65u,
-    0xE0u, 0x65u, 0xF6u, 0x65u, 0x0Cu, 0x66u, 0x22u, 0x66u,
-    0x38u, 0x66u, 0x4Eu, 0x66u, 0x64u, 0x66u, 0x7Au, 0x66u,
-    0x90u, 0x66u, 0xA6u, 0x66u, 0xBCu, 0x66u, 0xD2u, 0x66u,
-    0xE8u, 0x66u, 0xFEu, 0x66u, 0x14u, 0x67u, 0x2Au, 0x67u,
-    0x40u, 0x67u, 0x56u, 0x67u, 0x6Cu, 0x67u, 0x82u, 0x67u,
-    0x98u, 0x67u, 0xAEu, 0x67u, 0xC4u, 0x67u, 0xDAu, 0x67u
-};
-
-/* NES Z_07.asm WalkableTiles (line 2099): 9 bytes. */
-/* NES WalkableTiles (9 entries) as a lookup by tile id (T-125: the 9-entry
- * scan ran for every object on every frame). */
-static const unsigned char k_walkable_tile[256] = {
-    [0x8Du] = 1u, [0x91u] = 1u, [0x9Cu] = 1u, [0xACu] = 1u, [0xADu] = 1u,
-    [0xCCu] = 1u, [0xD2u] = 1u, [0xD5u] = 1u, [0xDFu] = 1u
-};
 
 /* SwordDamagePoints[3] — sword level 1/2/3 damage. NES drain
  * at collision_runtime.c:6. */
@@ -85,89 +66,46 @@ unsigned char collision_do_objects_collide(unsigned int threshold)
     return collision_do_objects_collide_with_thresholds();
 }
 
-/* Leaves the column address in [00:01] as the NES does (CheckLadder reads
- * [00] after GetCollidingTileMoving; T-171 compares it everywhere). */
+/* Query uses explicit coordinates. Only this remaining ABI bridge publishes
+ * scratch and collided-tile cells for unmigrated enemy/ladder/speed consumers. */
+static inline __attribute__((always_inline)) TerrainTileResult query_tile(
+    unsigned char x, unsigned char y, unsigned char dir,
+    unsigned char hotspot, unsigned char is_player)
+{
+    TerrainQueryView world = { &nes_ram[0x6530u], ENEMY_DARK_ROOM_FLAG, /* native_ram bulk:src/game/combat/collision_dispatch.c:75 */
+                               ENEMY_CANDLE_ROOM_ID };
+    return terrain_query_tile(&world, x, y, dir, hotspot, is_player);
+}
+static inline __attribute__((always_inline)) void publish_tile(
+    TerrainTileResult result, unsigned int slot)
+{
+    unsigned short legacy_column = (unsigned short)(0x6530u + result.column * 22u);
+    F_ram_0000_N2 = (unsigned char)legacy_column;
+    F_ram_0001_N2 = (unsigned char)(legacy_column >> 8);
+    ENEMY_COLLIDED_TILE(slot) = result.tile;
+}
 static inline __attribute__((always_inline)) unsigned char
 collidable_tile(unsigned int hotspot_offset, unsigned int slot)
 {
-    /* drain at collision_runtime.c:239-308. NES GetCollidableTile. */
-    COMBAT_HITBOX_X = (uint8_t)hotspot_offset;
-    const unsigned char y_pos = (unsigned char)OBJ_TILE_Y(slot);
-    const unsigned char adjusted_y = (uint8_t)(y_pos + 0x0Bu);
-    const unsigned char dir = COMBAT_PART_INDEX;
-
-    unsigned char tile_y = adjusted_y;
-    unsigned char tile_x;
-
-    if (dir & 0x0Cu) {
-        if (dir & 0x04u) {
-            if (adjusted_y < 0xDDu) {
-                tile_y =
-                    (uint8_t)(adjusted_y + (unsigned char)hotspot_offset);
-            }
-        } else {
-            tile_y = (uint8_t)(adjusted_y + (unsigned char)hotspot_offset);
-        }
-        tile_x = (unsigned char)OBJ_TILE_X(slot);
-    } else {
-        tile_x = (unsigned char)OBJ_TILE_X(slot);
-        if (dir & 0x01u) {
-            if (tile_x < 0xF0u) {
-                tile_x = (uint8_t)(tile_x + (unsigned char)hotspot_offset);
-            }
-        } else {
-            if (tile_x >= 0x10u) {
-                tile_x = (uint8_t)(tile_x + (unsigned char)hotspot_offset);
-            }
-        }
-    }
-
-    const unsigned char col_idx = (unsigned char)((tile_x & 0xF8u) >> 2);
-    const unsigned short col_addr =
-        (unsigned short)(((unsigned short)k_play_area_column_addrs[col_idx]) |
-                         ((unsigned short)k_play_area_column_addrs[col_idx + 1u] << 8));
-    nes_ram[0x0000u] = k_play_area_column_addrs[col_idx];
-    nes_ram[0x0001u] = k_play_area_column_addrs[col_idx + 1u];
-
-    /* NES SBC #$40 wraps at 8 bits before the LSRs (T-147: a red leever
-     * placed at Y $FD -> adjusted Y $08 -> row $19, the next column's row
-     * 3; the int subtraction gave row $F9). */
-    const unsigned char row_idx = (unsigned char)((unsigned char)(tile_y - 0x40u) >> 3);
-
-    unsigned char tile = (unsigned char)nes_ram[col_addr + row_idx];
-    ENEMY_COLLIDED_TILE(slot) = tile;
-
-    if (dir & 0x0Cu) {
-        const unsigned char next_row = (uint8_t)(row_idx + 0x16u);
-        const unsigned char next_tile =
-            (unsigned char)nes_ram[col_addr + next_row];
-        if (next_tile >= tile) {
-            RAM(0x049E + slot) = next_tile;
-        }
-    }
-
-    tile = (unsigned char)ENEMY_COLLIDED_TILE(slot);
-
-    if (ENEMY_DARK_ROOM_FLAG == 0u) {
-        tile = (unsigned char)ENEMY_COLLIDED_TILE(slot);
-        if (k_walkable_tile[tile]) {
-            tile = 0x26u;
-        }
-        ENEMY_COLLIDED_TILE(slot) = tile;
-
-        if (slot == 0u) {
-            if (ENEMY_CANDLE_ROOM_ID == 0x1Fu) {
-                if (dir & 0x0Cu) {
-                    if (ENEMY_PLAYER_OBJ_X == 0x80u &&
-                        ENEMY_PLAYER_OBJ_Y < 0x56u) {
-                        ENEMY_COLLIDED_TILE(0) = 0x26u;
-                    }
-                }
-            }
-        }
-    }
-
-    return (unsigned char)ENEMY_COLLIDED_TILE(slot);
+    TerrainTileResult result;
+    COMBAT_HITBOX_X = (unsigned char)hotspot_offset;
+    result = query_tile(OBJ_TILE_X(slot), OBJ_TILE_Y(slot), COMBAT_PART_INDEX,
+                        (unsigned char)hotspot_offset, slot == 0u);
+    publish_tile(result, slot);
+    return result.tile;
+}
+unsigned char collision_get_player_moving_tile(unsigned char x, unsigned char y,
+    unsigned char dir, unsigned char publish_legacy)
+{
+    unsigned char hotspot = 0xF8u;
+    TerrainTileResult result;
+    if (dir & 5u) hotspot = (dir & 4u) ? 8u : 16u;
+    /* Retain the old live scratch output even for nonpublishing probes.
+     * Player position/direction cells are never borrowed or overwritten. */
+    COMBAT_HITBOX_X = hotspot;
+    result = query_tile(x, y, dir, hotspot, 1u);
+    if (publish_legacy) publish_tile(result, 0u);
+    return result.tile;
 }
 
 unsigned char collision_get_collidable_tile(unsigned int hotspot_offset,
@@ -204,7 +142,7 @@ unsigned char collision_moving_tile_is_obstacle(unsigned char tile)
 {
     if (tile >= 0x54u && tile < 0x60u && game_profile_is_remix())
         return 1u;
-    return (unsigned char)(tile >= RAM(0x034Au));
+    return (unsigned char)(tile >= F_ram_034A_R2);
 }
 
 /* --------------------------------------------------------------- */
@@ -265,6 +203,9 @@ __attribute__((always_inline)) void collision_check_monster_weapon_collision(uns
         if (inv) {
             core_play_parry_tune();
         }
+        /* The player boomerang must retain the collision-selected return
+         * state; its next native update must not republish outbound state. */
+        g_player_boomerang.state = 80u;
         OBJ_STATE(weapon_slot) = 80u;
         if (inv) {
             return;

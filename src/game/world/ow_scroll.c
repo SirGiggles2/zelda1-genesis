@@ -19,6 +19,8 @@
  * picture glides, 4 px (OW) / 2 px (UW) every frame, the horizontal
  * speeds, and lands on the last row step (measured with
  * tools/lockstep/transition_smooth.py). CLASSIC shows the NES steps.
+ * T-409 SCROLL SPEED (Remix): the caller runs 2 or 4 whole NES frames per
+ * video frame during the mode 7 update; NES state is unchanged.
  */
 #include "ow_scroll.h"
 #include "platform_abi.h"
@@ -35,15 +37,15 @@
 #include "../hud/hud_runtime.h"
 #include "../enemies/enemy_dispatch.h" /* transient shield room lifetime */
 
-#define UPD nes_ram[0x11u]
-#define MODE nes_ram[0x12u]
-#define SUB nes_ram[0x13u]
-#define ROW nes_ram[0xE9u]
-#define CUR_LEVEL        nes_ram[0x10u]
-#define GRID             nes_ram[0x394u]
-#define OBJ_DIR          nes_ram[0x98u]
-#define FADE_CYCLE       nes_ram[0x51Cu]
-#define CANDLE_STATE     nes_ram[0x51Fu]
+#define UPD F_ram_0011_N
+#define MODE F_ram_0012_N
+#define SUB F_ram_0013_N
+#define ROW F_ram_00E9_N
+#define CUR_LEVEL        F_ram_0010_N
+#define GRID             F_ram_0394_N2
+#define OBJ_DIR          F_ram_0098_N
+#define FADE_CYCLE       F_ram_051C_N
+#define CANDLE_STATE     F_ram_051F_N
 
 static unsigned char direction;
 static unsigned char target_room;
@@ -82,7 +84,7 @@ void ow_scroll_begin(unsigned char dir, unsigned char target)
     enemy_like_like_shields_reset();
     direction = dir;
     target_room = target;
-    source_room = nes_ram[0xEBu];
+    source_room = F_ram_00EB_N2;
     pixels = 0u;
     column = 0xFFu;
     link_hidden = 0u;
@@ -94,8 +96,8 @@ void ow_scroll_begin(unsigned char dir, unsigned char target)
      * In particular, reversing at the arrival edge must not leave the
      * previous crossing's direction in the room-entry/spawn consumers. */
     OBJ_DIR = dir < 3u ? dir : (dir == 3u ? 4u : 8u);
-    nes_ram[0xACu] = nes_ram[0xC0u] = nes_ram[0xD3u] = 0u;
-    nes_ram[0x4F0u] = 0u;
+    F_ram_00AC_N2 = F_ram_00C0_N = F_ram_00D3_N = 0u;
+    F_ram_04F0_N = 0u;
 }
 
 void ow_scroll_begin_enter(unsigned char nes_dir)
@@ -103,13 +105,22 @@ void ow_scroll_begin_enter(unsigned char nes_dir)
     /* T-132: GoToNextModePlayLevelSong after the level-entry curtain
      * starts mode 4 at submode 0 (InitMode_EnterRoom). */
     direction = nes_dir == 1u ? 1u : nes_dir == 2u ? 2u : nes_dir == 4u ? 3u : 4u;
-    target_room = source_room = nes_ram[0xEBu];
+    target_room = source_room = F_ram_00EB_N2;
     pixels = 0u;
     column = 0xFFu;
     link_hidden = 1u;
     OBJ_DIR = nes_dir;
     MODE = 4u;
     SUB = UPD = 0u;
+}
+
+unsigned char ow_scroll_extra_frames(void)
+{
+    unsigned char s;
+    if (MODE != 7u || !UPD) return 0u;
+    s = options_consumer_get_scroll_speed();
+    return s == OPTIONS_SCROLL_SPEED_FASTER ? 3u :
+           s == OPTIONS_SCROLL_SPEED_FAST ? 1u : 0u;
 }
 
 unsigned char ow_scroll_column(void) { return column; }
@@ -182,10 +193,10 @@ static void discover_scroll_destination(void)
 void ow_scroll_enter_room_uw(short *x)
 {
     unsigned char d = OBJ_DIR, t, y;
-    nes_ram[0x53u] = d;                              /* DoorwayDir */
-    nes_ram[0x54u] = 0u;                             /* TriggeredDoorCmd */
-    nes_ram[0x55u] = (unsigned char)(opposite(d) & nes_ram[0xEEu]);
-    if (nes_ram[0x55u]) nes_ram[0x54u] = 0x02u;      /* close command */
+    F_ram_0053_N2 = d;                              /* DoorwayDir */
+    F_ram_0054_N = 0u;                             /* TriggeredDoorCmd */
+    F_ram_0055_N = (unsigned char)(opposite(d) & F_ram_00EE_N); /* native_ram bulk:dyn_addr */
+    if (F_ram_0055_N) F_ram_0054_N = 0x02u;      /* close command */
     if (d & 0x03u) *x = (d & 0x01u) ? 0x00 : 0xF0;
     y = (d & 0x05u) ? 1u : 0u;                       /* GetPassedDoorType */
     t = (unsigned char)(door_type(opposite(d)) & 7u);
@@ -194,7 +205,7 @@ void ow_scroll_enter_room_uw(short *x)
         static const unsigned char k_entering[4] = { 0x18u, 0xE8u, 0x28u, 0xD8u };
         GRID = k_entering[y];
     }
-    nes_ram[0x3A8u] = 0u;
+    F_ram_03A8_N = 0u;
 }
 
 unsigned char ow_scroll_tick(short *x, short *y)
@@ -203,14 +214,14 @@ unsigned char ow_scroll_tick(short *x, short *y)
     column = 0xFFu;
     if (MODE == 6u) {
         if (!UPD) {
-            unsigned char i;
             /* InitMode6: SaveKillCount (Z_05.asm, T-013: was saved on the
              * edge tick, a frame before the NES). */
             if (uw) room_save_kill_count_uw();
-            else room_save_kill_count_ow(nes_ram[0xEBu]);
+            else room_save_kill_count_ow(F_ram_00EB_N2);
             room_reset_player_state();   /* ResetPlayerState: ObjState, InvClock */
-            nes_ram[0x64u] = 0u;  /* LadderSlot */
-            for (i = 13u; i < 19u; ++i) nes_ram[0xACu + i] = 0u;
+            /* Use the shared reset boundary so native effect owners retire
+             * with the legacy weapon slots at InitMode6. */
+            room_reset_inv_obj_state();
             /* DrawSpritesBetweenRooms hides the outgoing weapons/items.
              * Their native SAT/cache must retire with ResetInvObjState:
              * weapon updates do not run again until the new room plays. */
@@ -221,7 +232,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
                  * to the edge (LeavingRoomRelativePositions). */
                 unsigned char t = (unsigned char)(door_type(OBJ_DIR) & 7u);
                 link_hidden = 1u;
-                if (t == 2u) nes_ram[0x602u] = 0x04u;
+                if (t == 2u) F_ram_0602_N = 0x04u;
                 GRID = (t >= 2u && t < 5u) ? ((OBJ_DIR & 0x05u) ? 0xD8u : 0x28u) : 0u;
             }
             UPD = 1u;
@@ -239,10 +250,10 @@ unsigned char ow_scroll_tick(short *x, short *y)
             /* InitMode7_Sub0: a whirlwind teleport scrolls from
              * WhirlwindPrevRoomId ($EA), the room left of the level's
              * entrance (T-171 t171_flute_whirlwind). */
-            if (nes_ram[0x522u] != 0u) nes_ram[0xEBu] = nes_ram[0xEAu];
+            if (F_ram_0522_N2 != 0u) F_ram_00EB_N2 = F_WHIRLWIND_PREV_ROOM_ID_N;
             /* The pond refills before the scroll (AnimatePond until
              * SecretColorCycle is 0; T-171). */
-            if (nes_ram[0x51Au] != 0u) { room_animate_pond(); break; }
+            if (F_ram_051A_N != 0u) { room_animate_pond(); break; }
             SUB = 1u;
             break;
         case 1u:
@@ -251,17 +262,17 @@ unsigned char ow_scroll_tick(short *x, short *y)
              * CalculateNextRoom. The UW door model publishes its own
              * $EE/$521; the OW keeps the NES bookkeeping (T-171). */
             if (!uw) {
-                nes_ram[0x521u] = nes_ram[0xEEu];
-                nes_ram[0xEEu] = opposite(OBJ_DIR);
-                nes_ram[0xEDu] = (unsigned char)(nes_ram[0xEDu] - 1u);
+                F_ram_0521_N = F_ram_00EE_N;
+                F_ram_00EE_N = opposite(OBJ_DIR);
+                F_ROOM_LAST_ROW_INDEX_N = (unsigned char)(F_ROOM_LAST_ROW_INDEX_N - 1u);
             }
             /* CalculateNextRoom -> CalculateNextRoomForDoor (every
              * passable side, OW and UW): [$E7] = the direction bit,
              * [$04E4] = the room's unique ID (GetUniqueRoomId, write-only
              * on the NES; ROM bank 5 $B522). */
-            nes_ram[0xE7u] = OBJ_DIR;
-            nes_ram[0x4E4u] = room_get_unique_room_id();
-            nes_ram[0xECu] = target_room;
+            F_ram_00E7_N = OBJ_DIR;
+            F_ram_04E4_N = room_get_unique_room_id();
+            F_PREV_ROOM_ID_N = target_room;
             if (uw) link_hidden = 1u;
             ROW = 21u;
             SUB = 2u;
@@ -291,7 +302,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
             /* fall through: InitMode7_Finish */
         default:
             if (SUB == 6u && world_animate_world_fading() != 0u) break;
-            nes_ram[0xEBu] = target_room;
+            F_ram_00EB_N2 = target_room;
             SUB = 0u;
             UPD = 1u;
             if (direction == 4u) discover_scroll_destination();
@@ -306,7 +317,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
             break;
         case 1u: SUB = 2u; break;
         case 2u:
-            nes_ram[0xE6u] = (unsigned char)((nes_ram[0x15u] + 1u) & (uw ? 3u : 1u));
+            F_ROOM_SCROLL_FRAME_N = (unsigned char)((F_ram_0015_N + 1u) & (uw ? 3u : 1u));
             SUB = 3u;
             break;
         case 3u:
@@ -317,7 +328,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
                 if (direction == 1u && *x > 0) *x -= speed;
                 if (direction == 2u && *x < 0xF0) *x += speed;
                 if (pixels == 256u) SUB = 4u;
-            } else if ((nes_ram[0x15u] & (uw ? 3u : 1u)) == nes_ram[0xE6u]) {
+            } else if ((F_ram_0015_N & (uw ? 3u : 1u)) == F_ROOM_SCROLL_FRAME_N) {
                 if (s_vk == 0xFFu) {
                     /* First row step: where ScrollWorld will leave Link
                      * (down: while Y >= $3E, Y -= 8; up: while Y < $DD,
@@ -339,14 +350,14 @@ unsigned char ow_scroll_tick(short *x, short *y)
                 }
                 if (pixels < 176u) pixels += 8u;
             }
-            if (SUB == 4u) ROW = nes_ram[0xEDu] = 0xFFu;
+            if (SUB == 4u) ROW = F_ROOM_LAST_ROW_INDEX_N = 0xFFu;
             break;
         case 4u: SUB = direction == 4u ? 6u : 5u; break;
         case 5u: SUB = 6u; break;
         case 6u:
             /* UpdateMode7Scroll_Sub6: after scrolling into a dark room,
              * CurRow = 0 tells mode 4 to re-copy the play area. */
-            if (uw && uw_dark_is_dark_room(nes_ram[0xEBu])) {
+            if (uw && uw_dark_is_dark_room(F_ram_00EB_N2)) {
                 ROW = 0u;
                 SUB = 7u;
                 break;
@@ -357,9 +368,9 @@ unsigned char ow_scroll_tick(short *x, short *y)
              * the CalculateNextRoom door bit [$E7] (set in Sub1) and
              * IsSprite0CheckActive ($E3). Lockstep: $E7 stayed set after
              * every scroll (NES 00, GEN direction bit). */
-            nes_ram[0x010Cu] = 0u;
-            nes_ram[0x00E7u] = 0u;
-            nes_ram[0x00E3u] = 0u;
+            F_ROOM_SCROLL_LOCK_FLAG = 0u;
+            F_ram_00E7 = 0u;
+            F_ram_00E3 = 0u;
             MODE = 4u; SUB = 1u; UPD = 0u; break;
         }
     } else if (MODE == 4u) {
@@ -380,7 +391,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
             /* InitMode4 Sub2: a light room entered from an unlit dark room
              * fades to light (cycle $C0). */
             SUB = 0u;
-            if (uw && !uw_dark_is_dark_room(nes_ram[0xEBu]) &&
+            if (uw && !uw_dark_is_dark_room(F_ram_00EB_N2) &&
                 uw_dark_is_dark_room(source_room) && CANDLE_STATE == 0u) {
                 FADE_CYCLE = 0xC0u;
                 SUB = 3u;
@@ -394,20 +405,20 @@ unsigned char ow_scroll_tick(short *x, short *y)
             }
         } else if (!UPD) {
             /* InitMode_EnterRoom (OW and UW). */
-            nes_ram[0x3A8u] = 0u;
+            F_ram_03A8_N = 0u;
             if (!uw) {
                 /* Method 2 in the OW: TriggeredDoorDir = the entering
                  * side if it is in CurOpenedDoors, command 2 (T-171;
                  * ow_scroll_enter_room_uw does the UW). */
-                nes_ram[0x54u] = 0u;
-                nes_ram[0x55u] = (unsigned char)(opposite(OBJ_DIR) & nes_ram[0xEEu]);
-                if (nes_ram[0x55u]) nes_ram[0x54u] = 0x02u;
+                F_ram_0054_N = 0u;
+                F_ram_0055_N = (unsigned char)(opposite(OBJ_DIR) & F_ram_00EE_N); /* native_ram bulk:dyn_addr */
+                if (F_ram_0055_N) F_ram_0054_N = 0x02u;
             }
             UPD = 1u;
             if (uw) link_hidden = 1u;
             else GRID = 0u;
-            nes_ram[0x70u] = (unsigned char)*x;
-            nes_ram[0x84u] = (unsigned char)*y;
+            F_ram_0070_N2 = (unsigned char)*x;
+            F_ram_0084_N2 = (unsigned char)*y;
             return OW_SCROLL_ENTER;
         } else if (!grid_at_limit()) {
             link_hidden = 0u;
@@ -417,7 +428,7 @@ unsigned char ow_scroll_tick(short *x, short *y)
         UPD = 1u;
         return OW_SCROLL_PLAY;
     }
-    nes_ram[0x70u] = (unsigned char)*x;
-    nes_ram[0x84u] = (unsigned char)*y;
+    F_ram_0070_N2 = (unsigned char)*x;
+    F_ram_0084_N2 = (unsigned char)*y;
     return OW_SCROLL_BUSY;
 }

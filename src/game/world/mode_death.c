@@ -26,33 +26,33 @@
 #include "world_dispatch.h"  /* world_animate_world_fading (drained) */
 
 /* Variables.inc */
-#define GAME_MODE              RAM(0x0012u)
-#define GAME_SUBMODE           RAM(0x0013u)
-#define IS_UPDATING_MODE       RAM(0x0011u)
-#define TILE_BUF_SELECTOR      RAM(0x0014u)
-#define CUR_SAVE_SLOT          RAM(0x0016u)
-#define OBJ_TIMER(s)           RAM((unsigned short)(0x0028u + (s)))
-#define OBJ_X0                 RAM(0x0070u)
-#define OBJ_Y0                 RAM(0x0084u)
-#define OBJ_DIR0               RAM(0x0098u)
-#define OBJ_STATE0             RAM(0x00ACu)
-#define PAUSED                 RAM(0x00E0u)
-#define IS_SPRITE0_CHECK       RAM(0x00E3u)
-#define DEATH_TURNS            RAM(0x00E5u)
-#define CUR_ROW                RAM(0x00E9u)
-#define CUR_OPENED_DOORS       RAM(0x00EEu)
-#define CUR_PPU_CONTROL        RAM(0x00FFu)
-#define SPRITES(i)             RAM((unsigned short)(0x0200u + (i)))
-#define OBJ_GRID_OFFSET0       RAM(0x0394u)
-#define OBJ_INVINCIBILITY0     RAM(0x04F0u)
-#define FADE_CYCLE             RAM(0x051Cu)
-#define PREV_OPENED_DOORS      RAM(0x0521u)
-#define TUNE1_REQUEST          RAM(0x0602u)
-#define EFFECT_REQUEST         RAM(0x0603u)
-#define TUNE0_REQUEST          RAM(0x0604u)
-#define DEATH_COUNTS(s)        RAM((unsigned short)(0x0630u + (s)))
-#define HEART_PARTIAL          RAM(0x0670u)
-#define FRAME_COUNTER          RAM(0x0015u)
+#define GAME_MODE              F_ram_0012_R
+#define GAME_SUBMODE           F_ram_0013_R
+#define IS_UPDATING_MODE       F_ram_0011_R
+#define TILE_BUF_SELECTOR      F_ram_0014_R
+#define CUR_SAVE_SLOT          F_ram_0016_R
+#define OBJ_TIMER(s)           F_ram_0028_R5((s))
+#define OBJ_X0                 F_ram_0070_R
+#define OBJ_Y0                 F_ram_0084_R
+#define OBJ_DIR0               F_ram_0098_R
+#define OBJ_STATE0             F_ram_00AC_R
+#define PAUSED                 F_ram_00E0_R
+#define IS_SPRITE0_CHECK       F_ram_00E3_R
+#define DEATH_TURNS            F_ram_00E5_R
+#define CUR_ROW                F_ram_00E9_R
+#define CUR_OPENED_DOORS       F_ram_00EE_R
+#define CUR_PPU_CONTROL        F_ram_00FF_R
+#define SPRITES(i)             F_ram_0200_R3((i))
+#define OBJ_GRID_OFFSET0       F_ram_0394_R
+#define OBJ_INVINCIBILITY0     F_ram_04F0_R
+#define FADE_CYCLE             F_ram_051C_R
+#define PREV_OPENED_DOORS      F_ram_0521_R
+#define TUNE1_REQUEST          F_ram_0602_R
+#define EFFECT_REQUEST         F_ram_0603_R
+#define TUNE0_REQUEST          F_ram_0604_R
+#define DEATH_COUNTS(s)        F_ram_0630_R((s))
+#define HEART_PARTIAL          F_ram_0670_R
+#define FRAME_COUNTER          F_ram_0015_R
 
 extern unsigned char room_get_unique_room_id(void);
 extern void roomrom_combat_animate_link_base(void);

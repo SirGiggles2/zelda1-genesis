@@ -32,6 +32,16 @@ KEYS = {"U": "UP", "D": "DOWN", "L": "LEFT", "R": "RIGHT", "A": "A", "B": "B",
         "S": "START", "s": "C"}
 
 
+
+def _field_off(name: str) -> int:
+    """Image offset of a field name (tools/native_ram/fields.json); these headless runners
+    only have the image, so every field is image-backed."""
+    global _FIELD_OFFS
+    if "_FIELD_OFFS" not in globals():
+        d = json.loads((ROOT / "tools" / "native_ram" / "fields.json").read_text(encoding="utf-8"))
+        _FIELD_OFFS = {c["name"]: int(k, 16) for k, c in d["cells"].items()}
+    return _FIELD_OFFS[str(name)]
+
 class Session:
     def __init__(self, rom: Path = ROOT / "builds" / "Zelda.md"):
         self.g = Genesis(rom)
@@ -106,6 +116,8 @@ class Session:
             nm = ROOT / "sgdk/bin/nm.exe" if os.name == "nt" else "m68k-linux-gnu-nm"
             out = subprocess.run([str(nm), str(elf)], capture_output=True, text=True, check=True).stdout
             self._elf = {p[2]: int(p[0], 16) for p in (l.split() for l in out.splitlines()) if len(p) == 3}
+        if name == "players" and name not in self._elf:
+            return 0xFF8800          # unit 4b+: PlayerRam block base (actor at record offset 0)
         return 0xFF0000 | (self._elf[name] & 0xFFFF)
 
     def _w(self, addr: int, value: int, size: int):
@@ -135,7 +147,8 @@ class Session:
         lua = LuaRuntime(unpack_returned_tuples=True)
         fn = lua.eval("function(rd, wr, log, sys, gen_b_item, gen_link_pos)\n" + body + "\nend")
         fn(lambda a: self.nes8(int(a)), lambda a, v: self.write_nes(int(a), int(v)),
-           lambda m: print("stage:", m), "GEN", self.gen_b_item, self.gen_link_pos)
+           lambda m: print("stage:", m), "GEN", self.gen_b_item, self.gen_link_pos,
+           lambda n, v: self.write_nes(_field_off(n), int(v)), lambda n: self.nes8(_field_off(n)))
 
 
 def run_preset(name: str, rom: Path = ROOT / "builds" / "Zelda.md") -> Session:

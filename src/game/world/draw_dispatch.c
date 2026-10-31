@@ -27,6 +27,7 @@
 #include "scratch_state.h"     /* ZP_TMP0..ZP_TMPF */
 #include "object_state.h"      /* OBJ_TYPE */
 #include "combat_state.h"      /* MON_STATUS_FLAGS, MON_HIT_REACTION */
+#include "enemy_state.h"       /* ENEMY_THROWER_SLOT (T-397 inline pair) */
 #include "progress_state.h"    /* FRAME_COUNTER */
 #include "core/core_dispatch.h"      /* core_anim_set_sprite_desc_attrs */
 #include "world/sprite_dispatch.h"   /* sprite_cycle_cur_sprite_index,
@@ -54,13 +55,13 @@
 #define DRAW_FLIP_H         ZP_TMPF   /* $0F = horizontal flip flag */
 
 /* OAM mirror + sprite-index registers (NES RAM). */
-#define DRAW_CUR_SPRITE_INDEX     RAM(0x0341u)
-#define DRAW_LEFT_SPRITE_OFFSET   RAM(0x0343u)
-#define DRAW_RIGHT_SPRITE_OFFSET  RAM(0x0344u)
-#define DRAW_OAM_X(off)           RAM(0x0203u + (unsigned short)(off))
-#define DRAW_OAM_Y(off)           RAM(0x0200u + (unsigned short)(off))
-#define DRAW_OAM_TILE(off)        RAM(0x0201u + (unsigned short)(off))
-#define DRAW_OAM_ATTR(off)        RAM(0x0202u + (unsigned short)(off))
+#define DRAW_CUR_SPRITE_INDEX     F_ram_0341_R
+#define DRAW_LEFT_SPRITE_OFFSET   F_DRAW_LEFT_SPRITE_OFFSET_R
+#define DRAW_RIGHT_SPRITE_OFFSET  F_DRAW_RIGHT_SPRITE_OFFSET_R
+#define DRAW_OAM_X(off)           F_ram_0203_R2((unsigned short)(off))
+#define DRAW_OAM_Y(off)           F_ram_0200_R2((unsigned short)(off))
+#define DRAW_OAM_TILE(off)        F_ram_0201_R2((unsigned short)(off))
+#define DRAW_OAM_ATTR(off)        F_ram_0202_R2((unsigned short)(off))
 
 /* MON_HIT_REACTION lives at $04F0+slot in the asm (`$04F0,A4,D2.W`).
  * combat_state.h's MON_HIT_REACTION(slot) macro resolves to the same
@@ -247,6 +248,11 @@ static void draw_object_with_type(unsigned char frame, unsigned int slot,
 /* populated by Link's draw path. Saves ~8 RAM writes × 11 enemies  */
 /* × ~12 cyc = ~1000 cyc/frame on busy rooms.                       */
 /* --------------------------------------------------------------- */
+/* T392 instruction capture: this byte-record producer is a busy-room hot
+ * path. On68000, merging four byte stores builds a long with shifts/masks
+ * before each write. Keep the original byte stores; values/order are the
+ * same and no presentation or simulation work is omitted. */
+__attribute__((optimize("no-tree-slp-vectorize")))
 static void anim_write_sprite_pair_not_flashing(void)
 {
     unsigned char off = (unsigned char)DRAW_LEFT_SPRITE_OFFSET;
@@ -294,12 +300,12 @@ static void anim_write_sprite_pair_not_flashing(void)
 
     do {
         const unsigned char tile =
-            (unsigned char)RAM(0x0002u + d3); /* TMP2/3 */
+            (unsigned char)F_ram_0002_R4(d3); /* TMP2/3 */
         const unsigned char y = (unsigned char)DRAW_Y;
         unsigned char x = (unsigned char)DRAW_X;
         const unsigned char xsep = (unsigned char)DRAW_X_SEPARATION;
         const unsigned char attr =
-            (unsigned char)RAM(0x0004u + d3); /* TMP4/5 */
+            (unsigned char)F_ram_0004_R3(d3); /* TMP4/5 */
 
         if (write_oam) {
             DRAW_OAM_TILE(off) = tile;
@@ -353,10 +359,10 @@ __attribute__((always_inline)) static void anim_write_sprite_pair(unsigned int s
     if (hit != 0u) {
         for (signed char d3 = 1; d3 >= 0; --d3) {
             unsigned char attr =
-                (unsigned char)RAM(0x0004u + (unsigned char)d3);
+                (unsigned char)F_ram_0004_R3((unsigned char)d3);
             attr = (unsigned char)(attr & 0xFCu);
             attr = (unsigned char)(attr | (hit & 0x03u));
-            RAM(0x0004u + (unsigned char)d3) = attr;
+            F_ram_0004_R3((unsigned char)d3) = attr;
         }
     }
     anim_write_sprite_pair_not_flashing();
@@ -408,6 +414,30 @@ static void draw_object_with_anim_and_specific_sprites(unsigned int slot)
     const unsigned char left_tile = k_obj_anim_frame_heap[tile_idx];
     DRAW_LEFT_TILE = left_tile;
     DRAW_RIGHT_TILE = (uint8_t)(left_tile + 2u);
+
+    /* T392: ordinary native enemies need the same descriptor result, not
+     * repeated scratch-memory round trips between tiny writer wrappers.
+     * Preserve every final scratch/cursor byte and use the existing bounded
+     * pair publisher. Special attributes/items retain the general chain. */
+    if(slot>0u && slot<=11u && g_draw_in_item_context==0u &&
+       ((unsigned char)MON_STATUS_FLAGS(slot)&0x0Au)==0u) {
+        unsigned char l=left_tile,r=(unsigned char)(left_tile+2u);
+        unsigned char la=k_obj_anim_attr_heap[tile_idx],ra=la;
+        const unsigned char x=(unsigned char)DRAW_X,y=(unsigned char)DRAW_Y;
+        const unsigned char hit=(unsigned char)MON_HIT_REACTION(slot);
+        if((unsigned char)DRAW_MIRRORED!=0u) {r=l;ra^=0x40u;}
+        else if((unsigned char)DRAW_FLIP_H!=0u) {
+            const unsigned char swap=l;l=r;r=swap;la^=0x40u;ra^=0x40u;
+        }
+        if(hit) {la=(unsigned char)((la&0xFCu)|(hit&3u));ra=(unsigned char)((ra&0xFCu)|(hit&3u));}
+        DRAW_LEFT_TILE=l;DRAW_RIGHT_TILE=r;DRAW_LEFT_ATTR=la;DRAW_RIGHT_ATTR=ra;
+        enemy_render_publish_native_pair_at((unsigned char)ENEMY_THROWER_SLOT,
+                                            l,la,r,ra,x,(unsigned char)(x+8u),y);
+        DRAW_X=(unsigned char)(x+16u);
+        sprite_cycle_cur_sprite_index_twice();
+        DRAW_HAS_TWO_SIDES=0xFFu;
+        return;
+    }
 
     /* If object is Link or weapon/room-item slot >= $D, force
      * UseTableAttr (skip the half-width / ignore-attr branches). */
@@ -554,13 +584,16 @@ void draw_object_not_mirrored_over_link(unsigned char frame, unsigned int slot)
 
 /* RAM($0052) = ProcessedNarrowObj, $0504 = StatusBarItemDrawingFlag
  * (suppress narrow X-shift when set), $0657+slot = item value. */
-#define DRAW_PROCESSED_NARROW_OBJ      RAM(0x0052u)
-#define DRAW_STATUS_BAR_DRAW_FLAG      RAM(0x0504u)
-#define DRAW_INVENTORY_ITEM(slot)      RAM(0x0657u + (unsigned char)(slot))
-#define DRAW_ITEM_LIFETIME(slot)       RAM(0x03A8u + (unsigned char)(slot))
+#define DRAW_PROCESSED_NARROW_OBJ      F_DRAW_PROCESSED_NARROW_OBJ_R
+#define DRAW_STATUS_BAR_DRAW_FLAG      F_ram_0504_R
+#define DRAW_INVENTORY_ITEM(slot)      F_ram_0657_R4((unsigned char)(slot))
+#define DRAW_ITEM_LIFETIME(slot)       F_ram_03A8_R3((unsigned char)(slot))
 
 /* Anim_WriteSpecificItemSprites (Z_01.asm:2399). Computes left/right
  * tiles from item-frame tables, then dispatches narrow/wide/slim. */
+/* T-317: set only around the Remix red-rupee draw below. */
+static unsigned char s_draw_red_rupee;
+
 static void anim_write_specific_item_sprites(unsigned int slot,
                                              unsigned int item_slot)
 {
@@ -581,6 +614,8 @@ static void anim_write_specific_item_sprites(unsigned int slot,
         g_draw_in_item_context == 1u) {
         left_tile = GREEN_RUPEE_NES_TILE;
     }
+    /* Red 20-rupee: its own remapped red copy (draw_item_by_slot $20). */
+    if (s_draw_red_rupee) left_tile = RED_RUPEE_NES_TILE;
     DRAW_LEFT_TILE = left_tile;
     DRAW_RIGHT_TILE = (uint8_t)(left_tile + 2u);
 
@@ -676,12 +711,12 @@ void draw_anim_write_item_sprites(unsigned int slot, unsigned int item_slot)
  * every 4 frames), item slot $14 written at the object's own slot. */
 void draw_fairy(unsigned int slot)
 {
-    RAM(0x0000u) = RAM(0x0070u + slot);
-    RAM(0x0001u) = RAM(0x0084u + slot);
-    RAM(0x000Fu) = 0u;
-    RAM(0x0004u) = 0x02u;
-    RAM(0x0005u) = 0x02u;
-    RAM(0x000Cu) = (uint8_t)((((unsigned char)(0x02u << 1)) &
+    F_ram_0000_R = F_ram_0070_R4(slot);
+    F_ram_0001_R = F_ram_0084_R4(slot);
+    F_ram_000F_R = 0u;
+    F_ram_0004_R = 0x02u;
+    F_ram_0005_R = 0x02u;
+    F_ram_000C_R = (uint8_t)((((unsigned char)(0x02u << 1)) &
                               (unsigned char)FRAME_COUNTER) >> 2);
     anim_write_item_sprites(slot, 0x14u);
 }
@@ -775,12 +810,13 @@ void draw_item_by_slot(unsigned int item_slot, unsigned int slot)
         return;
     }
 
-    /* T-317 MD Remix red rupee slot $20: reuse the small rupee tile via
-     * slot $1C (same frame-0 tile as $16) with sprite sub-palette 2
-     * (PAL3 red ramp). Sub-pal 3 routes to PAL2 (blue), so it cannot be
-     * used here. Slot $1C avoids the green tile substitution on $16. */
+    /* T-317 MD Remix red rupee slot $20: slot $1C's frame layout with sprite
+     * sub-palette 2 (PAL3), drawn from the remapped red copy so the colour
+     * no longer depends on the scene's sub-palette 2 ramp. */
     if (item_slot == 0x20u) {
+        s_draw_red_rupee = 1u;
         anim_write_static_item_sprites_with_attributes(2u, draw_slot, 0x1Cu);
+        s_draw_red_rupee = 0u;
         return;
     }
 
@@ -952,7 +988,7 @@ void draw_boomerang(unsigned int slot)
      * (Z_07.asm:4274-4282), sprite palette 0 or 1. A Goriya's boomerang
      * is OAM attr $00/$40 (T-057 t057_food_bait t605); the old +2 drew
      * it with the red sub-palette 2. */
-    attr = (unsigned char)(attr + (unsigned char)RAM(0x0675u));
+    attr = (unsigned char)(attr + (unsigned char)F_ram_0675_R);
     DRAW_LEFT_ATTR = attr;      /* NES writes [04] only; [05] stays (T-171) */
     if ((state & 0xF0u) == 0x20u) {
         (void)core_anim_set_sprite_desc_attrs(1u);
@@ -1021,7 +1057,7 @@ static void set_attr_and_draw_arrow(unsigned int slot, unsigned char y_idx,
     if (slot < 0x0Du && (unsigned char)OBJ_TYPE(slot) == 0x5Bu) {
         attr = (unsigned char)(attr + 2u);
     } else {
-        const unsigned char inv_arrow = (unsigned char)RAM(0x0659u);
+        const unsigned char inv_arrow = (unsigned char)F_ram_0659_R;
         attr = (unsigned char)(attr + inv_arrow - 1u);
     }
     DRAW_LEFT_ATTR = attr;

@@ -104,8 +104,8 @@ void enrt_update_rope(unsigned int slot) {
     if (!(ENEMY_PAUSE_FLAG | ENEMY_STUN_TIMER(slot))) {
         c_walker_move(slot);
 
-        if ((OBJ(NES_OBJ_GRID_OFFSET, slot) & 0x0F) == 0)
-            OBJ(NES_OBJ_GRID_OFFSET, slot) = 0;
+        if ((F_ram_0394_O(slot) & 0x0F) == 0)
+            F_ram_0394_O(slot) = 0;
 
         if (ENEMY_WALK_SPEED(slot) != 0x60 && ENEMY_MOVE_TIMER(slot) == 0) {
             ENEMY_MOVE_TIMER(slot) = ENEMY_RNG_A(slot) & 0x3F;
@@ -118,7 +118,7 @@ void enrt_update_rope(unsigned int slot) {
 
     /* NES UpdateRope lines up on Link's own position (ObjX/ObjY slot 0),
      * not the chase target (T-171). */
-    if (ENEMY_WALK_SPEED(slot) == 0x20 && OBJ(NES_OBJ_GRID_OFFSET, slot) == 0) {
+    if (ENEMY_WALK_SPEED(slot) == 0x20 && F_ram_0394_O(slot) == 0) {
         unsigned char x_dist = z01_abs((unsigned char)(ENEMY_X(0) - ENEMY_X(slot)));
         if (x_dist < 8) {
             ENEMY_DIR(slot) = 8;
@@ -203,9 +203,9 @@ void enrt_try_shooting_body(unsigned char qspeed, unsigned char shot_type, unsig
         new_timer = 0;                          /* temporarily invincible */
     } else {
         /* LDY ObjShootTimer / DEY / BPL: 0 (or >= $81) reads as expired. */
-        new_timer = (unsigned char)(OBJ(0x0451, slot) - 1u);
+        new_timer = (unsigned char)(F_ram_0451_O(slot) - 1u);
         if (new_timer & 0x80u) {
-            if (OBJ(0x0412, slot) == 0) {       /* ObjWantsToShoot */
+            if (F_ram_0412_O(slot) == 0) {       /* ObjWantsToShoot */
                 ENEMY_WALK_SPEED(slot) = qspeed;
                 return;
             }
@@ -213,7 +213,7 @@ void enrt_try_shooting_body(unsigned char qspeed, unsigned char shot_type, unsig
         }
     }
 
-    OBJ(0x0451, slot) = new_timer;
+    F_ram_0451_O(slot) = new_timer;
 
     if (new_timer == 0) {
         ENEMY_WALK_SPEED(slot) = qspeed;
@@ -232,8 +232,8 @@ void enrt_try_shooting_body(unsigned char qspeed, unsigned char shot_type, unsig
 
     /* _ShootIfWanted2 tail, then the success path. */
     ENEMY_MOVE_TIMER(slot) = 0x80;
-    OBJ(0x0437, slot) = (unsigned char)(OBJ(0x0437, slot) - 1);
-    OBJ(0x0412, slot) = 0;
+    F_ram_0437_O2(slot) = (unsigned char)(F_ram_0437_O2(slot) - 1);
+    F_ram_0412_O(slot) = 0;
     ENEMY_WALK_SPEED(slot) = 0;
 }
 
@@ -244,11 +244,11 @@ void enrt_try_shooting(unsigned char qspeed, unsigned char shot_type, unsigned i
 {
     unsigned char type = (unsigned char)ENEMY_TYPE(slot);
 
-    RAM(0x0001) = qspeed;
+    F_ram_0001_R2 = qspeed;
     if (!(type == 0x01u || type == 0x03u || type == 0x09u || type == 0x0Au)
-        && OBJ(0x0451, slot) == 0u && ENEMY_RNG_A(slot) < 0xF8u)
+        && F_ram_0451_O(slot) == 0u && ENEMY_RNG_A(slot) < 0xF8u)
         return;                                 /* @Exit: speed unchanged */
-    RAM(0x0000) = shot_type;
+    F_ram_0000_R3 = shot_type;
     enrt_try_shooting_body(qspeed, shot_type, slot);
 }
 
@@ -271,12 +271,12 @@ void enrt_update_stalfos(unsigned int slot) {
     c_check_monster_collisions(slot);
     enrt_animate_and_draw_common_object(8u, slot);
 
-    RAM(0x0001) = 0x20;
+    F_ram_0001_R2 = 0x20;
 
     if (SAVE_SLOT_QUEST(SAVE_SLOT_INDEX) == 0)
         return;
 
-    if (OBJ(0x0451, slot) == 0 && ENEMY_RNG_A(slot) < 0xF8)
+    if (F_ram_0451_O(slot) == 0 && ENEMY_RNG_A(slot) < 0xF8)
         return;
 
     /* @PrepareToShoot: the _TryShooting body without its [00] store; the
@@ -310,14 +310,14 @@ void enrt_update_darknut(unsigned int slot) {
     unsigned char dir = (unsigned char)ENEMY_DIR(slot);
 
     if (dir == 0x02u)
-        RAM(0x000F) = (unsigned char)(RAM(0x000F) + 1u);
+        F_ram_000F_R4 = (unsigned char)(F_ram_000F_R4 + 1u);
 
     unsigned char frame = (unsigned char)(dir >> 2);
 
     if (ENEMY_DRAW_FRAME(slot) != 0u) {
         frame = (unsigned char)(frame + 3u);
         if (dir == 0x08u)
-            RAM(0x000F) = (unsigned char)(RAM(0x000F) + 1u);
+            F_ram_000F_R4 = (unsigned char)(F_ram_000F_R4 + 1u);
     }
 
     c_draw_object_not_mirrored_with_frame((unsigned int)frame, slot);
@@ -325,32 +325,40 @@ void enrt_update_darknut(unsigned int slot) {
 
 void enrt_draw_ghini_and_check_collisions(unsigned int slot) {
     unsigned char frame = z07_anim_fetch_obj_pos(slot);
-    RAM(0x000D) = frame;
+    F_ram_000D_R2 = frame;
     unsigned char dir = ENEMY_DIR(slot);
     if ((dir & 0x08) == 0) {
-        RAM(0x000D) = (unsigned char)(RAM(0x000D) + 1);
+        F_ram_000D_R2 = (unsigned char)(F_ram_000D_R2 + 1);
         if ((dir & 0x01) != 0) {
-            RAM(0x000F) = (unsigned char)(RAM(0x000F) + 1);
+            F_ram_000F_R4 = (unsigned char)(F_ram_000F_R4 + 1);
         }
     } else {
         if ((dir & 0x02) != 0) {
-            RAM(0x000F) = (unsigned char)(RAM(0x000F) + 1);
+            F_ram_000F_R4 = (unsigned char)(F_ram_000F_R4 + 1);
         }
     }
-    c_draw_object_not_mirrored_with_frame((unsigned int)RAM(0x000D), slot);
+    c_draw_object_not_mirrored_with_frame((unsigned int)F_ram_000D_R2, slot);
     c_check_link_collision(slot);
+}
+
+/* NES source: Z_04.asm:UpdateGhini @LoopObject.
+ * Drained C: enrt_update_ghini death tail below.
+ * Coverage: FULL existing companion cleanup, shared with party kills.
+ * Stance: EXTEND composition without another enemy update. */
+void enemy_ghini_finish_collisions(unsigned int slot) {
+    if (ENEMY_METASTATE(slot) == 0) return;
+    unsigned int y = 0x0B;
+    while (y != 0) {
+        if (F_ram_034F_O3(y) == 0x22) {
+            F_NES_OBJ_METASTATE_BASE_O(y) = 0x11;
+        }
+        y--;
+    }
 }
 
 void enrt_update_ghini(unsigned int slot) {
     enrt_update_common_wanderer(0xFFu, slot);
     enrt_draw_ghini_and_check_collisions(slot);
     c_check_monster_collisions(slot);
-    if (ENEMY_METASTATE(slot) == 0) return;
-    unsigned int y = 0x0B;
-    while (y != 0) {
-        if (OBJ(0x034F, y) == 0x22) {
-            OBJ(0x0405, y) = 0x11;
-        }
-        y--;
-    }
+    enemy_ghini_finish_collisions(slot);
 }

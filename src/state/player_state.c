@@ -7,27 +7,18 @@
  * fills them. `g_player_count` is 1 by default; Phase 13 bumps it after
  * lobby selection. */
 
-PlayerState  players[PLAYER_MAX_COUNT];
 unsigned char g_player_count = 1u;
 
-/* player_state_size_invariant probe (compile-time).
- *
- * Genesis SRAM regions in this project are bounded by the Z1 save-state
- * footprint plus per-player progress. Z1 SaveData::profile is 0x40
- * bytes; budgeting 0x80 (128) bytes per slot for the typed PlayerState
- * + future Genesis-native progress fields keeps the 4-player save under
- * 512 bytes — well below the 8 KB SRAM available even on the lightest
- * NES-faithful cartridge layout.
- *
- * If `sizeof(PlayerState) * PLAYER_MAX_COUNT` ever drifts past the
- * envelope, this static_assert fails the build before silent SRAM
- * stomping can ship. */
-#define PLAYER_STATE_SRAM_HEADROOM_BYTES   16u
-#define PLAYER_STATE_SRAM_BUDGET_BYTES    512u
-
+/* Transient work-RAM record budget, not a save format. Save serialization
+ * remains the explicit compatible codec. Build.bat independently checks the
+ * complete linked BSS against the physical A4 fence. */
+#define PLAYER_STATE_WORK_RAM_HEADROOM_BYTES   16u
+#define PLAYER_STATE_WORK_RAM_BUDGET_BYTES    512u
 _Static_assert(
-    (sizeof(PlayerState) * PLAYER_MAX_COUNT) + PLAYER_STATE_SRAM_HEADROOM_BYTES
-        < PLAYER_STATE_SRAM_BUDGET_BYTES,
-    "player_state_size_invariant: PlayerState[4] + headroom must fit in "
-    "the SRAM multiplayer save budget"
+    (sizeof(PlayerState) * PLAYER_MAX_COUNT) + PLAYER_STATE_WORK_RAM_HEADROOM_BYTES
+        < PLAYER_STATE_WORK_RAM_BUDGET_BYTES,
+    "player_state_size_invariant: native records exceed work-RAM budget"
 );
+_Static_assert(sizeof(PlayerState) == 28u &&
+               __builtin_offsetof(PlayerState, go_straight_when_diag) == 26u,
+               "update native player schema/probes with the current layout");

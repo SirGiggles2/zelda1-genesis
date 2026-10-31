@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "platform_abi.h"
 #include "../../state/game_profile.h"
+#include "../../state/weapon_state.h"
 #include "cave_state.h"        /* CAVE_DELAY_TIMER, CAVE_TEXT_SELECTOR,
                                 * CAVE_TEXT_LINE_ADDR_LO, CAVE_ROOM_TYPE */
 #include "object_state.h"      /* OBJ_STATE, OBJ_TILE_Y, OBJ_TYPE */
@@ -195,7 +196,7 @@ void uw_person_init_underworld_person_c(unsigned int slot)
     if (obj_type != 0x4Bu) {
         return;
     }
-    if ((unsigned char)RAM(0x0671) != 0xFFu) {
+    if ((unsigned char)F_ram_0671_R != 0xFFu) {
         return;
     }
     ROOM_SHUTTER_TRIGGERED = 1u;
@@ -295,8 +296,8 @@ void uw_person_draw_life_or_money_items(void)
      * Loops i = 1 -> 0 ; sets ObjX[19]=LifeOrMoneyItemXs[i],
      * ObjY[19]=$98, AnimateItemObject(LifeOrMoneyItemTypes[i], 19). */
     for (signed char i = 1; i >= 0; --i) {
-        RAM(0x0083u) = k_life_or_money_item_xs[(unsigned char)i];
-        RAM(0x0097u) = 0x98u;
+        F_ram_0083_R = k_life_or_money_item_xs[(unsigned char)i];
+        F_ram_0097_R = 0x98u;
         draw_animate_item_object(
             k_life_or_money_item_types[(unsigned char)i], 19u);
     }
@@ -363,8 +364,10 @@ void uw_person_update_grumble3(void)
     if ((unsigned char)CAVE_DELAY_TIMER != 0u) {
         return;
     }
+    /* Consume the native food owner before its legacy publication. */
+    g_player_boomerang.state = 0u;
     OBJ_STATE(15) = 0u;
-    RAM(0x065Du) = 0u;
+    F_NES_INV_FOOD_R = 0u;
     OBJ_STATE(0) = 0u;
     CAVE_ROOM_TYPE = 0u;
 }
@@ -376,8 +379,8 @@ void uw_person_update_person_complex(unsigned int slot)
     if (state != 4u || ((unsigned char)FRAME_COUNTER & 1u) == 0u) {
         uw_person_person_draw_and_check_collisions(slot);
         if ((unsigned char)CAVE_ROOM_TYPE == 0x4Fu) {
-            RAM(0x0083u) = 120u;
-            RAM(0x0097u) = 0x98u;
+            F_ram_0083_R = 120u;
+            F_ram_0097_R = 0x98u;
             draw_animate_item_object(24u, 19u);
         }
     }

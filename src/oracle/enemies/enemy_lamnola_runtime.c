@@ -19,26 +19,26 @@ void enrt_init_lamnola(unsigned int slot) {
 
     for (seg = 9; seg >= 0; --seg) {
         unsigned char uidx = (unsigned char)seg;
-        RAM(0x0071u + uidx) = 64;
-        RAM(0x0085u + uidx) = 0x8D;
-        RAM(0x0099u + uidx) = 0;
-        RAM(0x0406u + uidx) = 0;
-        RAM(0x0493u + uidx) = 0;
-        RAM(0x04C0u + uidx) = RAM(0x04C0u);
-        RAM(0x0486u + uidx) = RAM(0x0486u);
-        RAM(0x0350u + uidx) = RAM(0x0350u);
+        F_ENEMY_GLEEOK_BASE_X_R5(uidx) = 64;
+        F_ENEMY_GLEEOK_BASE_Y_R5(uidx) = 0x8D;
+        F_ram_0099_R2(uidx) = 0;
+        F_ram_0406_R(uidx) = 0;
+        F_ram_0493_R(uidx) = 0;
+        F_ram_04C0_R2(uidx) = F_ram_04C0_R;
+        F_ram_0486_R2(uidx) = F_ram_0486_R;
+        F_CAVE_ROOM_TYPE_R5(uidx) = F_CAVE_ROOM_TYPE_R3;
     }
 
-    RAM(0x009Du) = 8;
-    RAM(0x0385u) = 8;
-    RAM(0x00A2u) = 8;
-    RAM(0x038Au) = 8;
+    F_ram_009D_R = 8;
+    F_ram_0385_R = 8;
+    F_ram_00A2_R = 8;
+    F_ram_038A_R = 8;
 
-    type = RAM(0x0350u);
+    type = F_CAVE_ROOM_TYPE_R3;
     ENEMY_LAMNOLA_TYPE = type;
     ENEMY_LAMNOLA_SPEED = (unsigned char)(type - 0x39u);
 
-    RAM(0x034Eu) = 8;
+    F_ram_034E_R2 = 8;
 }
 
 void enrt_update_lamnola(unsigned int slot) {
@@ -47,7 +47,6 @@ void enrt_update_lamnola(unsigned int slot) {
     unsigned char saved_dir;
     unsigned char tile;
     unsigned char speed;
-    signed char tail;
 
     if (dir == 0) {
         return;
@@ -64,7 +63,7 @@ void enrt_update_lamnola(unsigned int slot) {
     ENEMY_X(slot) = (unsigned char)(saved_x + 4);
 
     speed = ENEMY_LAMNOLA_SPEED;
-    RAM(0x0003u) = (unsigned char)(speed ^ 0x03u);
+    F_ram_0003_R = (unsigned char)(speed ^ 0x03u);
 
     tile = (slot == 5 || slot == 0x0A) ? 0x9E : 0xA0;
     c_anim_write_sprite(tile, slot);
@@ -75,29 +74,37 @@ void enrt_update_lamnola(unsigned int slot) {
     c_check_monster_collisions(slot);
     ENEMY_DIR(slot) = saved_dir;
 
+    enrt_lamnola_finish_collisions(slot);
+}
+
+/* NES source: UpdateLamnola post-collision tail. Drained C: unchanged
+ * body below. Coverage: P1 and party full/melee/beam finalization.
+ * Stance: EXTEND shared tail ownership without a second enemy tick. */
+void enrt_lamnola_finish_collisions(unsigned int slot) {
+    signed char tail;
     if (ENEMY_METASTATE(slot) == 0) {
         return;
     }
 
     c_reset_shove_info(slot);
-    OBJ(0x0485u, slot) = 32;
+    F_ram_0485_O(slot) = 32;
 
     tail = (slot < 6u) ? (signed char)-1 : (signed char)4;
     do {
         ++tail;
-    } while (RAM(0x0350u + (unsigned char)tail) != ENEMY_LAMNOLA_TYPE);
+    } while (F_CAVE_ROOM_TYPE_R5((unsigned char)tail) != ENEMY_LAMNOLA_TYPE);
 
-    RAM(0x0029u + (unsigned char)tail) = 17;
+    F_ram_0029_R3((unsigned char)tail) = 17;
 
-    RAM(0x04F1u + (unsigned char)tail) = OBJ(0x04F0u, slot);
-    RAM(0x0071u + (unsigned char)tail) = ENEMY_X(slot);
-    RAM(0x0085u + (unsigned char)tail) = ENEMY_Y(slot);
+    F_ram_04F1_R((unsigned char)tail) = F_ram_04F0_O(slot);
+    F_ENEMY_GLEEOK_BASE_X_R5((unsigned char)tail) = ENEMY_X(slot);
+    F_ENEMY_GLEEOK_BASE_Y_R5((unsigned char)tail) = ENEMY_Y(slot);
 
     if (tail == 4 || tail == 9) {
         return;
     }
 
-    RAM(0x0350u + (unsigned char)tail) = 93;
+    F_CAVE_ROOM_TYPE_R5((unsigned char)tail) = 93;
     c_reset_obj_metastate(slot);
 }
 
@@ -119,8 +126,8 @@ void enrt_lamnola_update_head(unsigned int slot) {
     if (slot != 5)
         chain_slot = 5;
     for (i = 0; i < 4; ++i, ++chain_slot)
-        ENEMY_MANHANDLA_SEG_DIR(chain_slot) = OBJ(0x009A, chain_slot);
-    RAM(0x0000) = 0;        /* NES loop counter [00] ends at 0 (T-171) */
+        ENEMY_MANHANDLA_SEG_DIR(chain_slot) = F_ram_009A_O(chain_slot);
+    F_ram_0000_R3 = 0;        /* NES loop counter [00] ends at 0 (T-171) */
 
     if ((ENEMY_X(slot) & 0x0F) != 0)
         return;
@@ -128,7 +135,7 @@ void enrt_lamnola_update_head(unsigned int slot) {
         return;
 
     cur_dir = ENEMY_DIR(slot);
-    RAM(0x0000) = (unsigned char)((cur_dir >> 1) & 0x05u);   /* NES [00] */
+    F_ram_0000_R3 = (unsigned char)((cur_dir >> 1) & 0x05u);   /* NES [00] */
     ENEMY_LAMNOLA_VIABLE_DIR_MASK = (unsigned char)(0x0Fu ^ c_get_opposite_dir(cur_dir));
 
     if (ENEMY_RNG_A(slot) < 0x80) {
@@ -138,8 +145,8 @@ void enrt_lamnola_update_head(unsigned int slot) {
         vert_dir = 4;
         if (ENEMY_PLAYER_OBJ_Y < ENEMY_Y(slot))
             vert_dir = 8;
-        RAM(0x0002) = horiz_dir;            /* NES [02]/[03] (T-171) */
-        RAM(0x0003) = vert_dir;
+        F_ram_0002_R2 = horiz_dir;            /* NES [02]/[03] (T-171) */
+        F_ram_0003_R3 = vert_dir;
         /* NES BIT ObjDir: the horizontal turn needs *Link* facing that
          * way (slot 0), not the head (T-171). */
         chosen_dir = horiz_dir;
@@ -188,5 +195,5 @@ void enrt_lamnola_move(unsigned int slot) {
         ENEMY_Y(slot) = (unsigned char)(ENEMY_Y(slot) + step);
     if (dir & 0x08)
         ENEMY_Y(slot) = (unsigned char)(ENEMY_Y(slot) - step);
-    RAM(0x0002) = 0x08;     /* NES mask $A1 << 3 left in [02] (T-171) */
+    F_ram_0002_R2 = 0x08;     /* NES mask $A1 << 3 left in [02] (T-171) */
 }

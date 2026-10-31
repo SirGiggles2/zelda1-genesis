@@ -8,6 +8,9 @@ from pathlib import Path
 import math
 
 ROOT = Path(__file__).resolve().parents[1]
+# PAL3[4] is black in every gameplay sprite-palette load (bg_palette.c); PAL3[15]
+# became the T-317 pale-green rupee entry and turned the mask green.
+MASK_INDEX = 4
 
 
 def generate():
@@ -19,7 +22,7 @@ def generate():
         # Startup Link is (120,141), rendered at y-7 with an 8px half-height.
         vertices = [(128 + radius * math.cos(math.radians(angle + 120 * k)),
                      142 + radius * math.sin(math.radians(angle + 120 * k))) for k in range(3)]
-        patterns = [(0xffffffff,) * 8]
+        patterns = [(0x44444444,) * 8]
         indices = {patterns[0]: 0}
         cells = []
         for ty in range(28):
@@ -32,7 +35,7 @@ def generate():
                         cross = [(vertices[(k + 1) % 3][0] - vertices[k][0]) * (py - vertices[k][1])
                                  - (vertices[(k + 1) % 3][1] - vertices[k][1]) * (px - vertices[k][0]) for k in range(3)]
                         inside = frame > 0 and min(cross) >= 0
-                        word = (word << 4) | (0 if inside else 15)
+                        word = (word << 4) | (0 if inside else MASK_INDEX)
                     words.append(word)
                 pattern = tuple(words)
                 if not any(pattern):

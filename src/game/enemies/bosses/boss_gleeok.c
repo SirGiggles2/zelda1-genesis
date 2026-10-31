@@ -21,6 +21,8 @@
  */
 
 #include "boss_gleeok.h"
+#include "combat/link_collision_dispatch.h"
+#include "../../../../engine/src/engine_state.h"
 #include "platform_abi.h"
 #include "scratch_state.h"            /* ZP_TMP0..5 */
 #include "enemy_state.h"
@@ -124,22 +126,22 @@ static const unsigned short k_head_info_base[4] = {
 
 /* Working-area aliases used by Gleeok_MoveHead (loaded into $0413..$0418
  * per current neck via the indirect ($04),Y fetch in UpdateGleeok). */
-#define GLEEOK_WORK_DIRCNT_H   RAM(0x0413u)
-#define GLEEOK_WORK_DIRCNT_V   RAM(0x0414u)
-#define GLEEOK_WORK_SPEEDX     RAM(0x0415u)
-#define GLEEOK_WORK_SPEEDY     RAM(0x0416u)
-#define GLEEOK_WORK_DIRCHG     RAM(0x0417u)
-#define GLEEOK_WORK_DELAY      RAM(0x0418u)
+#define GLEEOK_WORK_DIRCNT_H   F_ram_0413_R
+#define GLEEOK_WORK_DIRCNT_V   F_GLEEOK_WORK_DIRCNT_V_R
+#define GLEEOK_WORK_SPEEDX     F_ram_0415_R
+#define GLEEOK_WORK_SPEEDY     F_ram_0416_R
+#define GLEEOK_WORK_DIRCHG     F_GLEEOK_WORK_DIRCHG_R
+#define GLEEOK_WORK_DELAY      F_ram_0418_R
 
 /* Gleeok per-axis tier-limit RAM cells (Z_04.asm:8907/8916/8925).
  * X = 0 horizontal, X = 1 vertical -> +0/+1 offsets. */
-#define GLEEOK_PRIMARY_LIMIT(axis)   RAM(0x04D9u + (axis))
-#define GLEEOK_SECONDARY_LIMIT(axis) RAM(0x04DBu + (axis))
-#define GLEEOK_TERTIARY_LIMIT(axis)  RAM(0x04DDu + (axis))
+#define GLEEOK_PRIMARY_LIMIT(axis)   F_ram_04D9_R((axis))
+#define GLEEOK_SECONDARY_LIMIT(axis) F_ram_04DB_R((axis))
+#define GLEEOK_TERTIARY_LIMIT(axis)  F_ENEMY_GLEEOK_REF_LIMIT_H_3_R2((axis))
 
 /* Frame counter ($0015) — the asm calls it FrameCounter; the C state
  * map already aliases it as ENEMY_CUR_SPRITE_ATTR_ROW (same address). */
-#define GLEEOK_FRAME_COUNTER         RAM(0x0015u)
+#define GLEEOK_FRAME_COUNTER         F_ram_0015_R
 
 /* ------------------------------------------------------------------
  * Helpers: signed math + abs.
@@ -427,10 +429,10 @@ static void gleeok_anim_write_specific_sprite(unsigned char tile,
                                               unsigned char sprite_off,
                                               unsigned char attrs)
 {
-    unsigned char gx = (unsigned char)OBJ(NES_OBJ_X, slot);
-    unsigned char gy = (unsigned char)OBJ(NES_OBJ_Y, slot);
+    unsigned char gx = (unsigned char)F_ram_0070_O2(slot);
+    unsigned char gy = (unsigned char)F_ram_0084_O2(slot);
     enemy_render_note_boss_oam();
-    RAM(0x0003u) = attrs;               /* NES passes the attributes in [03] */
+    F_ram_0003_R = attrs;               /* NES passes the attributes in [03] */
     OAM_BYTE((unsigned int)(sprite_off + 1u)) = tile;
     OAM_BYTE((unsigned int)(sprite_off + 3u)) = gx;
     OAM_BYTE((unsigned int)sprite_off) = gy;
@@ -447,7 +449,7 @@ static void gleeok_anim_write_level_palette_sprite(unsigned char tile,
         attrs = (unsigned char)(ENEMY_CUR_SPRITE_ATTR_ROW & 0x03u);
     }
     {
-        const unsigned char rsi = (unsigned char)RAM(0x0341u);
+        const unsigned char rsi = (unsigned char)F_ram_0341_R;
         const unsigned char off = k_sprite_offsets[rsi & 0x3Fu];
         gleeok_anim_write_specific_sprite(tile, slot, off, attrs);
     }
@@ -484,6 +486,16 @@ void c_gleeok_draw_segment_and_check_collisions(unsigned int slot)
     }
     gleeok_anim_write_level_palette_sprite(tile, slot);
     enrt_gleeok_check_collisions(slot);
+}
+
+/* NES source: Z_04.asm:Gleeok_CheckCollisions, before its segment tail.
+ * Drained C: enrt_gleeok_check_collisions owns writhe/detach/death.
+ * Coverage: PARTIAL P1 then extra-player checks at the loaded segment.
+ * Stance: EXTEND context admission; execute the existing tail only once. */
+void c_gleeok_check_monster_collisions(unsigned int slot)
+{
+    c_check_monster_collisions(slot);
+    roomrom_main_gleeok_party_collisions(slot);
 }
 
 void c_gleeok_draw_head_and_check_collisions(void)
@@ -529,10 +541,10 @@ void c_gleeok_draw_body(void)
         /* [06] row and [07] column counters live in NES RAM (T-171). */
         for (row = 0u; row < 2u; row++) {
             unsigned char col;
-            RAM(0x0006u) = row;
+            F_ram_0006_R = row;
             for (col = 0u; col < 3u; col++) {
-                RAM(0x0007u) = col;
-                const unsigned char rsi = (unsigned char)RAM(0x0341u);
+                F_ram_0007_R = col;
+                const unsigned char rsi = (unsigned char)F_ram_0341_R;
                 const unsigned char off = k_sprite_offsets[rsi & 0x3Fu];
 
                 /* Y = $57 + row * $10. */
@@ -557,9 +569,9 @@ void c_gleeok_draw_body(void)
                 tile_idx = (unsigned char)(tile_idx + 1u);
                 sprite_cycle_cur_sprite_index();
             }
-            RAM(0x0007u) = 3u;
+            F_ram_0007_R = 3u;
         }
-        RAM(0x0006u) = 2u;
+        F_ram_0006_R = 2u;
     }
 }
 
@@ -589,7 +601,7 @@ void boss_gleeok_init(unsigned int slot)
     (void)slot;
     /* Play Aquamentus/Gleeok/Ganon roar: SampleRequest ($0601) = $10.
      * ($0600 is SongRequest.) */
-    RAM(0x0601u) = 0x10u;
+    F_ram_0601_R = 0x10u;
 
     /* Per-segment loop X = 5..0 (each neck has 6 segments).
      * NES uses Gleeok_NeckXs0..3 absolute base addrs. */
@@ -598,62 +610,62 @@ void boss_gleeok_init(unsigned int slot)
         for (x = 5; x >= 0; --x) {
             const unsigned int u = (unsigned int)x;
             /* X = $7C for all 4 necks at this segment slot. */
-            nes_ram[(0x0438u + u)] = 0x7Cu;
-            nes_ram[(0x0452u + u)] = 0x7Cu;
-            nes_ram[(0x046Cu + u)] = 0x7Cu;
-            nes_ram[(0x0395u + u)] = 0x7Cu;
+            F_CAVE_SELECTED_WARE_INDEX_X(u) = 0x7Cu;
+            F_Gleeok_NeckXs1_X(u) = 0x7Cu;
+            F_ram_046C_X(u) = 0x7Cu;
+            F_Gleeok_NeckXs3_X(u) = 0x7Cu;
             /* ObjX+1, X (= $0071+x — ENEMY_GLEEOK_BASE_X area). */
-            nes_ram[(0x0071u + u)] = 0x7Cu;
+            F_ENEMY_GLEEOK_BASE_X_X(u) = 0x7Cu;
 
             /* Y from GleeokSegmentYs[x] for all 4 necks. */
             {
                 const unsigned char y = k_gleeok_segment_ys[u];
-                nes_ram[(0x0445u + u)] = y;
-                nes_ram[(0x045Fu + u)] = y;
-                nes_ram[(0x0479u + u)] = y;
-                nes_ram[(0x03BDu + u)] = y;
-                nes_ram[(0x0085u + u)] = y;   /* ObjY+1, X */
+                F_GANON_SCENE_PHASE_X(u) = y;
+                F_CAVE_TEXT_LINE_ADDR_LO_X(u) = y;
+                F_ram_0479_X(u) = y;
+                F_Gleeok_NeckYs3_X(u) = y;
+                F_ENEMY_GLEEOK_BASE_Y_X(u) = y;   /* ObjY+1, X */
             }
 
             /* HP $A0 in ObjHP+1 ($0486+x). */
-            nes_ram[(0x0486u + u)] = 0xA0u;
+            F_ram_0486_X(u) = 0xA0u;
 
             /* Reset metastate ($0405+1+x) and uninit-flag ($0492+2+x).
              * NES has the +2 quirk noted as UNKNOWN at line 7687. */
-            nes_ram[(0x0406u + u)] = 0x00u;
-            nes_ram[(0x0494u + u)] = 0x00u;
+            F_ram_0406_X(u) = 0x00u;
+            F_ram_0494_X(u) = 0x00u;
 
             /* InvincibilityMask $FE — sword only (ObjInvincibilityMask+1). */
-            nes_ram[(0x04B3u + u)] = 0xFEu;
+            F_ram_04B3_X(u) = 0xFEu;
         }
     }
 
     /* Speed flags: necks 0 X / 1 Y / 2 X / 3 Y to $FF (decel),
      * remaining flags stay 0 (accel). NES STX uses X register at
      * end of loop = $FF (DEX past 0). */
-    nes_ram[k_head_info_base[0] + GLEEOK_OFF_SPEEDX] = 0xFFu;
-    nes_ram[k_head_info_base[1] + GLEEOK_OFF_SPEEDY] = 0xFFu;
-    nes_ram[k_head_info_base[2] + GLEEOK_OFF_SPEEDX] = 0xFFu;
-    nes_ram[k_head_info_base[3] + GLEEOK_OFF_SPEEDY] = 0xFFu;
+    F_ram_0002_X(k_head_info_base[0]) = 0xFFu;
+    F_ram_0003_X(k_head_info_base[1]) = 0xFFu;
+    F_ram_0002_X(k_head_info_base[2]) = 0xFFu;
+    F_ram_0003_X(k_head_info_base[3]) = 0xFFu;
 
     /* V dir-counter = 3 for all 4 necks. */
-    nes_ram[k_head_info_base[0] + GLEEOK_OFF_DIRCNT_V] = 0x03u;
-    nes_ram[k_head_info_base[1] + GLEEOK_OFF_DIRCNT_V] = 0x03u;
-    nes_ram[k_head_info_base[2] + GLEEOK_OFF_DIRCNT_V] = 0x03u;
-    nes_ram[k_head_info_base[3] + GLEEOK_OFF_DIRCNT_V] = 0x03u;
+    F_ram_0001_X2(k_head_info_base[0]) = 0x03u;
+    F_ram_0001_X2(k_head_info_base[1]) = 0x03u;
+    F_ram_0001_X2(k_head_info_base[2]) = 0x03u;
+    F_ram_0001_X2(k_head_info_base[3]) = 0x03u;
 
     /* H dir-counter = 6 (= 3 << 1). */
-    nes_ram[k_head_info_base[0] + GLEEOK_OFF_DIRCNT_H] = 0x06u;
-    nes_ram[k_head_info_base[1] + GLEEOK_OFF_DIRCNT_H] = 0x06u;
-    nes_ram[k_head_info_base[2] + GLEEOK_OFF_DIRCNT_H] = 0x06u;
-    nes_ram[k_head_info_base[3] + GLEEOK_OFF_DIRCNT_H] = 0x06u;
+    F_ram_0000_X2(k_head_info_base[0]) = 0x06u;
+    F_ram_0000_X2(k_head_info_base[1]) = 0x06u;
+    F_ram_0000_X2(k_head_info_base[2]) = 0x06u;
+    F_ram_0000_X2(k_head_info_base[3]) = 0x06u;
 
     /* Per-neck head-delay timers: neck 0 = 0, 1 = 12, 2 = 24, 3 = 36.
      * NES asm derives these via successive ASLs from $03 (= 6 -> 12 -> 24)
      * and ADC for neck 3 (24 + 12 = 36). */
-    nes_ram[k_head_info_base[1] + GLEEOK_OFF_DELAY] = 12u;
-    nes_ram[k_head_info_base[2] + GLEEOK_OFF_DELAY] = 24u;
-    nes_ram[k_head_info_base[3] + GLEEOK_OFF_DELAY] = 36u;
+    F_ram_0005_X(k_head_info_base[1]) = 12u;
+    F_ram_0005_X(k_head_info_base[2]) = 24u;
+    F_ram_0005_X(k_head_info_base[3]) = 36u;
 }
 
 /* ------------------------------------------------------------------
@@ -678,7 +690,7 @@ extern void c_control_keese_flight(unsigned int slot);
 static void gleeok_control_head_flight(unsigned int slot)
 {
     /* Z_04.asm:8559 — JT[FlyingState] over slot $0444. */
-    const unsigned char st = (unsigned char)OBJ(0x0444u, slot);
+    const unsigned char st = (unsigned char)F_ram_0444_O(slot);
     switch (st & 0x03u) {
     case 0u: enrt_flyer_speed_up(slot);                 break;
     case 1u: enrt_flyer_gleeok_head_decide_state(slot); break;
@@ -692,6 +704,24 @@ static void gleeok_control_head_flight(unsigned int slot)
     }
 }
 
+/* NES source: Z_04.asm:UpdateGleeokHead collision/reset tail.
+ * Drained C: native boss_gleeok_update_head below, same three reset calls.
+ * Coverage: PARTIAL extra collision contexts before world object dispatch.
+ * Stance: EXTEND reuse of the immortal-head tail; no flight/draw/timer tick. */
+static inline __attribute__((always_inline)) void gleeok_finish_head_collisions(unsigned int slot)
+{
+    core_reset_obj_metastate(slot);
+    core_set_shove_info_with0(0u, slot);
+    F_ram_04F0_O(slot) = 0u;
+}
+
+void boss_gleeok_check_head_party_collisions(unsigned int slot, unsigned char player,
+                                             unsigned char context)
+{
+    link_collision_check_gleeok_head_part(slot, player, context);
+    gleeok_finish_head_collisions(slot);
+}
+
 void boss_gleeok_update_head(unsigned int slot)
 {
     gleeok_control_head_flight(slot);
@@ -700,10 +730,10 @@ void boss_gleeok_update_head(unsigned int slot)
     /* Fireball gate — every odd dist-traveled, RNG_B < $20, slot $B
      * empty -> shoot fireball $56. */
     {
-        const unsigned char dist = (unsigned char)OBJ(0x0437u, slot);
+        const unsigned char dist = (unsigned char)F_ram_0437_O(slot);
         if ((dist & 0x01u) == 0u) {
             const unsigned char rng = (unsigned char)ENEMY_RNG_B(slot);
-            if (rng < 0x20u && (unsigned char)OBJ(NES_OBJ_TYPE, 0x0Bu) == 0u) {
+            if (rng < 0x20u && (unsigned char)F_ram_034F_O2(0x0Bu) == 0u) {
                 c_shoot_fireball(0x56u, slot);
             }
         }
@@ -718,7 +748,7 @@ void boss_gleeok_update_head(unsigned int slot)
         extern void draw_object_mirrored(unsigned char frame,
                                          unsigned int slot);
         z07_anim_advance_and_fetch(1u, slot);
-        draw_object_mirrored((unsigned char)OBJ(0x03E4u, slot), slot);
+        draw_object_mirrored((unsigned char)F_ram_03E4_O(slot), slot);
     }
 
     c_check_monster_collisions(slot);
@@ -728,7 +758,5 @@ void boss_gleeok_update_head(unsigned int slot)
      * T-171: the drain cleared $04B2 + slot, not the timer ($04F0), so
      * a hit made the head invincible for 16 frames (t171_gleeok_sword
      * t887: NES HP D0 -> B0 on the next hit, Genesis stayed D0). */
-    core_reset_obj_metastate(slot);
-    core_set_shove_info_with0(0u, slot);
-    OBJ(0x04F0u, slot) = 0u;
+    gleeok_finish_head_collisions(slot);
 }

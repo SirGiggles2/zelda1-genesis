@@ -31,20 +31,20 @@
 #include "hud/hud_dispatch.h"    /* hud_world_fill_hearts, hud_tick_native_rupees */
 
 /* NES Variables.inc. */
-#define M12_IS_UPDATING_MODE   RAM(0x0011u)
-#define M12_GAME_SUBMODE       RAM(0x0013u)
-#define M12_TILE_BUF_SELECTOR  RAM(0x0014u)
-#define M12_FRAME_COUNTER      RAM(0x0015u)
-#define M12_OBJ_TIMER_LINK     RAM(0x0028u)   /* ObjTimer */
-#define M12_FILLING_HEARTS     RAM(0x0063u)   /* World_IsFillingHearts */
-#define M12_CURTAIN_DEC_COL    RAM(0x007Cu)   /* ObjX+12 */
-#define M12_CURTAIN_INC_COL    RAM(0x007Du)   /* ObjX+13 */
-#define M12_SONG_REQUEST       RAM(0x0600u)
-#define M12_TUNE0_REQUEST      RAM(0x0604u)
-#define M12_ITEM_TYPE_TO_LIFT  RAM(0x0505u)
-#define M12_E7                 RAM(0x00E7u)
-#define M12_CUR_PPU_CTRL_2000  RAM(0x00FFu)
-#define M12_CUR_PPU_MASK_2001  RAM(0x00FEu)
+#define M12_IS_UPDATING_MODE   F_ram_0011_R
+#define M12_GAME_SUBMODE       F_ram_0013_R
+#define M12_TILE_BUF_SELECTOR  F_ram_0014_R
+#define M12_FRAME_COUNTER      F_ram_0015_R
+#define M12_OBJ_TIMER_LINK     F_ram_0028_R   /* ObjTimer */
+#define M12_FILLING_HEARTS     F_ram_0063_R   /* World_IsFillingHearts */
+#define M12_CURTAIN_DEC_COL    F_ram_007C_R   /* ObjX+12 */
+#define M12_CURTAIN_INC_COL    F_ram_007D_R   /* ObjX+13 */
+#define M12_SONG_REQUEST       F_ram_0600_R
+#define M12_TUNE0_REQUEST      F_ram_0604_R
+#define M12_ITEM_TYPE_TO_LIFT  F_ram_0505_R
+#define M12_E7                 F_ram_00E7_R
+#define M12_CUR_PPU_CTRL_2000  F_ram_00FF_R
+#define M12_CUR_PPU_MASK_2001  F_ram_00FE_R
 
 
 /* Genesis presentation / flow hooks (engine/src/main.c). */
@@ -59,7 +59,7 @@ static void init_mode12(void)
     M12_CURTAIN_DEC_COL = 0x20u;
     M12_CURTAIN_INC_COL = 0x01u;
     M12_OBJ_TIMER_LINK = 0x30u;
-    RAM(0x000Au) = 0x24u;              /* FillTileMap($24) */
+    F_ZP_TMPA_R = 0x24u;              /* FillTileMap($24) */
     world_fill_tile_map();
     M12_IS_UPDATING_MODE = (unsigned char)(M12_IS_UPDATING_MODE + 1u);
     M12_ITEM_TYPE_TO_LIFT = 0x1Bu;     /* triforce */
@@ -134,7 +134,7 @@ static void sub4(void)
     M12_IS_UPDATING_MODE = 0u;
     M12_GAME_SUBMODE = 0u;
     M12_E7 = 0u;
-    RAM(0x0012u) = 0x02u;
+    F_ram_0012_R = 0x02u;
     M12_TUNE0_REQUEST = 0x80u;
     M12_CUR_PPU_MASK_2001 = (unsigned char)(M12_CUR_PPU_MASK_2001 & 0xFEu);
     roomrom_mode12_exit();

@@ -69,9 +69,13 @@
 #define ROOMROM_SPRITE_SLOT_MP_SWORD3      27u  /* T-251 player 3 sword */
 #define ROOMROM_SPRITE_SLOT_MP_SWORD4      28u  /* T-251 player 4 sword */
 #define ROOMROM_MP_LINK_SLOT(p)   (20u + 2u * ((p) - 1u))
-#define ROOMROM_MP_SWORD_SLOT(p)  (26u + 3u * ((p) - 1u))
-#define ROOMROM_MP_SHOT_SLOT(p)   (27u + 3u * ((p) - 1u))
-#define ROOMROM_MP_FX_SLOT(p)     (28u + 3u * ((p) - 1u))
+#define ROOMROM_MP_SWORD_SLOT(p)  (26u + ((p) - 1u))
+/* Virtual owner/family tokens. They are staged, never written into the SAT. */
+#define ROOMROM_MP_WEAPON_TOKEN_BASE 64u
+#define ROOMROM_MP_WEAPON_FAMILIES 10u /* beam pieces0..3, other items4..9 */
+#define ROOMROM_MP_WEAPON_TOKEN_COUNT (3u * ROOMROM_MP_WEAPON_FAMILIES)
+#define ROOMROM_MP_WEAPON_TOKEN(p, family) \
+    (ROOMROM_MP_WEAPON_TOKEN_BASE + ((p) - 1u) * ROOMROM_MP_WEAPON_FAMILIES + (family))
 
 /* Play-area sprite Y: NES shows an OAM sprite one line below its Y, and
  * the Genesis frame is the NES frame without its top eight lines (the BG

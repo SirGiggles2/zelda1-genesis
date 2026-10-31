@@ -33,6 +33,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "converter"))
+from platform_tools import ToolNotFoundError, tool_path  # noqa: E402
 
 # Supported input ROMs, pinned here rather than read from an extractor's
 # output manifest: a clean package has no generated files yet, so the old
@@ -59,25 +61,26 @@ def sha256_file(p: Path) -> str:
 
 
 def check_toolchain() -> int:
-    """Verify gcc/objcopy/python availability."""
-    gcc = ROOT / "sgdk" / "bin" / "gcc.exe"
-    objcopy = ROOT / "sgdk" / "bin" / "objcopy.exe"
+    """Verify native tools and pinned SGDK libraries before conversion."""
     issues = []
-    if not gcc.exists():
-        issues.append(f"missing: {gcc}")
-    if not objcopy.exists():
-        issues.append(f"missing: {objcopy}")
-    libmd = ROOT / "sgdk" / "lib" / "libmd.a"
-    if not libmd.exists():
-        issues.append(f"missing: {libmd} (the package's SGDK folder is incomplete)")
+    tools = {}
+    for name in ("gcc", "objcopy", "nm", "xgmtool", "node"):
+        try:
+            tools[name] = tool_path(name, ROOT)
+        except ToolNotFoundError as exc:
+            issues.append(str(exc))
+    for name in ("libmd.a", "libgcc.a"):
+        library = ROOT / "sgdk" / "lib" / name
+        if not library.is_file():
+            issues.append(f"missing: {library} (the package's pinned SGDK folder is incomplete)")
     if issues:
         for i in issues:
             print(f"  {i}", file=sys.stderr)
-        print("The converter package is incomplete: extract the whole package again.",
+        print("Install the native tools listed above, or extract the whole package for your platform again.",
               file=sys.stderr)
         return 2
-    print(f"  gcc:     {gcc.name}")
-    print(f"  objcopy: {objcopy.name}")
+    for name, executable in tools.items():
+        print(f"  {name:8s} {executable}")
     print("Toolchain ok.")
     return 0
 
@@ -422,6 +425,10 @@ def main() -> int:
         if validate_rom(args.rom) != 0:
             return 1
         args.redux = make_redux_rom(args.rom, args.redux_patch)
+    if args.redux is not None:
+        # Child music generators must consume the same authenticated Redux
+        # input, including an external --redux path outside the project tree.
+        os.environ["ZELDA_REDUX_ROM"] = str(args.redux)
     if args.extract_only:
         if (rc := validate_rom(args.rom)) != 0:
             return rc

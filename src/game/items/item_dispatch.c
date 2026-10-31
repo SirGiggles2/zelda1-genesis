@@ -18,6 +18,7 @@
                                       * room_patch_and_cue_level_palettes_transfer */
 #include "../../state/inventory.h"   /* T2.7: inventory_add_heart_container */
 #include "../../state/game_profile.h"
+#include "../../state/player_state.h"
 
 /* NES source: Redux arrows.asm:ShopArrow / GiveArrowDrop.
  * Drained C: item_take_item / existing native cave and dropped-item paths.
@@ -27,10 +28,10 @@ void item_add_arrow_ammunition(unsigned char amount)
 {
     unsigned char type, cap, sum;
     if (!game_profile_is_remix()) return;
-    type = RAM(0x0659u);
+    type = F_ram_0659_R;
     cap = type == 2u ? 60u : type == 1u ? 30u : 0u;
-    sum = (unsigned char)(RAM(0x0677u) + amount);
-    RAM(0x0677u) = sum < cap ? sum : cap;
+    sum = (unsigned char)(F_ram_0677_R + amount);
+    F_ram_0677_R = sum < cap ? sum : cap;
 }
 
 /* T5.2 Plan v5b — item pickup SFX. ID 7 = itempickup per
@@ -183,20 +184,32 @@ static void item_check_class1(unsigned char item_slot, unsigned char item_class)
 
 void item_take_item(unsigned char item_id)
 {
+    item_take_item_for_player(item_id, 0u);
+}
+
+/* NES source: Z_01.asm:TakeItem / CheckLinkLiftingItem.
+ * Drained C: item_take_item and existing check_lift_item host boundary.
+ * Coverage: PARTIAL explicit party lift owner; Stance: EXTEND.
+ * The shared timer/id stay single-owner; the native role identifies whose
+ * body is halted/drawn. No slot-0 actor substitution for an item award. */
+void item_take_item_for_player(unsigned char item_id, unsigned char player)
+{
     /* drain at item_runtime.c:110-137. NES TakeItem. */
     if (game_profile_is_remix() && item_id == 0x55u) {
         /* GiveArrowDrop establishes wood ownership if absent, then grants
          * five. Use the corresponding native graded item for pickup SFX
          * and ownership; an extended drop ID is not a legacy table index. */
-        if (RAM(0x0659u) == 0u) RAM(0x0659u) = 1u;
+        if (F_ram_0659_R == 0u) F_ram_0659_R = 1u;
         item_add_arrow_ammunition(5u);
-        item_id = RAM(0x0659u) == 2u ? 9u : 8u;
+        item_id = F_ram_0659_R == 2u ? 9u : 8u;
     }
     ITEM_SFX_PRIMARY = 8u;
     if (item_id == 0x0Eu) {
         ITEM_SFX_PRIMARY = 2u;
     }
     if ((unsigned char)GAME_MODE != 5u) {
+        G_OBJECT_PLAYER_REFS[19u].pickup_player =
+            player < g_player_count ? player : 0u;
         ITEM_FREEZE_FLAG = 0x80u;
         ITEM_SFX_SECONDARY = 8u;
         ITEM_PICKUP_ID = item_id;

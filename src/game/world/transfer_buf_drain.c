@@ -80,7 +80,7 @@ found:
 static unsigned short playfield_tile_word(unsigned char raw, unsigned char pal)
 {
     unsigned short slot;
-    if (RAM(0x0012u) == 9u) return roomrom_cellar_tile_word(raw);
+    if (F_ram_0012_R == 9u) return roomrom_cellar_tile_word(raw);
     slot = bg_sparse_tile_lut[raw][pal];
     return slot == 0xFFFFu ? missing_font_word(raw, pal) : ROOMROM_BG_TILE_BASE + slot;
 }
@@ -95,7 +95,7 @@ static unsigned short playfield_tile_word(unsigned char raw, unsigned char pal)
 /* NES TileBufSelector cell — Variables.inc:5 (`TileBufSelector := $14`).
  * Selectors are byte indices into TransferBufAddrs (Z_06.asm:489) so
  * valid values are even. Non-zero selector = pending static transfer. */
-#define TILE_BUF_SELECTOR RAM(0x0014u)
+#define TILE_BUF_SELECTOR F_ram_0014_R
 
 /* ---- Static asm-side palette buffers ----
  *
@@ -241,7 +241,7 @@ static const unsigned char *resolve_static_buffer(unsigned char selector,
     case 0x06u: {
         unsigned char i;
         for (i = 0u; i < 4u; ++i)
-            s_level_row7[3u + i] = nes_ram[LEVEL_PALETTES_TRANSFER_BUF + 31u + i];
+            s_level_row7[3u + i] = F_LEVEL_PALETTES_TRANSFER_BUF_6B9D_X(i);
         *out_len = (unsigned char)sizeof s_level_row7;
         return s_level_row7;
     }
@@ -257,7 +257,7 @@ static const unsigned char *resolve_static_buffer(unsigned char selector,
     case 0x7Cu: *out_len = (unsigned char)sizeof k_gleeok_row7;      return k_gleeok_row7;
     case 0x18u:
         *out_len = 36u;
-        return (const unsigned char *)&nes_ram[LEVEL_PALETTES_TRANSFER_BUF];
+        return (const unsigned char *)&nes_ram[LEVEL_PALETTES_TRANSFER_BUF]; /* native_ram bulk:src/game/world/transfer_buf_drain.c:260 */
     case 0x78u:
         *out_len = (unsigned char)sizeof k_white_palette_bottom_half;
         return k_white_palette_bottom_half;
@@ -384,7 +384,7 @@ static unsigned char attribute_raw_tile(unsigned char col, unsigned char row)
         unsigned char i = (unsigned char)((row - 13u) * 24u + col - 4u);
         if (s_text_nt_valid[i >> 3] & (1u << (i & 7u))) return s_text_nt[i];
     }
-    return nes_ram[0x6530u + (unsigned short)col * 0x16u + (unsigned char)(row - 8u)];
+    return F_NES_PLAY_AREA_BASE_6530_X3((unsigned short)col * 0x16u, (unsigned char)(row - 8u));
 }
 
 void transfer_buf_attr_shadow_reset(void)
@@ -484,8 +484,8 @@ static void emit_attribute_record(unsigned char attr_off,
      * attributes (cellar_host_layout -> load_room), which InitModeA_Sub6/7
      * transfer again: the same words, and their rewrite overran a frame
      * (T-171 ls_l1_cellar f268). */
-    if (s_nt_cleared || RAM(0x0012u) == 9u ||
-        (RAM(0x0012u) == 0x0Au && RAM(0x0010u) != 0u)) {
+    if (s_nt_cleared || F_ram_0012_R == 9u ||
+        (F_ram_0012_R == 0x0Au && F_ram_0010_R != 0u)) {
         for (i = 0u; i < count && (unsigned char)(attr_off + i) < 0x40u; i++) {
             if ((unsigned char)(src_off + (repeat ? 0u : i)) >= src_end) break;
             s_attr_shadow[attr_off + i] = src[src_off + (repeat ? 0u : i)];
@@ -532,7 +532,7 @@ static void emit_nametable_record(unsigned char hi,
 {
     /* Credits own two NTs and their attributes. Gameplay's one-room
      * bridge intentionally collapses NT addresses, so route before it. */
-    if (RAM(0x0012u) == 0x13u && RAM(0x0011u) && RAM(0x0013u) >= 3u &&
+    if (F_ram_0012_R == 0x13u && F_ram_0011_R && F_ram_0013_R >= 3u &&
         ending_render_record(hi, lo, ctrl, count, src, src_off, src_end)) return;
     const unsigned char vertical = (unsigned char)(ctrl & 0x80u);
     const unsigned char repeat   = (unsigned char)(ctrl & 0x40u);
@@ -554,7 +554,7 @@ static void emit_nametable_record(unsigned char hi,
      * each status record to hidden Plane A cells every even game tick.
      * Keep formatter, buffer consumption, cues and scratch writes intact.
      * Only skip a complete record wholly covered by the displayed HUD. */
-    if (!game_profile_is_remix() && RAM(0x0012u) == 5u && RAM(0x0011u) && nes_row >= 1u && nes_row <= 7u &&
+    if (!game_profile_is_remix() && F_ram_0012_R == 5u && F_ram_0011_R && nes_row >= 1u && nes_row <= 7u &&
         (vertical ? (unsigned short)nes_row + count <= 8u
                   : (unsigned short)nes_col + count <= 32u) &&
         roomrom_hud_owns_status_bar()) return;
@@ -601,7 +601,7 @@ static void emit_nametable_record(unsigned char hi,
             s_text_nt[k] = nes_tile;
             s_text_nt_valid[k >> 3] |= (unsigned char)(1u << (k & 7u));
         }
-        if (RAM(0x0012u) == 9u && cell_row >= 8u && cell_row < 30u && cell_col < 32u) {
+        if (F_ram_0012_R == 9u && cell_row >= 8u && cell_row < 30u && cell_col < 32u) {
             unsigned short pc, pr;
             roomrom_main_nt_cell_to_plane(cell_col, cell_row, &pc, &pr);
             render_set_plane_a_word(pc, pr, roomrom_cellar_tile_word(nes_tile));
@@ -890,7 +890,7 @@ void transfer_buf_note_native_record(void)
 
 unsigned char transfer_buf_dyn_busy(void)
 {
-    return (unsigned char)(s_native_record || !(nes_ram[0x0302u] & 0x80u));
+    return (unsigned char)(s_native_record || !(F_ram_0302 & 0x80u));
 }
 
 void transfer_buf_drain(void)

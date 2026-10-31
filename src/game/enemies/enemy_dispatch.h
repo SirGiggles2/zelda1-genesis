@@ -14,6 +14,15 @@
 extern "C" {
 #endif
 
+/* Publish this monster's nearest party target before its drained update. */
+/* Existing Leever/Zora owner phase gate, shared with party contacts. */
+unsigned char enemy_burrower_collisions_enabled(unsigned int slot);
+/* Existing primary-Ghini death tail, shared with extra-player kills. */
+void enemy_ghini_finish_collisions(unsigned int slot);
+void enemy_target_party_player(unsigned int slot, unsigned char mirror);
+unsigned char enemy_nearest_party_player(unsigned int slot);
+void enemy_finish_party_projectile_contact(unsigned int slot);
+
 /* Find an empty monster slot in 11..1 (skipping slot 0 = Link).
  * Stashes result into ENEMY_NEXT_SHOT_SLOT and returns it. Returns 0
  * if no slot free. NES FindEmptyMonsterSlot. drain at
@@ -31,6 +40,11 @@ void enemy_hide_sprites_over_link(void);
 void enemy_like_like_shields_reset(void);
 void enemy_like_like_shield_forget(unsigned int slot);
 unsigned char enemy_like_like_shield_take(unsigned int slot);
+/* Party capture roles use the existing native object/player records. */
+void enemy_capture_contact(unsigned int slot, unsigned char player);
+void enemy_capture_release(unsigned int slot);
+void enemy_capture_sync(void);
+unsigned char enemy_capture_player(unsigned int slot);
 
 /* SFX trivials: play "secret found" tune (Z1 secret reveal),
  * boss death cry, gohma parry tune. drain at enemy_common_runtime.c:9-20. */
@@ -74,6 +88,8 @@ void enemy_init_tektite(unsigned int slot);
 /* Ganon randomize: Y=$A0, X=GanonStartXs[sprite_attr_row & 1] ($30 or $B0).
  * NES Z_04.asm:10488 table baked inline. */
 void enemy_ganon_randomize_location(unsigned int slot);
+/* Loaded party context: bit0 sword, bit1 owned slot18 arrow, zero body only. */
+void enemy_ganon_check_party_collisions(unsigned int slot, unsigned char weapons);
 
 /* Jumper-boulder dir-down: only if ENEMY_TYPE == $20, OR $04 into low
  * 2 bits of dir. NES JumperPointBoulderDownward. */

@@ -40,6 +40,8 @@ def main():
     # Every explicitly compiled implementation must reach the public package.
     from package_check import is_banned
     assert not is_banned("data/graphics/verified_uw_layout_aliases.json")[0]
+    assert not is_banned("data/music/builder_mix.json")[0]
+    assert is_banned("data/music/studio_project.json")[0]
     assert is_banned("data/graphics/other.json")[0]
     script = export_repo.ROOT / ('tools/build/build_rom.py' if public_layout.is_public(export_repo.ROOT)
                                  else 'tools/debug/build_debug.py')

@@ -33,7 +33,7 @@ unsigned int enemy_find_empty_monster_slot(void)
     /* drain at enemy_runtime.c:12-20. NES FindEmptyMonsterSlot.
      * Scan slots 11..1 (skip slot 0 = Link); first empty slot wins. */
     for (signed char i = 11; i >= 1; i--) {
-        if (OBJ(NES_OBJ_TYPE, (unsigned char)i) == 0u) {
+        if (F_ram_034F_O2((unsigned char)i) == 0u) {
             ENEMY_NEXT_SHOT_SLOT = (unsigned char)i;
             return (unsigned int)(unsigned char)i;
         }
@@ -228,8 +228,8 @@ void enemy_gohma_handle_weapon_collision(unsigned int monster_slot,
     if (weapon_slot == 0x12u) {
         /* nes_ram[$00AC + weapon_slot] = 40 (arrow's lifetime/anim).
          * Use OBJ()-style addressing to mirror asm's lea+move.b. */
-        OBJ(0x00ACu, weapon_slot) = 40u;
-        OBJ(0x03D0u, weapon_slot) = 4u;
+        F_ram_00AC_O(weapon_slot) = 40u;
+        F_ram_03D0_O(weapon_slot) = 4u;
     }
 
     const unsigned char part = (unsigned char)COMBAT_PART_INDEX;
@@ -245,7 +245,7 @@ void enemy_gohma_handle_weapon_collision(unsigned int monster_slot,
         enemy_gohma_play_parry_tune();
         return;
     }
-    RAM(0x0601u) = 2u;
+    F_ram_0601_R = 2u;
     combat_deal_damage(monster_slot);
     enemy_play_boss_hit_cry_if_needed(monster_slot);
     /* Fall-through: NES Gohma_HandleWeaponCollision_PlayParryTune.

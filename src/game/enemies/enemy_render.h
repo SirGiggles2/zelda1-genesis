@@ -77,6 +77,57 @@ void enemy_render_publish_native_pair(unsigned char left_tile,
                                       unsigned char right_x,
                                       unsigned char y);
 
+/* T-397: the native pair cache, so the hot draw writer publishes inline
+ * (the out-of-line call cost ~650 cycles: seven stacked arguments and a
+ * register save for eight byte stores). Same entries, order and caps. */
+typedef struct {
+    unsigned char tile;
+    unsigned char attrs;
+    unsigned char x;
+    unsigned char y;
+} enemy_render_entry_t;
+#define ENEMY_RENDER_MAX_PER_SLOT 20u
+#define ENEMY_RENDER_CACHE_SLOTS  12u      /* monster slots 0..11 */
+extern enemy_render_entry_t *const g_enemy_render_rows[ENEMY_RENDER_CACHE_SLOTS];
+extern unsigned char g_enemy_render_count[ENEMY_RENDER_CACHE_SLOTS];
+void enemy_render_publish_pair_above(unsigned char left_tile, unsigned char left_attrs,
+                                     unsigned char right_tile, unsigned char right_attrs,
+                                     unsigned char left_x, unsigned char right_x,
+                                     unsigned char y);
+/* NES source: Z_01.asm Anim_WriteSpritePairNotFlashing; drained C:
+ * draw_dispatch.c; coverage: ordinary two-sided native enemies; stance:
+ * EXTEND. `slot` is ENEMY_THROWER_SLOT (CurObjIndex). */
+static inline __attribute__((always_inline)) void enemy_render_publish_native_pair_at(
+    unsigned char slot, unsigned char left_tile, unsigned char left_attrs,
+    unsigned char right_tile, unsigned char right_attrs,
+    unsigned char left_x, unsigned char right_x, unsigned char y)
+{
+    unsigned char n;
+    enemy_render_entry_t *e;
+    if (slot >= ENEMY_RENDER_CACHE_SLOTS) {
+        enemy_render_publish_pair_above(left_tile, left_attrs, right_tile, right_attrs,
+                                        left_x, right_x, y);
+        return;
+    }
+    n = g_enemy_render_count[slot];
+    if (n >= ENEMY_RENDER_MAX_PER_SLOT) return;
+    e = &g_enemy_render_rows[slot][n];
+    e->tile = left_tile;
+    e->attrs = left_attrs;
+    e->x = left_x;
+    e->y = y;
+    ++n;
+    if (n < ENEMY_RENDER_MAX_PER_SLOT) {
+        ++e;
+        e->tile = right_tile;
+        e->attrs = right_attrs;
+        e->x = right_x;
+        e->y = y;
+        ++n;
+    }
+    g_enemy_render_count[slot] = n;
+}
+
 /* Phase D 2026-05-15 — death-spark + spawn-cloud frame publisher.
  * NES Z_07.asm:4977 AnimateAndDrawMetaObject draws the spark or cloud
  * sprite per frame during dying / spawning sequences. The drained

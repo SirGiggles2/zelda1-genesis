@@ -9,33 +9,30 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "converter"))
+from platform_tools import ToolNotFoundError, tool_command, tool_path  # noqa: E402
+
 SGDK = ROOT / "sgdk"
-TOOLBIN = ROOT / "sgdk" / "bin"   # SGDK's bundled m68k-elf GCC 13.2 (Windows; Wine elsewhere)
 LIB = SGDK / "lib"
 PROJ = ROOT / "build" / "rom_project"
 OUT = PROJ / "out"
 ROM_RAW = OUT / "Zelda_raw.md"
 ROM_OUT = ROOT / "builds" / "Zelda.md"
 
-GCC = TOOLBIN / "gcc.exe"
-OBJCOPY = TOOLBIN / "objcopy.exe"
-NM = TOOLBIN / "nm.exe"
 # NES RAM mirror (A4 base, platform_abi.h). .bss must end before the heap's
 # reserved block header at $FF7FFE (src/platform/game_main.c heap wall).
 NES_MIRROR_RESERVED = 0xFF7FFE
 
-# Non-Windows hosts (cloud sessions) run the same bundled SGDK toolchain
-# under Wine: same compiler, same libmd.a, same ROM as the Windows build.
-# (The distribution m68k-linux-gnu-gcc is not usable: its ABI returns
-# pointers in a0, and it merges byte accesses into odd-address word/long
-# accesses that fault on the 68000.)
-WINE = os.name != "nt"
-if WINE:
-    os.environ.setdefault("WINEDEBUG", "-all")
-
-
-def exe(tool: Path) -> list[str | Path]:
-    return ["wine", tool] if WINE else [tool]
+# Native m68k-elf tools on every host; the pinned SGDK headers and libraries
+# remain shared. m68k-linux-gnu is not a compatible replacement for this ABI.
+# Legacy audit consumers read these attributes; resolve only when requested,
+# so merely importing the source lists never requires an installed toolchain.
+def __getattr__(name: str) -> Path:
+    if name == "TOOLBIN":
+        return tool_path("gcc", ROOT).parent
+    if name in ("GCC", "OBJCOPY", "NM"):
+        return tool_path(name.lower(), ROOT)
+    raise AttributeError(name)
 
 
 CFLAGS = [
@@ -56,6 +53,11 @@ CFLAGS = [
 # Explicit local playtest only; normal Debug builds contain no drop shortcut.
 if os.environ.get("ZELDA_DROP_TEST") == "1":
     CFLAGS += ["-DZELDA_DROP_TEST"]
+# T-368 C3: checked build for address evidence (tools/native_ram/gr_check_scan.py). Indexed field
+# macros route through gr_chk() (src/state/game_ram.h #ifdef GR_CHECK). Output is still builds/Zelda.md.
+GR_CHECK = os.environ.get("ZELDA_GR_CHECK") == "1"
+if GR_CHECK:
+    CFLAGS += ["-DGR_CHECK"]
 # build.py --music: your own VGMs (tools/converter/local_music.py writes
 # build/local_music/local_music.c). Off by default; local builds only.
 LOCAL_MUSIC = os.environ.get("ZELDA_LOCAL_MUSIC") == "1"
@@ -81,6 +83,10 @@ if LOCAL_MUSIC:
 # -ffixed-a4 keeps the nes_ram register binding (platform_abi.h).
 # One partition so every TU sees every other for inlining.
 LTO_CFLAGS = ["-flto"]
+# T-394: ZELDA_DEBUG_INFO=1 adds DWARF line info for profiling (addr2line).
+# -g never changes generated code; the ROM must stay byte-identical.
+if os.environ.get("ZELDA_DEBUG_INFO") == "1":
+    CFLAGS += ["-g"]
 LTO_LINK_FLAGS = [
     "-flto",
     "-flto-partition=none",
@@ -90,6 +96,8 @@ LTO_LINK_FLAGS = [
     "-fno-builtin",
     "-fms-extensions",
 ]
+if os.environ.get("ZELDA_DEBUG_INFO") == "1":
+    LTO_LINK_FLAGS += ["-g"]
 
 INCS = [
     ROOT / "src",
@@ -130,6 +138,9 @@ TITLE_C_SOURCES = [
     ("src/sgdk_adapter/render_adapter.c", "render_adapter.o"),
     # Phase 10.3 audio link, VBlank tick slice + XGM SFX path.
     ("src/sgdk_adapter/audio_vblank_hook.c", "audio_vblank_hook.o"),
+    ("src/sgdk_adapter/frame_pipeline.c", "frame_pipeline.o"),
+    ("src/sgdk_adapter/controller_adapter.c", "controller_adapter.o"),
+    ("src/game/input/controller_runtime.c", "controller_runtime.o"),
     ("src/sgdk_adapter/audio_adapter.c",    "audio_adapter.o"),
     ("data/audio/sfx_pcm.c",                "sfx_pcm.o"),
     ("data/audio/sfx_pcm_stairs.c",         "sfx_pcm_stairs.o"),
@@ -187,6 +198,7 @@ ROOMROM_C_SOURCES = [
     ("src/game/core/core_dispatch.c", "core_dispatch.o"),
     ("src/game/enemies/enemy_dispatch.c", "enemy_dispatch.o"),
     ("src/game/combat/collision_dispatch.c", "collision_dispatch.o"),
+    ("src/game/combat/terrain_query.c", "terrain_query.o"),
     ("src/game/room/room_dispatch.c", "room_dispatch.o"),
     ("src/game/hud/hud_dispatch.c", "hud_dispatch.o"),
     ("src/game/items/weapon_dispatch.c", "weapon_dispatch.o"),
@@ -246,6 +258,10 @@ ROOMROM_C_SOURCES = [
     ("src/game/hud/hud_runtime.c", "hud_runtime.o"),  # Phase 12.2 promoted (SGDK-1 clean)
     # Plan v5b T2.7 2026-05-16 — heart-container 3-frame scale-up anim.
     ("src/game/hud/heart_container_anim.c", "heart_container_anim.o"),
+    # T-261 boss name banner + floating health bars (Remix only).
+    ("src/game/hud/boss_overlay_table.c", "hud_boss_overlay_table.o"),
+    ("src/game/hud/boss_overlay.c", "hud_boss_overlay.o"),
+    ("src/game/hud/boss_overlay_draw.c", "hud_boss_overlay_draw.o"),
     ("src/game/dungeon/uw_render.c", "dungeon_uw_render.o"),  # Phase 12.2 promoted
     ("src/game/dungeon/uw_map_builder.c", "dungeon_uw_map_builder.o"),
     ("engine/src/uw_room_blob.c", "uw_room_blob.o"),
@@ -253,14 +269,19 @@ ROOMROM_C_SOURCES = [
     # Phase 12.2 family 7: dungeon meta promoted to src/game/dungeon/.
     ("src/game/dungeon/walk_model.c",  "dungeon_walk_model.o"),
     ("src/game/dungeon/door_state.c",  "dungeon_door_state.o"),
-    ("src/game/world/render/sprite_render.c", "world_sprite_render.o"),  # Phase 12.2 promoted (SGDK-1 clean)
+    ("src/game/world/render/sprite_render.c", "world_sprite_render.o"),
+    ("src/game/world/render/mp_sprite_runtime.c", "mp_sprite_runtime.o"),  # Phase 12.2 promoted (SGDK-1 clean)
     ("src/game/combat/combat_runtime.c", "combat_runtime.o"),  # Phase 12.2 promoted (SGDK-1 cleanup)
+    ("src/game/combat/sword_runtime.c", "sword_runtime.o"),
     # Phase 12.2 family 3: items promoted to src/game/items/.
     ("src/game/items/boomerang.c", "items_boomerang.o"),
     ("src/game/items/arrow.c",     "items_arrow.o"),
     ("src/game/items/bomb.c",      "items_bomb.o"),
     ("src/game/items/debug_unlock_all.c", "items_debug_unlock_all.o"),  # P6.1
     ("src/game/inventory/inventory_render.c", "inventory_render.o"),    # P6.2
+    ("src/game/inventory/item_ring_runtime.c", "item_ring_runtime.o"),
+    ("src/game/inventory/pause_actions.c", "pause_actions.o"),          # T-256 Remix pause actions
+    ("src/game/inventory/pause_map.c", "pause_map.o"),              # T-257 Remix pause Hyrule map
     ("src/game/inventory/inventory_palette.c", "inventory_palette.o"),  # L4 Phase 7 v2 CRAM swap
     ("src/game/inventory/inventory_tilemap.c", "inventory_tilemap.o"),  # V2.1 NES subscreen NT blob
     ("src/game/inventory/inventory_sprite_chr.c", "inventory_sprite_chr.o"),  # live subscreen item icons
@@ -307,6 +328,16 @@ ROOMROM_C_SOURCES = [
     ("src/state/palette_tick.c", "palette_tick.o"),
     # Task 6.1: PlayerState[4] shape (Phase 13 multiplayer-ready by construction).
     ("src/state/player_state.c", "player_state.o"),
+    ("src/state/player_ram.c", "player_ram.o"),
+    ("src/state/player_defer.c", "player_defer.o"),
+    # T-367: explicit per-player held/pressed/released input, separate from
+    # gameplay action timers.
+    ("src/state/input_state.c", "input_state.o"),
+    # T-367: native position/q-speed/grid integration for player movement.
+    ("src/game/player/player_runtime.c", "game_player_runtime.o"),
+    ("src/game/player/player_runtime_bridge.c", "game_player_runtime_bridge.o"),
+    # T-367: per-player sword lifecycle/pose owner.
+    ("src/state/weapon_state.c", "weapon_state.o"),
     # Task 6.10.4: inventory_t struct mirroring NES Variables.inc cells.
     # Phase 12.2 family migration: substrate-singletons promoted to src/state/.
     # engine/src/inventory.c -> src/state/inventory.c; consumer includes
@@ -511,6 +542,7 @@ ROOMROM_C_SOURCES = [
     ("src/game/options/options_runtime.c", "game_options_runtime.o"),
     ("src/game/options/options_persistence.c", "game_options_persistence.o"),
     ("src/game/options/options_consumer.c", "game_options_consumer.o"),
+    ("src/game/options/options_menu_model.c", "game_options_menu_model.o"),  # T-256 shared menu rows
     ("src/sgdk_adapter/sram_options_io.c", "sram_options_io.o"),
     ("src/game/options/probes/options_probe.c", "game_options_probe.o"),
     ("src/game/options/probes/options_persistence_probe.c", "game_options_persistence_probe.o"),
@@ -556,6 +588,7 @@ ROOMROM_C_SOURCES = [
     ("engine/src/redux_hud_chr.c", "redux_hud_chr.o"),
     ("data/chr/common.c", "common.o"),
     ("build/generated/core_redux_chr.c", "core_redux_chr.o"),
+    ("build/generated/mp_link_poses.c", "mp_link_poses.o"),
     ("data/chr/sprites.c", "sprites.o"),
     # T-011: NES sprite tiles $70.. (demo block; Link item-lift pose $78/$79).
     ("data/chr/demo.c", "demo_chr.o"),
@@ -574,7 +607,9 @@ def run(args: list[str | Path], *, cwd: Path = ROOT) -> None:
 
 
 def gcc_prefix() -> list[str | Path]:
-    return exe(GCC) + ["-B", f"{TOOLBIN}\\"]
+    gcc = tool_path("gcc", ROOT)
+    separator = "\\" if sys.platform == "win32" else "/"
+    return [str(gcc), "-B", f"{gcc.parent}{separator}"]
 
 
 def include_args() -> list[str]:
@@ -593,8 +628,7 @@ def depfile_inputs(dep: Path) -> list[Path] | None:
     toks = [t.replace("\\ ", " ") for t in re.findall(r"(?:\\ |\S)+", text)]
     for i, t in enumerate(toks):
         if t.endswith(":"):
-            return [Path(re.sub(r"(?i)^z:(?=/)", "", x) if WINE else x)
-                    for x in toks[i + 1:]]
+            return [Path(x) for x in toks[i + 1:]]
     return None
 
 
@@ -681,7 +715,11 @@ def ensure_nes_music() -> bool:
     import json
     digest = hashlib.sha256(rom.read_bytes()).hexdigest()
     report = NES_MUSIC_DIR / "capture.json"
-    gens = [ROOT / "tools" / "converter" / n for n in ("nes_music.py", "local_music.py")]
+    gens = [ROOT / rel for rel in (
+        "tools/converter/nes_music.py", "tools/converter/local_music.py",
+        "tools/converter/studio_music.py", "tools/converter/studio_render.js",
+        "tools/music_studio/web/render.js", "data/music/builder_mix.json",
+    )]
     stale = not (table.is_file() and report.is_file())
     if not stale:
         try:
@@ -700,14 +738,12 @@ def ensure_nes_music() -> bool:
 
 
 def main() -> int:
-    if not GCC.exists():
-        print(f"ERROR: gcc not found at {GCC}")
+    try:
+        for name in ("gcc", "objcopy", "nm", "xgmtool"):
+            tool_path(name, ROOT)
+    except ToolNotFoundError as exc:
+        print(f"ERROR: {exc}")
         return 1
-    if WINE:
-        import shutil
-        if not shutil.which("wine"):
-            print("ERROR: wine not found (non-Windows hosts run the SGDK toolchain under Wine)")
-            return 1
 
     PROJ.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -748,11 +784,14 @@ def main() -> int:
     print("[Build][CHR-1 gate] authenticated core Redux banks")
     run([sys.executable, ROOT / "tools" / "converter" / "redux_graphics.py", "--verify"])
 
-    print("[1] Compiling sgdk/src/boot/rom_head.c...")
-    run(gcc_prefix() + CFLAGS + include_args() + ["-c", SGDK / "src" / "boot" / "rom_head.c", "-o", OUT / "rom_head.o"], cwd=PROJ)
+    print("[Build][MP poses] derive immutable poses from installed CHR")
+    run([sys.executable, ROOT / "tools" / "converter" / "mp_link_poses.py"])
+
+    print("[1] Compiling tools/build/rom_head.c...")
+    run(gcc_prefix() + CFLAGS + include_args() + ["-c", ROOT / "tools" / "build" / "rom_head.c", "-o", OUT / "rom_head.o"], cwd=PROJ)
 
     print("[1] objcopy rom_head.o -> rom_head.bin...")
-    run(exe(OBJCOPY) + ["-O", "binary", OUT / "rom_head.o", OUT / "rom_head.bin"], cwd=PROJ)
+    run(tool_command("objcopy", ROOT) + ["-O", "binary", OUT / "rom_head.o", OUT / "rom_head.bin"], cwd=PROJ)
 
     print("[2] Compiling sgdk/src/boot/sega.s...")
     run(
@@ -776,6 +815,8 @@ def main() -> int:
     # T-141: C units compile in parallel; unchanged ones are reused
     # (compile_c / up_to_date). Link order stays the source-list order.
     c_units = list(TITLE_C_SOURCES) + list(ROOMROM_C_SOURCES)
+    if GR_CHECK:
+        c_units.append(("src/state/game_ram_check.c", "game_ram_check.o"))
     if NES_MUSIC:
         if not ensure_nes_music():
             return 1
@@ -815,7 +856,7 @@ def main() -> int:
         cwd=PROJ,
     )
 
-    nm = subprocess.run([str(a) for a in exe(NM) + [OUT / "Zelda.out"]], cwd=PROJ,
+    nm = subprocess.run(tool_command("nm", ROOT) + [str(OUT / "Zelda.out")], cwd=PROJ,
                         capture_output=True, text=True, check=True).stdout
     bend = next(int(l.split()[0], 16) for l in nm.splitlines()
                 if l.split()[-1:] == ["_bend"])
@@ -827,7 +868,7 @@ def main() -> int:
           f"({NES_MIRROR_RESERVED - (bend & 0xFFFFFF)} bytes below the NES RAM mirror)")
 
     print("[5] objcopy ELF -> flat binary...")
-    run(exe(OBJCOPY) + ["-O", "binary", OUT / "Zelda.out", ROM_RAW], cwd=PROJ)
+    run(tool_command("objcopy", ROOT) + ["-O", "binary", OUT / "Zelda.out", ROM_RAW], cwd=PROJ)
 
     print("[5] fix_checksum...")
     run([sys.executable, ROOT / "tools" / "fix_checksum.py", ROM_RAW, ROM_OUT])

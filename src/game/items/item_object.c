@@ -23,7 +23,10 @@
 #include "enemy_state.h"          /* ENEMY_X/Y/TYPE/ALIVE_FLAG/PLAYER_OBJ_* */
 #include "combat_state.h"         /* OBJ_STATE alias */
 #include "item_dispatch.h"        /* item_take_item */
+#include "item_object.h"
 #include "world/draw_dispatch.h"   /* draw_animate_item_object */
+#include "../../state/player_state.h"
+#include "../../state/weapon_state.h"
 #ifdef ZELDA_DROP_TEST
 #include "../enemies/enemy_loop.h"
 #include "../../state/game_profile.h"
@@ -52,8 +55,8 @@ void item_object_spawn_test_drops(void)
         enemy_loop_force_spawn_typed(slot, 0x60u,
             (unsigned char)(56u + (i & 3u) * 48u),
             (unsigned char)(136u + (i >> 2) * 32u), 0u);
-        OBJ(0x00ACu, slot) = ids[i];
-        OBJ(0x03A8u, slot) = 0xFFu;
+        F_ram_00AC_O(slot) = ids[i];
+        F_ram_03A8_O2(slot) = 0xFFu;
         if (ids[i] == 0x23u) enrt_set_up_fairy_object(slot);
     }
 }
@@ -63,8 +66,8 @@ void item_object_spawn_test_drops(void)
  * META_ITEM_ID       = Item_ObjItemId      ($00AC+slot, aliases OBJ_STATE).
  *
  * Same defines used by enemy_walker_bridge.c::native_set_up_dropped_item. */
-#define META_ITEM_LIFETIME(slot)  OBJ(0x03A8, (slot))
-#define META_ITEM_ID(slot)        OBJ(0x00AC, (slot))
+#define META_ITEM_LIFETIME(slot)  F_ram_03A8_O3((slot))
+#define META_ITEM_ID(slot)        F_ram_00AC_O2((slot))
 
 /* DestroyMonster_Bank4 — clear slot. Inline to avoid the static binding
  * in enemy_walker_bridge.c. Same fields as native_destroy_monster. */
@@ -140,7 +143,7 @@ void item_object_update(unsigned int slot)
      *
      * After LSR, BCC branches if the SHIFTED-OUT bit was 0 → i.e. if
      * (FrameCounter & 1) was 0. So decrement on ODD frames. */
-    frame_counter = (unsigned char)RAM(0x0015);
+    frame_counter = (unsigned char)F_ram_0015_R3;
     if ((frame_counter & 1u) != 0u) {
         /* DEC wraps: a lifetime of 0 on an odd frame becomes $FF. */
         lifetime = (unsigned char)META_ITEM_LIFETIME(slot);
@@ -171,22 +174,49 @@ void item_object_update(unsigned int slot)
     /* NES UpdateItem checks arrow, sword, boomerang, then Link. Active
      * weapons publish their positions into these object slots; Link is
      * always eligible unless his high state bits indicate a halt. */
-    if (((unsigned char)OBJ_STATE(0u) & 0xC0u) == 0x40u) return;
     /* [0D] counts the takers 4..1 (ItemTakerObjSlots-1,Y); [04] holds
      * the item id handed to TryTakeItem. Both are left as the NES leaves
      * them. */
-    for (i = 0u; i < 4u; ++i) {
+    if (((unsigned char)OBJ_STATE(0u) & 0xC0u) != 0x40u) {
+      for (i = 0u; i < 4u; ++i) {
         unsigned int taker = taker_slots[i];
         unsigned char state = (unsigned char)OBJ_STATE(taker);
-        RAM(0x000Du) = (uint8_t)(4u - i);
+        F_ram_000D_R = (uint8_t)(4u - i);
         if (taker == 0u || (state != 0u && (state & 0x80u) == 0u)) {
-            RAM(0x0004u) = (uint8_t)META_ITEM_ID(slot);
+            F_ram_0004_R = (uint8_t)META_ITEM_ID(slot);
             if (item_obj_try_take(slot, (unsigned char)OBJ_X(taker),
                                   (unsigned char)OBJ_Y(taker))) {
                 item_obj_destroy(slot);
                 return;
             }
         }
+      }
+      F_ram_000D_R = 0u;
     }
-    RAM(0x000Du) = 0u;
+    /* T-251 P6.1: extend the existing TryTakeItem owner to native party
+     * bodies after the unchanged NES taker order. One shared award and
+     * one destruction; a halted P1 cannot disable the other players.
+     * NES source: Z_01.asm:TryTakeItem; Drained C: item_obj_try_take.
+     * Coverage: PARTIAL additional body contacts; Stance: EXTEND. */
+    for (i = 1u; i < g_player_count; ++i) {
+        const PlayerState *player = &PLAYER(i);
+        const PlayerSwordState *sword = &g_player_sword[i];
+        const PlayerBoomerangState *boomerang = &g_player_boomerang;
+        unsigned char x, y;
+        if ((player->state & 0xC0u) == 0x40u) continue;
+        /* Same NES arrow/sword/boomerang/body order, using the named
+         * current producers instead of P1's one-way collision slots. */
+        if ((roomrom_item_extra_arrow_pose((unsigned char)i, &x, &y) &&
+             item_obj_try_take(slot, x, y)) ||
+            (sword->state != 0u && (sword->state & 0x80u) == 0u &&
+             item_obj_try_take(slot, (unsigned char)sword->x, (unsigned char)sword->y)) ||
+            (boomerang->owner == i && boomerang->state != 0u &&
+             (boomerang->state & 0x80u) == 0u &&
+             item_obj_try_take(slot, boomerang->x, boomerang->y)) ||
+            item_obj_try_take(slot, (unsigned char)player->x,
+                              (unsigned char)player->y)) {
+            item_obj_destroy(slot);
+            return;
+        }
+    }
 }

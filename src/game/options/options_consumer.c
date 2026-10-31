@@ -21,6 +21,7 @@ static unsigned char effective_option(unsigned int id)
     case OPTION_ID_AB_SWAP:
     case OPTION_ID_ROOM_SCROLL:
     case OPTION_ID_UW_MUSIC:
+    case OPTION_ID_SPRITE_OVERFLOW:
         return options_get(id); /* Existing Genesis presentation preferences. */
     case OPTION_ID_AUTOMAP:
     case OPTION_ID_DUNGEON_COLORS:
@@ -28,8 +29,10 @@ static unsigned char effective_option(unsigned int id)
     case OPTION_ID_DIAGONAL_SWORD:
         return game_profile_is_remix();
     case OPTION_ID_NO_REDUCED_FLASHING:
+    case OPTION_ID_LOW_HEALTH_WARNING:  /* Remix low-HP beep; default OFF */
     case OPTION_ID_SWORD_STYLE:
     case OPTION_ID_LIKE_LIKE_BEHAVIOR:
+    case OPTION_ID_SCROLL_SPEED:        /* T-409 Remix room slide; Original NORMAL */
         return game_profile_is_remix() ? options_get(id) : 0u;
     case OPTION_ID_START_HEARTS:
         return OPTIONS_START_HEARTS_MIN;
@@ -152,6 +155,16 @@ unsigned char options_consumer_get_room_scroll(void)
 unsigned char options_consumer_get_uw_music(void)
 {
     return effective_option((unsigned int)OPTION_ID_UW_MUSIC);
+}
+
+unsigned char options_consumer_get_sprite_overflow(void)
+{
+    return effective_option((unsigned int)OPTION_ID_SPRITE_OVERFLOW);
+}
+
+unsigned char options_consumer_get_scroll_speed(void)
+{
+    return effective_option((unsigned int)OPTION_ID_SCROLL_SPEED);
 }
 
 /* --- Numeric ------------------------------------------------------- */

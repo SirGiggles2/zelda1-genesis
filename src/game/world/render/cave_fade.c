@@ -139,8 +139,8 @@ void cave_fade_begin_enter(cave_id_t cid, unsigned char entrance_tile)
      * Mode $10 stairs. $50 selects Mode $0C shortcut; all other cave
      * selectors use Mode $0B. Let audio_requests consume the NES request
      * on the next tick, including when OW music belongs to XGM. */
-    RAM(0x005Bu) = (cid == 0x6Eu) ? 0x0Cu : 0x0Bu;
-    RAM(0x0604u) = 0x80u;
+    F_ram_005B_R = (cid == 0x6Eu) ? 0x0Cu : 0x0Bu;
+    F_ram_0604_R = 0x80u;
     s_pending_cid   = cid;
     /* Keep the native entrance walk; MD Remix closes its iris afterward. */
     s_entrance_tile = entrance_tile;
@@ -219,7 +219,7 @@ static void animate_link_nes(void)
 {
     roomrom_combat_animate_link_base();
     if (s_cb.on_anim_tick != 0)
-        s_cb.on_anim_tick(RAM(0x03D0u), RAM(0x03E4u));
+        s_cb.on_anim_tick(F_ram_03D0_R, F_ram_03E4_R);
 }
 
 void cave_fade_tick(void)
@@ -271,10 +271,10 @@ void cave_fade_tick(void)
          * it sets StairsTargetY ($412) $10 below Link (Z_05.asm:1400). */
         if (s_frame_counter == 1u) {
             (void)collision_get_collidable_tile_still(0u);       /* InitMode10 */
-            RAM(0x0412u) = (unsigned char)(RAM(0x0084u) + 0x10u);
+            F_ram_0412_R = (unsigned char)(F_ram_0084_R + 0x10u);
         }
         if (s_frame_counter < 2u) break;
-        if ((RAM(0x0015u) & 0x03u) == 0u) {
+        if ((F_ram_0015_R & 0x03u) == 0u) {
             if (s_cb.on_descend_step != 0) {
                 s_cb.on_descend_step(s_step_idx);
             }
@@ -323,7 +323,7 @@ void cave_fade_tick(void)
         /* InitMode_EnterRoom's object setup sees the cave layout in
          * PlayAreaTiles and Link still at the descent end; on_swap_entry
          * then puts Link at ($70, $DD) (InitModeB_EnterCave_Bank5 order). */
-        enemy_loop_enter_cave_objects((unsigned char)RAM(0x00EBu));  /* RoomId: the OW room */
+        enemy_loop_enter_cave_objects((unsigned char)F_ram_00EB_R);  /* RoomId: the OW room */
         cave_palette_apply();
         if (s_cb.on_swap_entry != 0) {
             s_cb.on_swap_entry(s_pending_cid);
@@ -348,7 +348,7 @@ void cave_fade_tick(void)
         /* InitModeB_EnterCave: InitMode_EnterRoom leaves Link's
          * ObjAnimCounter at 4 and ObjInputDir 0, so its
          * Link_EndMoveAndAnimate does not step (NES t011 f155: $3D0 4). */
-        RAM(0x03D0u) = 4u;
+        F_ram_03D0_R = 4u;
         /* T-202 NES source: Z_05.asm:InitMode_EnterRoom clears $0300..$051F.
          * Drained C: core_runtime.c:corert_clear_ram0300_up_to;
          * cave adapter: enemy_loop.c:enemy_loop_enter_cave_slots.
@@ -356,9 +356,9 @@ void cave_fade_tick(void)
          * Stance: EXTEND the native entry reset to include ObjAnimFrame+0.
          * Walking starts from the cleared frame; carrying the previous
          * OW pose inverts the settled cave pose when that pose was 1. */
-        RAM(0x03E4u) = 0u;
+        F_ram_03E4_R = 0u;
         if (s_cb.on_anim_tick != 0)
-            s_cb.on_anim_tick(RAM(0x03D0u), RAM(0x03E4u));
+            s_cb.on_anim_tick(F_ram_03D0_R, F_ram_03E4_R);
         s_phase          = CAVE_FADE_LINK_EMERGE;
         break;
 

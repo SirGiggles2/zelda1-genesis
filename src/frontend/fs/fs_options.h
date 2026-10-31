@@ -35,10 +35,14 @@
 
 /* Core is informational; only implemented preferences/modifiers are editable.
  * Row identity is independent of the wire-stable OptionId/save layout. */
-#define FS_OPTIONS_ROW_COUNT   8u
-#define FS_OPTIONS_SAVE_ROW    7u
+#define FS_OPTIONS_ROW_COUNT   9u
+#define FS_OPTIONS_SAVE_ROW    8u
 #define FS_OPTIONS_CORE_ROW    0u
 #define FS_OPTIONS_MUSIC_ROW   6u
+#define FS_OPTIONS_MORE_ROW    7u
+/* T-409 second page (MORE OPTIONS): room scroll, scroll speed, sprites. */
+#define FS_MORE_BACK_ROW       3u
+#define FS_MORE_ROW_COUNT      4u
 #define FS_MUSIC_BACK_ROW      11u
 #define FS_MUSIC_ROW_COUNT     12u
 
@@ -55,6 +59,7 @@ void fs_options_enter(void);
 
 /* Returns OPTION_ID_COUNT for informational/action rows. */
 unsigned int fs_options_id_for_row(uint8_t row);
+unsigned int fs_more_id_for_row(uint8_t row);
 
 /* One-vblank step. Reads input edges, updates live options state via
  * options_set, and may commit + return to FS_NAV. */

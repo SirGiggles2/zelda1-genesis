@@ -78,6 +78,19 @@ static void clear_save_state(void)
     s_save.dest_link_face = 0u;
 }
 
+/* NES source: Z_07.asm:Link_EndMoveAndAnimate clears exit guard per Link.
+ * Drained C: roomrom_world_transition_ow_step_uet_clear below.
+ * Coverage: PARTIAL collision/movement context binding for independent actors.
+ * Stance: EXTEND observation ownership, keep the shared warp machine once. */
+signed char roomrom_world_transition_previous_grid(void)
+{
+    return s_prev_grid_offset;
+}
+void roomrom_world_transition_set_previous_grid(signed char grid)
+{
+    s_prev_grid_offset = grid;
+}
+
 void roomrom_world_transition_init(void)
 {
     s_state = RR_WARP_IDLE;
@@ -195,8 +208,8 @@ unsigned char roomrom_world_transition_unsupported_selector_count(void)
  * (matches NES Z_05.asm warp-fade behavior). */
 void roomrom_audio_silence_for_warp(void)
 {
-    nes_ram[0x0602u] = 0u;  /* Tune1Request */
-    nes_ram[0x003Cu] = 0u;  /* FluteTimer */
+    F_ram_0602 = 0u;  /* Tune1Request */
+    F_ram_003C = 0u;  /* FluteTimer */
 }
 
 /* Rule 8: NES collapses warp-stair tiles ($70/$71/$72/$73) into a single
@@ -266,15 +279,15 @@ static unsigned char detect_warp_ow(unsigned char source_room_id,
         return 0u;
     }
     (void)tile_col; (void)tile_row; (void)y_in_play;
-    nes_ram[0x0070u] = (unsigned char)link_x;
-    nes_ram[0x0084u] = (unsigned char)link_y;
+    F_ram_0070 = (unsigned char)link_x;
+    F_ram_0084 = (unsigned char)link_y;
     /* NES Z_07.asm @CheckWarps saves ObjCollidedTile around CheckWarps.
      * Sampling the standing tile may update that scratch cell, but the
      * dungeon selector must leave the preceding collision result intact. */
     {
-        unsigned char collided_before = nes_ram[0x049Eu];
+        unsigned char collided_before = F_ram_049E;
         raw_tile = collision_get_collidable_tile_still(0u);
-        nes_ram[0x049Eu] = collided_before;
+        F_ram_049E = collided_before;
     }
     if (raw_tile != 0x24u && raw_tile != 0x88u &&
         !(raw_tile >= 0x70u && raw_tile <= 0x73u)) {
@@ -427,7 +440,7 @@ unsigned char roomrom_world_transition_level_exit(rr_warp_outcome_t *out)
      * The latched entrance only knew the walked-in route (T-171: a level
      * reached any other way scrolled to the room below instead). */
     {
-        const unsigned char src = nes_ram[0x0526u];
+        const unsigned char src = F_ROOM_ID_ALT;
         s_save.source_room_id = (src != 0xFFu) ? src : level_info_ow_start_room();
     }
     s_save.dest_scene = ROOMROM_MAIN_SCENE_OW;
@@ -473,7 +486,7 @@ void roomrom_world_transition_tick(void)
                 if (s_cellar_entry_count != 0xFFu) ++s_cellar_entry_count;
                 return;
             }
-            if (nes_ram[0x0012u] != 5u) return;
+            if (F_ram_0012 != 5u) return;
             /* Phase C: if no cellar hit, try dungeon-exit (UW→OW) arm. */
             if (!hit) {
                 hit = detect_warp_uw_to_ow(rid_before,
@@ -494,7 +507,7 @@ void roomrom_world_transition_tick(void)
              * stores its own copy but must keep this NES RAM cell too:
              * t111 L5 entry was left with the previous $74 instead of
              * the actual $24 entrance tile. */
-            nes_ram[0x0065u] = s_save.source_underground_entrance_tile_raw;
+            F_ram_0065 = s_save.source_underground_entrance_tile_raw;
             outcome.dest_scene    = s_save.dest_scene;
             outcome.dest_level    = s_save.dest_level;
             outcome.dest_quest    = s_save.dest_quest;

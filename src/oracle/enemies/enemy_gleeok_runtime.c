@@ -50,7 +50,7 @@ void enrt_init_gleeok_head(unsigned int slot) {
 }
 
 static unsigned int gleeok_ptr(unsigned int ptr_addr) {
-    return (unsigned int)RAM(ptr_addr) | ((unsigned int)RAM(ptr_addr + 1) << 8);
+    return (unsigned int)RAM(ptr_addr) | ((unsigned int)RAM(ptr_addr + 1) << 8); /* native_ram bulk:dyn_addr */
 }
 
 void enrt_update_gleeok(unsigned int slot) {
@@ -60,7 +60,7 @@ void enrt_update_gleeok(unsigned int slot) {
 
     c_gleeok_draw_body();
 
-    obj_type = OBJ(NES_OBJ_TYPE, 1);            /* ($0350,A4) = type of slot 1 */
+    obj_type = F_ram_034F_O2(1);            /* ($0350,A4) = type of slot 1 */
     ENEMY_GLEEOK_NECK_INDEX = (unsigned char)(obj_type - 0x42);
 
     for (neck_index = (int)(unsigned char)ENEMY_GLEEOK_NECK_INDEX;
@@ -82,13 +82,13 @@ void enrt_update_gleeok(unsigned int slot) {
          * per-byte pointer loads cost ~1k instructions a frame with 3
          * necks). The arrays never overlap the $00-$05 pointers. */
         {
-            const unsigned char *sx = &nes_ram[gleeok_ptr(0x0000)];
-            const unsigned char *sy = &nes_ram[gleeok_ptr(0x0002)];
-            const unsigned char *sm = &nes_ram[gleeok_ptr(0x0004)];
+            const unsigned char *sx = &nes_ram[gleeok_ptr(0x0000)]; /* native_ram bulk:src/oracle/enemies/enemy_gleeok_runtime.c:85 */
+            const unsigned char *sy = &nes_ram[gleeok_ptr(0x0002)]; /* native_ram bulk:src/oracle/enemies/enemy_gleeok_runtime.c:86 */
+            const unsigned char *sm = &nes_ram[gleeok_ptr(0x0004)]; /* native_ram bulk:src/oracle/enemies/enemy_gleeok_runtime.c:87 */
             for (seg = 5; seg >= 0; seg--) {
-                RAM(0x0071 + seg) = sx[seg];
-                RAM(0x0085 + seg) = sy[seg];
-                RAM(0x0413 + seg) = sm[seg];
+                F_ENEMY_GLEEOK_BASE_X_R4(seg) = sx[seg];
+                F_ENEMY_GLEEOK_BASE_Y_R4(seg) = sy[seg];
+                F_ram_0413_R3(seg) = sm[seg];
             }
         }
 
@@ -105,7 +105,7 @@ void enrt_update_gleeok(unsigned int slot) {
                 {
                     unsigned int head_slot = 5;
                     unsigned char rng = ENEMY_RNG_A(head_slot);
-                    if (rng < 0x20 && OBJ(NES_OBJ_TYPE, 0x0B) == 0)
+                    if (rng < 0x20 && F_ram_034F_O2(0x0B) == 0)
                         c_shoot_fireball(86, head_slot);
                 }
             }
@@ -116,13 +116,13 @@ void enrt_update_gleeok(unsigned int slot) {
         /* Save segment data back to the external NES arrays. */
         c_gleeok_fetch_neck_addrs();
         {
-            unsigned char *dx = &nes_ram[gleeok_ptr(0x0000)];
-            unsigned char *dy = &nes_ram[gleeok_ptr(0x0002)];
-            unsigned char *dm = &nes_ram[gleeok_ptr(0x0004)];
+            unsigned char *dx = &nes_ram[gleeok_ptr(0x0000)]; /* native_ram bulk:src/oracle/enemies/enemy_gleeok_runtime.c:119 */
+            unsigned char *dy = &nes_ram[gleeok_ptr(0x0002)]; /* native_ram bulk:src/oracle/enemies/enemy_gleeok_runtime.c:120 */
+            unsigned char *dm = &nes_ram[gleeok_ptr(0x0004)]; /* native_ram bulk:src/oracle/enemies/enemy_gleeok_runtime.c:121 */
             for (seg = 5; seg >= 0; seg--) {
-                dx[seg] = RAM(0x0071 + seg);
-                dy[seg] = RAM(0x0085 + seg);
-                dm[seg] = RAM(0x0413 + seg);
+                dx[seg] = F_ENEMY_GLEEOK_BASE_X_R4(seg);
+                dy[seg] = F_ENEMY_GLEEOK_BASE_Y_R4(seg);
+                dm[seg] = F_ram_0413_R3(seg);
             }
         }
     }
@@ -172,7 +172,7 @@ void enrt_gleeok_store_ref_seg_distance(unsigned int signed_ref_dist) {
      * (slots 0..3 vs 1..4 mapped onto OBJ(0x71,seg) etc). When the gap
      * exceeds the limit, nudge cur 2 pixels toward prev. */
     for (seg = 0; seg < 4; seg++) {
-        unsigned char prev_x = RAM(0x0071 + seg);
+        unsigned char prev_x = F_ENEMY_GLEEOK_BASE_X_R4(seg);
         unsigned char cur_x  = ENEMY_GLEEOK_SEG_X(seg);
         unsigned char dx = z01_abs((unsigned int)(unsigned char)(prev_x - cur_x));
         unsigned char prev_y, cur_y, dy;
@@ -184,7 +184,7 @@ void enrt_gleeok_store_ref_seg_distance(unsigned int signed_ref_dist) {
             ENEMY_GLEEOK_SEG_X(seg) = new_x;
         }
 
-        prev_y = RAM(0x0085 + seg);
+        prev_y = F_ENEMY_GLEEOK_BASE_Y_R4(seg);
         cur_y  = ENEMY_GLEEOK_SEG_Y(seg);
         dy = z01_abs((unsigned int)(unsigned char)(prev_y - cur_y));
 
@@ -222,7 +222,7 @@ void enrt_gleeok_store_ref_seg_distance(unsigned int signed_ref_dist) {
     for (i = 1; i >= 0; i--) {
         unsigned char cur = ENEMY_GLEEOK_SEG_Y_TARGET((unsigned int)i);
         unsigned char above = ENEMY_GLEEOK_SEG_Y((unsigned int)i);
-        unsigned char below = RAM(0x0088 + (unsigned int)i);
+        unsigned char below = F_ram_0088_R((unsigned int)i);
 
         if (cur < above) {
             /* cur < above: if also cur < below, nudge up (++) toward middle */
@@ -259,13 +259,18 @@ void enrt_gleeok_store_ref_seg_distance(unsigned int signed_ref_dist) {
  * (which then JMPs back into here). We use bounded recursion (max 5
  * levels) which mirrors the asm tail-jump chain.
  *------------------------------------------------------------------*/
+/* NES source: Z_04.asm:Gleeok_CheckCollisions loaded segment boundary.
+ * Drained C: this function remains the sole segment/death owner.
+ * Coverage: PARTIAL selected-player collision admission, tail unchanged.
+ * Stance: EXTEND call boundary without another update/draw/segment loop. */
+extern void c_gleeok_check_monster_collisions(unsigned int slot);
 void enrt_gleeok_check_collisions(unsigned int slot) {
     unsigned int next_slot;
 
     if (slot != 5 && slot != 1)
         goto next_segment;
 
-    c_check_monster_collisions(slot);
+    c_gleeok_check_monster_collisions(slot);
 
     /* ENEMY_OBJ_SHOVE_DIR != 0 means the segment was hit this frame */
     if (ENEMY_OBJ_SHOVE_DIR(slot) != 0) {
@@ -299,7 +304,7 @@ void enrt_gleeok_check_collisions(unsigned int slot) {
             ENEMY_ALIVE_FLAG(flying) = 0xFF;       /* OBJ(0x0492) */
             ENEMY_X(flying) = ENEMY_GLEEOK_HEAD_X;
             ENEMY_Y(flying) = ENEMY_GLEEOK_HEAD_Y;
-            OBJ(NES_OBJ_TYPE, flying) = 70;        /* type 0x46 = flying head */
+            F_ram_034F_O2(flying) = 70;        /* type 0x46 = flying head */
         }
 
         destroy_slot = saved_slot;             /* PLA -> D2 */
@@ -333,7 +338,7 @@ void enrt_gleeok_check_collisions(unsigned int slot) {
             /* Compare to original neck count (type - 0x41). */
             {
                 unsigned char total_necks =
-                    (unsigned char)(OBJ(NES_OBJ_TYPE, 1) - 0x41);
+                    (unsigned char)(F_ram_034F_O2(1) - 0x41);
                 if (dead_count == total_necks)
                     goto boss_died;
             }
@@ -364,6 +369,6 @@ boss_died:
          * t1353). Slot 11 (a fireball) is left, as the NES notes. */
         unsigned int s;
         for (s = 2; s <= 0x0A; s++)
-            OBJ(NES_OBJ_TYPE, s) = 0;
+            F_ram_034F_O2(s) = 0;
     }
 }

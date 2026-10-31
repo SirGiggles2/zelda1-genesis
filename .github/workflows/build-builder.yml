@@ -1,0 +1,74 @@
+name: Native builder apps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/converter/**'
+      - 'tools/build/**'
+      - 'data/music/builder_mix.json'
+      - '.github/workflows/build-builder.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            label: Windows-x64
+          - os: ubuntu-22.04
+            label: Linux-x64
+          - os: macos-15-intel
+            label: macOS-Intel
+          - os: macos-14
+            label: macOS-Apple-Silicon
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Python runtime and app packager
+        run: python -m pip install -r tools/converter/requirements.txt pyinstaller==6.22.0
+      - uses: actions/cache@v4
+        with:
+          path: toolchains/native
+          key: native-13.2-${{ matrix.label }}-${{ hashFiles('tools/converter/prepare_native_tools.py', 'tools/sgdk_pin.json') }}
+      - name: Native compiler, music tool and JavaScript runtime
+        run: python tools/converter/prepare_native_tools.py
+      - name: Native tool and local API tests
+        run: python -m unittest discover -s tools/converter -p "test_platform_tools.py" -v
+      - name: Browser API tests
+        run: python -m unittest discover -s tools/converter -p "test_web_builder.py" -v
+      - name: Workspace and source validation
+        run: |
+          python tools/converter/test_package_workspace.py
+          python tools/converter/test_native_setup.py
+          python tools/converter/test_public_layout.py
+          python tools/converter/build.py --check-toolchain
+      - name: Native compiler smoke check
+        shell: bash
+        run: |
+          python tools/converter/native_smoke.py
+      - name: Build standalone application
+        run: python tools/converter/package_app.py --out build/app
+      - name: Test packaged Python and script dispatch
+        shell: bash
+        run: |
+          python tools/converter/native_smoke.py --app-dir build/app/dist
+      - name: Archive application
+        shell: bash
+        run: |
+          python tools/converter/archive_app.py --source build/app/dist --label '${{ matrix.label }}' --out build/downloads
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zelda-Genesis-Builder-${{ matrix.label }}
+          path: build/downloads/*
+          retention-days: 30

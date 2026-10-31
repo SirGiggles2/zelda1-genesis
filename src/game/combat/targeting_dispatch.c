@@ -38,15 +38,25 @@ unsigned char targeting_get_one_direction_and_distance_to_target(
 void targeting_get_directions_and_distances_to_target(
     unsigned char target_slot, unsigned int origin_slot)
 {
+    targeting_get_directions_and_distances_to_point(
+        (unsigned char)OBJ_X(target_slot), (unsigned char)OBJ_Y(target_slot), origin_slot);
+}
+
+/* NES source: GetDirectionsAndDistancesToTarget. Drained C: same function
+ * above. Coverage: unchanged axis arithmetic with native target inputs.
+ * Stance: EXTEND; no borrowed Link slot for a shared returning projectile. */
+void targeting_get_directions_and_distances_to_point(
+    unsigned char target_x, unsigned char target_y, unsigned int origin_slot)
+{
     /* drain at targeting_runtime.c:21-30. */
     TARGET_H_DIR = 2u;
     TARGET_H_DIST = targeting_get_one_direction_and_distance_to_target(
-        (unsigned char)OBJ_X(target_slot),
+        target_x,
         (unsigned char)OBJ_X(origin_slot));
     TARGET_V_DIR = (uint8_t)TARGET_H_DIR;
     TARGET_H_DIR = 8u;
     TARGET_V_DIST = targeting_get_one_direction_and_distance_to_target(
-        (unsigned char)OBJ_Y(target_slot),
+        target_y,
         (unsigned char)OBJ_Y(origin_slot));
 }
 

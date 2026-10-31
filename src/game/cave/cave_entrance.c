@@ -82,8 +82,8 @@ unsigned char cave_shortcut_destination(unsigned char source_room,
              link_x == 0xB0u ? 3u : 0u;
     if (offset == 0u) return 0xFFu;
     for (i = 0u; i < 4u; ++i) {
-        if ((unsigned char)RAM(0x6BB2u + i) == source_room)
-            return (unsigned char)RAM(0x6BB2u + ((i + offset) & 3u));
+        if ((unsigned char)F_ram_6BB2_R(i) == source_room)
+            return (unsigned char)F_ram_6BB2_R(((i + offset) & 3u));
     }
     return 0xFFu;
 }

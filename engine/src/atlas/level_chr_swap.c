@@ -10,6 +10,7 @@
  * here only as the eventual *content* selector; the residency state
  * machine itself is a Genesis-side resource manager.
  */
+#include "../../../src/sgdk_adapter/frame_pipeline.h"  /* T-393 */
 #include <genesis.h>
 #include "level_chr_swap.h"
 #include "enemy_chr.h"
@@ -185,6 +186,7 @@ void level_chr_swap_tick(void)
                     : s_last_used_tiles;
             /* VDP fill owns the data port until complete. HUD/room CPU
              * writes later this frame must not become its fill data. */
+            frame_pipeline_wait();   /* T-393: VDP port owner */
             VDP_fillTileData(0u, c->tile_base, blank_tiles, TRUE);
             s_total_bytes_dma += (unsigned long)blank_tiles * 32ul;
             s_last_used_tiles = c->tile_count;
@@ -198,6 +200,7 @@ void level_chr_swap_tick(void)
         if (c != 0 && blob != 0 && c->tile_count > 0u) {
             unsigned short half_a = (unsigned short)(c->tile_count >> 1);
             if (half_a > 0u) {
+                frame_pipeline_wait();   /* T-393 */
                 VDP_loadTileData((const u32 *)(blob + c->blob_offset),
                                  c->tile_base, half_a, TRUE);
                 s_total_bytes_dma += (unsigned long)half_a * 32ul;
@@ -215,6 +218,7 @@ void level_chr_swap_tick(void)
             if (half_b > 0u) {
                 unsigned long off = (unsigned long)c->blob_offset
                                   + (unsigned long)half_a * 32ul;
+                frame_pipeline_wait();   /* T-393 */
                 VDP_loadTileData((const u32 *)(blob + off),
                                  (unsigned short)(c->tile_base + half_a),
                                  half_b, TRUE);
@@ -355,6 +359,7 @@ void level_chr_boss_tick(void)
                     : s_boss_last_used_tiles;
             /* VDP fill owns the data port until complete. HUD/room CPU
              * writes later this frame must not become its fill data. */
+            frame_pipeline_wait();   /* T-393: VDP port owner */
             VDP_fillTileData(0u, c->tile_base, blank_tiles, TRUE);
             s_boss_total_bytes_dma += (unsigned long)blank_tiles * 32ul;
             s_boss_last_used_tiles = c->tile_count;
@@ -369,6 +374,7 @@ void level_chr_boss_tick(void)
         if (c != 0 && blob != 0 && c->tile_count > 0u) {
             unsigned short half_a = (unsigned short)(c->tile_count >> 1);
             if (half_a > 0u) {
+                frame_pipeline_wait();   /* T-393 */
                 VDP_loadTileData((const u32 *)(blob + c->blob_offset),
                                  c->tile_base, half_a, TRUE);
                 VDP_loadTileData((const u32 *)(subpal3 + c->blob_offset),
@@ -389,6 +395,7 @@ void level_chr_boss_tick(void)
             if (half_b > 0u) {
                 unsigned long off = (unsigned long)c->blob_offset
                                   + (unsigned long)half_a * 32ul;
+                frame_pipeline_wait();   /* T-393 */
                 VDP_loadTileData((const u32 *)(blob + off),
                                  (unsigned short)(c->tile_base + half_a),
                                  half_b, TRUE);

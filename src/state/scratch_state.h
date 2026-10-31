@@ -32,22 +32,22 @@
 
 /* Pure scratch slots — NES zero-page bytes used as transient state by
  * whichever subsystem currently holds the CPU. */
-#define ZP_TMP0    RAM(0x0000)
-#define ZP_TMP1    RAM(0x0001)
-#define ZP_TMP2    RAM(0x0002)
-#define ZP_TMP3    RAM(0x0003)
-#define ZP_TMP4    RAM(0x0004)
-#define ZP_TMP5    RAM(0x0005)
-#define ZP_TMP6    RAM(0x0006)
-#define ZP_TMP7    RAM(0x0007)
-#define ZP_TMP8    RAM(0x0008)
-#define ZP_TMP9    RAM(0x0009)
-#define ZP_TMPA    RAM(0x000A)
-#define ZP_TMPB    RAM(0x000B)
-#define ZP_TMPC    RAM(0x000C)
-#define ZP_TMPD    RAM(0x000D)
-#define ZP_TMPE    RAM(0x000E)
-#define ZP_TMPF    RAM(0x000F)
+#define ZP_TMP0    F_ram_0000_R3
+#define ZP_TMP1    F_ram_0001_R2
+#define ZP_TMP2    F_ram_0002_R2
+#define ZP_TMP3    F_ram_0003_R3
+#define ZP_TMP4    F_ram_0004_R2
+#define ZP_TMP5    F_ram_0005_R2
+#define ZP_TMP6    F_ram_0006_R2
+#define ZP_TMP7    F_ram_0007_R2
+#define ZP_TMP8    F_ZP_TMP8_R
+#define ZP_TMP9    F_ZP_TMP9_R2
+#define ZP_TMPA    F_ZP_TMPA_R2
+#define ZP_TMPB    F_ZP_TMPB_R2
+#define ZP_TMPC    F_ram_000C_R2
+#define ZP_TMPD    F_ram_000D_R2
+#define ZP_TMPE    F_ram_000E_R3
+#define ZP_TMPF    F_ram_000F_R4
 
 /* NES Z_Rand seed bytes — semantic but live in zero-page scratch.
  * Per reference/aldonunez/Variables.inc:8 — `Random := $18`. NES code
@@ -64,8 +64,8 @@
  * (NES base PRNG read) goes through ZP_RNG_BASE. Renaming for full
  * clarity (PLUS1/PLUS2) deferred to avoid breaking many consumers.
  */
-#define ZP_RNG_BASE  RAM(0x0018)   /* NES Random+0 */
-#define ZP_RNG_A     RAM(0x0019)   /* NES Random+1 */
-#define ZP_RNG_B     RAM(0x001A)   /* NES Random+2 */
+#define ZP_RNG_BASE  F_ram_0018_R3   /* NES Random+0 */
+#define ZP_RNG_A     F_ram_0019_R2   /* NES Random+1 */
+#define ZP_RNG_B     F_ZP_RNG_B_R2   /* NES Random+2 */
 
 #endif /* SCRATCH_STATE_H */

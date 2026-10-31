@@ -18,6 +18,10 @@ void hud_select_inventory_item(unsigned char direction);
  * Zero validates the existing selection. Letter shares potion cell7. */
 void hud_move_inventory_item(unsigned char direction);
 unsigned char hud_inventory_item_selectable(unsigned char slot);
+/* T-256: palette of discovery-map quadrant tx 0..7, ty 0..3. */
+unsigned char hud_discovery_map_pal(unsigned char tx, unsigned char ty);
+void hud_cycle_loadout(unsigned char cycle_b, unsigned char cycle_c);
+void hud_cycle_player_loadout(unsigned char player,unsigned char cycle_b,unsigned char cycle_c);
 void roomrom_hud_draw(unsigned char hud_id, unsigned char room_id,
                       unsigned char is_underworld);
 
@@ -30,6 +34,8 @@ void roomrom_hud_refresh_dynamic(void);
 void roomrom_hud_refresh_play(void);
 void roomrom_hud_preset_counts_hidden(void);
 void roomrom_hud_play_flush(void);
+/* T-393: a status-bar redraw waits for the next VBlank flush. */
+unsigned char roomrom_hud_play_pending(void);
 /* NES FormatStatusBarText ran this tick (World_ChangeRupees). */
 void roomrom_hud_status_bar_formatted(void);
 /* Fixed Window owns these status-bar cells; native formatter still runs. */
@@ -64,5 +70,11 @@ void roomrom_hud_transfer_record(unsigned char col, unsigned char row,
 unsigned char roomrom_hud_cache_epoch(void);
 unsigned char roomrom_hud_cache_clean(void);
 
+
+/* T-261: one word of HUD row 6 (boss strip). No-op in pause layout. */
+void roomrom_hud_boss_strip_word(unsigned char col, unsigned short word);
+/* T-261: changes when the HUD window was wiped or moved (strip redraw). */
+unsigned char roomrom_hud_clear_gen(void);
+extern unsigned char g_hud_clear_gen;       /* same value, for per-frame fast paths */
 
 #endif

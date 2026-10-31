@@ -25,9 +25,9 @@
 #include "transfer_buf_drain.h"
 
 /* NES Variables.inc. */
-#define MODE_SAVE_IS_UPDATING  RAM(0x0011u)
-#define MODE_SAVE_GAME_MODE    RAM(0x0012u)
-#define MODE_SAVE_GAME_SUBMODE RAM(0x0013u)
+#define MODE_SAVE_IS_UPDATING  F_ram_0011_R
+#define MODE_SAVE_GAME_MODE    F_ram_0012_R
+#define MODE_SAVE_GAME_SUBMODE F_ram_0013_R
 
 /* Last save result, readable by probes and by any UI that wants to report
  * failure. 0 = no attempt yet, 1 = committed, 2 = refused (bad slot). */
@@ -56,17 +56,17 @@ static const unsigned char k_file_b_addr_sets[3][14] = {
  * (T-171: t171_save_resume_nes t257/t378). */
 static void save_pointer_scratch(void)
 {
-    const unsigned char slot = (unsigned char)RAM(0x0016u);
+    const unsigned char slot = (unsigned char)F_ram_0016_R;
     unsigned char i;
     unsigned short wf;
     if (slot >= 3u) return;
-    for (i = 0u; i < 14u; ++i) RAM(0x00C0u + i) = k_file_b_addr_sets[slot][i];
-    wf = (unsigned short)(((unsigned short)RAM(0x00C3u) << 8) | RAM(0x00C2u));
+    for (i = 0u; i < 14u; ++i) F_ram_00C0_R2(i) = k_file_b_addr_sets[slot][i];
+    wf = (unsigned short)(((unsigned short)F_ram_00C3_R << 8) | F_ram_00C2_R);
     wf = (unsigned short)(wf + 0x180u);
-    RAM(0x00C2u) = (unsigned char)wf;
-    RAM(0x00C3u) = (unsigned char)(wf >> 8);
-    RAM(0x00CEu) = nes_ram[0x6524u + 2u * slot];
-    RAM(0x00CFu) = nes_ram[0x6525u + 2u * slot];
+    F_ram_00C2_R = (unsigned char)wf;
+    F_ram_00C3_R = (unsigned char)(wf >> 8);
+    F_ram_00CE_R = F_NES_FILEA_CHECKSUM_6524_X(2u * slot);
+    F_ram_00CF_R = F_NES_FILEA_CHECKSUM_6525_X(2u * slot);
 }
 
 static unsigned char s_running;

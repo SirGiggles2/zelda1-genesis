@@ -77,7 +77,7 @@
 /* RoomItemId — global type code of the current room-item reward.
  * NES Variables.inc:52 `RoomItemId := $AB`. Set by CreateRoomObjects;
  * read by MoveAndDrawRoomItem / AnimateRoomItemObject. */
-#define BOSS_ROOM_ITEM_ID            RAM(0x00ABu)
+#define BOSS_ROOM_ITEM_ID            F_BOSS_ROOM_ITEM_ID_R
 
 /* ObjState[19] — room-item activation flag.
  *   $00 = active (visible, ready to take)

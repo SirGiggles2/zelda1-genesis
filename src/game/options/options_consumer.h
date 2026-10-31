@@ -57,6 +57,9 @@ unsigned char options_consumer_get_room_scroll(void);
 
 /* OPTIONS_UWMUSIC_*: which underworld theme plays (audio_adapter.c). */
 unsigned char options_consumer_get_uw_music(void);
+unsigned char options_consumer_get_sprite_overflow(void);
+/* OPTIONS_SCROLL_SPEED_* (T-409): Remix room slide speed; NORMAL in Original. */
+unsigned char options_consumer_get_scroll_speed(void);
 
 /* Numeric — clamped before return so callers don't need to re-clamp. */
 unsigned char options_consumer_get_start_hearts(void);

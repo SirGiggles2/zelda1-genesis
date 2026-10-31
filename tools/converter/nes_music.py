@@ -387,7 +387,10 @@ def main():
     p.add_argument("--vgm-only", action="store_true")
     args = p.parse_args()
     try:
-        generate(args.rom, args.out, compile_xgm=not args.vgm_only)
+        # Public conversion uses the user's saved Studio mix. Keep generate()
+        # above as the legacy instrument oracle for existing extraction probes.
+        from studio_music import generate as generate_studio
+        generate_studio(args.rom, args.out, compile_xgm=not args.vgm_only)
     except (OSError, ValueError) as exc:
         p.exit(1, f"ERROR: music from your ROM: {exc}\n")
 

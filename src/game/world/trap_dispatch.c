@@ -5,6 +5,8 @@
  */
 
 #include "trap_dispatch.h"
+#include "../../state/player_state.h"
+#include "../../../engine/src/engine_state.h"
 #include <stdint.h>
 #include "platform_abi.h"      /* RAM, OBJ */
 #include "trap_state.h"        /* TELEPORT_LEVEL_INDEX, TELEPORT_ACTIVE_FLAG,
@@ -34,6 +36,8 @@
 #include "combat/link_collision_dispatch.h" /* link_collision_check_link_collision */
 #include "cave/uw_person_dispatch.h" /* uw_person_person_draw_and_check_collisions */
 #include "room/room_dispatch.h"     /* room_go_to_next_mode_from_play */
+#include "../../state/game_profile.h" /* game_profile_is_remix */
+#include "../inventory/pause_map.h" /* pause_map_flute_request (T-258) */
 
 /* TeleportYs — Z_01.asm:1226. Per-level teleport Y coords. */
 static const unsigned char k_teleport_ys[8] = {
@@ -129,6 +133,22 @@ void trap_check_init_whirlwind_and_begin_update(void)
     MODE_TIMER = (uint8_t)((unsigned char)MODE_TIMER + 1u);
 }
 
+unsigned char trap_whirlwind_level_index(void)
+{
+    return (unsigned char)((unsigned char)TELEPORT_LEVEL_INDEX & 7u);
+}
+
+unsigned char trap_whirlwind_entrance_room(unsigned char level_index)
+{
+    return (unsigned char)(k_whirlwind_prev_room_id_list[level_index & 7u] + 1u);
+}
+
+void trap_whirlwind_set_destination(unsigned char level_index)
+{
+    TELEPORT_LEVEL_INDEX = (uint8_t)(level_index & 7u);
+    WHIRLWIND_PREV_ROOM_ID = k_whirlwind_prev_room_id_list[level_index & 7u];
+}
+
 void trap_summon_whirlwind(void)
 {
     /* drain at trap_runtime.c:88-110. */
@@ -139,7 +159,7 @@ void trap_summon_whirlwind(void)
     unsigned char mask =
         k_trap_level_masks[(unsigned char)TELEPORT_LEVEL_INDEX & 7u];
     for (;;) {
-        const unsigned char triforce_pieces = (unsigned char)RAM(0x0671);
+        const unsigned char triforce_pieces = (unsigned char)F_ram_0671_R;
         if (triforce_pieces == 0u) {
             return;
         }
@@ -205,7 +225,7 @@ static void whirlwind_sync_link(void)
     const unsigned char face = (d & 0x01u) ? 3u : (d & 0x02u) ? 2u :
                                (d & 0x08u) ? 1u : 0u;
     roomrom_main_set_link_story_pose((unsigned char)LINK_X,
-                                     (unsigned char)RAM(0x0084u), face);
+                                     (unsigned char)F_ram_0084_R, face);
 }
 
 void trap_update_whirlwind_full(unsigned int slot)
@@ -227,6 +247,7 @@ void trap_update_whirlwind_full(unsigned int slot)
                 TELEPORT_ACTIVE_FLAG = 0u;
                 MON_TYPE(slot) = 0u;
                 progress_update_player_position_marker();
+                roomrom_main_whirlwind_party_state(1u);
                 trap_draw_whirlwind(slot);
                 return;
             }
@@ -234,8 +255,17 @@ void trap_update_whirlwind_full(unsigned int slot)
         }
     }
     if (!skip_collision) {
+        /* NES source: Z_01 UpdateWhirlwind_Full's capture branch.
+         * Drained C: this original updater and CheckLinkCollision.
+         * Coverage: PARTIAL party contact; Stance: EXTEND one world tick.
+         * P1 retains first priority and the exact existing contact call. */
+        unsigned char owner = 0u;
         link_collision_check_link_collision(slot);
-        if ((unsigned char)COMBAT_COLLIDED) {
+        if (!(unsigned char)COMBAT_COLLIDED && g_player_count > 1u)
+            owner = roomrom_main_whirlwind_try_extra_contact(slot);
+        if ((unsigned char)COMBAT_COLLIDED || (owner != 0u && owner < g_player_count)) {
+            if (g_player_count > 1u)
+                G_OBJECT_PLAYER_REFS[slot].status_player = owner;
             LINK_DIR = 1u;
             MON_SHOVE_DIR(0) = 0u;
             MON_SHOVE_TIMER(0) = 0u;
@@ -249,6 +279,10 @@ void trap_update_whirlwind_full(unsigned int slot)
             TELEPORT_ACTIVE_FLAG =
                 (uint8_t)((unsigned char)TELEPORT_ACTIVE_FLAG + 1u);
             whirlwind_sync_link();
+            roomrom_main_whirlwind_party_state(0u);
+            /* T-258: Remix lets the player choose where it goes; the pause
+             * map opens next tick with the summon's choice preselected. */
+            if (game_profile_is_remix()) pause_map_flute_request();
         }
     }
     if ((unsigned char)OBJ_X(slot) < 0xF0u) {
@@ -378,8 +412,8 @@ void trap_init_mode_b_enter_cave_bank5(void)
      * + ResetInvObjState. Skip DrawSpritesBetweenRooms + level-attr-F. */
     room_reset_player_state();
     core_clear_ram0300_up_to(5u, 31u);
-    RAM(0x0054u) = 0u;     /* door trigger info */
-    RAM(0x0055u) = 0u;
+    F_ram_0054_R = 0u;     /* door trigger info */
+    F_ram_0055_R = 0u;
     room_reset_inv_obj_state();
 
     LINK_X = 112u;

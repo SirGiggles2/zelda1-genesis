@@ -7,6 +7,7 @@
 #include "weapon_dispatch.h"
 #include <stdint.h>
 #include "platform_abi.h"
+#include "weapon_state.h"
 #include "world_state.h"       /* WORLD_TMP*, LINK_X/_Y, LINK_DIR, WEAPON_DRAW_SLOT_*, SFX_COMBAT, OBJ_QSPD_FRAC, OBJ_POS_FRAC, OBJ_GRID_OFFSET, OBJ_MOVE_TIMER, OBJ_ANIM_TIMER */
 #include "combat_state.h"      /* LINK_ACTION_TIMER, OBJ_STATE, OBJ_DIR, OBJ_X, OBJ_Y */
 #include "item_state.h"        /* LINK_BOMB_COUNT, LINK_CANDLE_LEVEL */
@@ -19,7 +20,7 @@ static unsigned char weapon_choose_offset_for_direction_h(unsigned char dir);
 
 /* CANDLE_LIT_FLAG = RAM(0x0513). */
 #ifndef CANDLE_LIT_FLAG_REF
-#define CANDLE_LIT_FLAG_REF  RAM(0x0513u)
+#define CANDLE_LIT_FLAG_REF  F_ram_0513_R2
 #endif
 
 static unsigned char weapon_choose_offset_for_direction_h(unsigned char dir)
@@ -67,7 +68,10 @@ void weapon_place_weapon_for_player_state_and_anim(unsigned int slot)
 void weapon_place_weapon_for_player_state_and_anim_and_weapon_state(
     unsigned char weapon_state, unsigned int slot)
 {
-    OBJ_STATE(slot) = weapon_state;
+    if (slot == 16u || slot == 17u)
+        shared_effect_set_state((unsigned char)slot, weapon_state);
+    else
+        OBJ_STATE(slot) = weapon_state;
     weapon_place_weapon_for_player_state_and_anim(slot);
 }
 
@@ -100,7 +104,7 @@ void weapon_wield_bomb(unsigned int slot)
     }
     LINK_BOMB_COUNT = (uint8_t)(LINK_BOMB_COUNT - 1u);
     SFX_COMBAT = 32u;
-    OBJ_MOVE_TIMER(use_slot) = 0u;
+    shared_effect_set_timer((unsigned char)use_slot, 0u);
     weapon_place_weapon_for_player_state_and_anim_and_weapon_state(17u, use_slot);
 }
 
@@ -122,7 +126,7 @@ unsigned int weapon_wield_candle(unsigned int slot)
     OBJ_GRID_OFFSET(use_slot) = 0u;
     OBJ_POS_FRAC(use_slot) = 0u;
     OBJ_QSPD_FRAC(use_slot) = 32u;
-    OBJ_STATE(use_slot) = 33u;
+    shared_effect_set_state((unsigned char)use_slot, 33u);
     core_play_effect(4u);
     OBJ_ANIM_TIMER(use_slot) = 4u;
     weapon_place_weapon_for_player_state(use_slot);
@@ -147,17 +151,17 @@ void weapon_wield_flute(void)
 {
     signed char y;
     unsigned char quest;
-    RAM(0x0602u) = 0x10u;                       /* Tune1Request */
-    RAM(0x003Cu) = 0x98u;                       /* FluteTimer */
-    if (RAM(0x0010u) != 0u) {                   /* CurLevel: UW */
-        if (RAM(0x051Bu) == 0u)                 /* UsedFlute */
-            RAM(0x051Bu) = 1u;
+    F_ram_0602_R = 0x10u;                       /* Tune1Request */
+    F_ram_003C_R = 0x98u;                       /* FluteTimer */
+    if (F_ram_0010_R != 0u) {                   /* CurLevel: UW */
+        if (F_ENEMY_USED_FLUTE_R == 0u)                 /* UsedFlute */
+            F_ENEMY_USED_FLUTE_R = 1u;
         return;
     }
-    if (RAM(0x0012u) != 0x05u) return;          /* GameMode */
-    quest = RAM((unsigned short)(0x062Du + RAM(0x0016u)));   /* QuestNumbers */
+    if (F_ram_0012_R != 0x05u) return;          /* GameMode */
+    quest = F_ram_062D_R(F_ram_0016_R);   /* QuestNumbers */
     for (y = 10; y >= 0; --y)
-        if (RAM(0x00EBu) == k_flute_room_secrets_ow[(unsigned char)y]) break;
+        if (F_ram_00EB_R == k_flute_room_secrets_ow[(unsigned char)y]) break;
     if (y < 0) {                                /* @FluteSecretNotFound */
         trap_summon_whirlwind();
         return;
@@ -171,11 +175,11 @@ void weapon_wield_flute(void)
         return;
     }
     /* @RevealSecret: not while the color cycle runs or is done. */
-    if (RAM(0x051Au) != 0u) return;             /* SecretColorCycle */
+    if (F_ram_051A_R != 0u) return;             /* SecretColorCycle */
     /* Empty slot from 8 down to 0 (ObjType+1 + y), as the NES. */
     for (y = 8; y >= 0; --y) {
-        if (RAM((unsigned short)(0x0350u + (unsigned char)y)) == 0u) {
-            RAM((unsigned short)(0x0350u + (unsigned char)y)) = 0x5Eu;
+        if (F_CAVE_ROOM_TYPE_R4((unsigned char)y) == 0u) {
+            F_CAVE_ROOM_TYPE_R4((unsigned char)y) = 0x5Eu;
             return;
         }
     }
@@ -188,8 +192,8 @@ void weapon_wield_flute(void)
  * involuntarily paused (Paused 2); World_FillHearts clears both. */
 void weapon_wield_potion(void)
 {
-    if (RAM(0x065Eu) == 0u) return;             /* Potion */
-    RAM(0x065Eu) = (unsigned char)(RAM(0x065Eu) - 1u);
-    RAM(0x0063u) = 1u;                          /* World_IsFillingHearts */
-    RAM(0x00E0u) = 2u;                          /* Paused */
+    if (F_NES_INV_POTION_R == 0u) return;             /* Potion */
+    F_NES_INV_POTION_R = (unsigned char)(F_NES_INV_POTION_R - 1u);
+    F_ram_0063_R = 1u;                          /* World_IsFillingHearts */
+    F_ram_00E0_R = 2u;                          /* Paused */
 }

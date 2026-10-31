@@ -31,14 +31,14 @@
 static inline unsigned char progress_read_room_flags_inline(void)
 {
     const unsigned char ptr_lo =
-        nes_ram[NES_SRAM_BASE + NES_SRAM_ROOM_FLAGS_PTR_LO];
+        F_ram_6BAF_N;
     const unsigned char ptr_hi =
-        nes_ram[NES_SRAM_BASE + NES_SRAM_ROOM_FLAGS_PTR_HI];
+        F_ram_6BB0_N;
     SAVEFILE_PTR_LO = ptr_lo;
     SAVEFILE_PTR_HI = ptr_hi;
     const unsigned short ptr =
         (unsigned short)(((unsigned short)ptr_hi << 8) | ptr_lo);
-    return (unsigned char)nes_ram[ptr + CUR_ROOM_ID];
+    return (unsigned char)nes_ram[ptr + CUR_ROOM_ID]; /* native_ram bulk:dyn_ptr_table */
 }
 
 void progress_set_room_flag_uw_item_state(void)
@@ -53,7 +53,7 @@ void progress_set_room_flag_uw_item_state(void)
     flags = (unsigned char)(flags | 0x10u);
     const unsigned short ptr =
         (unsigned short)(((unsigned short)SAVEFILE_PTR_HI << 8) | SAVEFILE_PTR_LO);
-    nes_ram[ptr + CUR_ROOM_ID] = flags;
+    nes_ram[ptr + CUR_ROOM_ID] = flags; /* native_ram bulk:dyn_ptr_table */
 }
 
 /* NES Z_01.asm PaletteRow7TransferRecord (8-byte transfer header,
@@ -98,7 +98,7 @@ static void progress_replace_palette_row_common(unsigned char color_index)
 
     /* Stash 3 color triple bytes at RAM($0306..$0308). */
     for (int j = 0; j < 3; j++) {
-        RAM(0x0306 + j) = progress_ganon_palette_color((unsigned char)(color_index - 2 + j));
+        F_ram_0306_R(j) = progress_ganon_palette_color((unsigned char)(color_index - 2 + j));
     }
 }
 
@@ -220,11 +220,11 @@ void progress_fetch_file_a_address_set(void)
     const unsigned char file_slot = (unsigned char)SAVE_SLOT_INDEX;
     unsigned char end_idx = (unsigned char)(0x0Du + file_slot * 0x0Eu);
     for (int i = 13; i >= 0; i--) {
-        RAM(i) = k_save_file_a_address_sets[end_idx];
+        RAM(i) = k_save_file_a_address_sets[end_idx]; /* native_ram bulk:dyn_range */
         end_idx = (unsigned char)(end_idx - 1u);
     }
-    RAM(0x000Eu) = 0x7Fu;
-    RAM(0x000Fu) = 0x06u;
+    F_ram_000E_R2 = 0x7Fu;
+    F_ram_000F_R = 0x06u;
 }
 
 void progress_update_position_marker(unsigned char room_id, unsigned int idx)
@@ -246,7 +246,7 @@ void progress_update_position_marker(unsigned char room_id, unsigned int idx)
     }
     MAP_MARKER_TILE(idx) = 62u;
     MAP_MARKER_X(idx)    = (uint8_t)(col_shifted + tile_val +
-                                     nes_ram[NES_SRAM_BASE + 0x0BACu]);
+                                     F_NES_SRAM_BASE_6BAC_N);
 
     if (idx == 0u) {
         MAP_MARKER_ATTR(0) = 0u;
@@ -254,7 +254,7 @@ void progress_update_position_marker(unsigned char room_id, unsigned int idx)
     }
     {
         unsigned char attr = 3u;
-        if (level != 9u && (RAM(0x0671) & k_level_masks[level - 1u])) {
+        if (level != 9u && (F_ram_0671_R & k_level_masks[level - 1u])) {
             /* Item already found in this level — stay full-bright. */
         } else {
             const unsigned char flash = (unsigned char)(FRAME_COUNTER & 0x1Fu);
@@ -316,7 +316,7 @@ unsigned char progress_get_room_flag_uw_item_state(void)
     SAVEFILE_MASK_HI = ptr_hi;
     const unsigned short ptr =
         (unsigned short)(((unsigned short)ptr_hi << 8) | ptr_lo);
-    return (unsigned char)(nes_ram[ptr + CUR_ROOM_ID] & 0x10u);
+    return (unsigned char)(nes_ram[ptr + CUR_ROOM_ID] & 0x10u); /* native_ram bulk:dyn_ptr_table */
 }
 
 void progress_update_world_curtain_effect(void)
@@ -331,7 +331,7 @@ void progress_update_world_curtain_effect(void)
     ITEM_VALUE_SCRATCH = 1u;
     do {
         const unsigned char col_idx = (unsigned char)ITEM_VALUE_SCRATCH;
-        CUR_ROOM_FLAGS_PTR = RAM(0x007Cu + col_idx);
+        CUR_ROOM_FLAGS_PTR = F_ram_007C_R3(col_idx);
         room_copy_column_to_tilebuf();
         ITEM_VALUE_SCRATCH =
             (uint8_t)((unsigned char)ITEM_VALUE_SCRATCH - 1u);

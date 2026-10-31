@@ -2,6 +2,7 @@
 #define PLAYER_STATE_H
 
 #include "link_state.h"
+#include "player_ram.h"
 
 /* ---------------------------------------------------------------------------
  * Phase 6 Task 6.1 — PlayerState array shape.
@@ -16,14 +17,17 @@
  * rewriting every Phase 6 system that touched `players[0]` directly.
  *
  * Sizing rationale: 4 is the hard cap because the Genesis VDP sprite
- * budget (80 sprites total, 20 per scanline) cannot sustain more
+ * budget (64 sprites total, 16 per scanline in active H32 mode) cannot sustain more
  * simultaneous Links + their projectiles + enemies. See render_budget.h
  * for the per-player sprite reservation.
  * ------------------------------------------------------------------------ */
 
 #define PLAYER_MAX_COUNT  4u
 
-extern PlayerState  players[PLAYER_MAX_COUNT];
+/* T-367 unit 4b: actors live in the native PlayerRam records ($FF8800 block, 128-byte
+ * stride, A4-relative). PLAYER(i) is the actor lvalue; there is no flat PlayerState array. */
+#define PLAYER(i) (G_PLAYERS[(i)].actor)
+_Static_assert(PLAYER_MAX_COUNT == PLAYER_RAM_COUNT, "one PlayerRam record per player");
 extern unsigned char g_player_count;
 
 #endif /* PLAYER_STATE_H */

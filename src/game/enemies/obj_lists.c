@@ -148,7 +148,7 @@ static void modify_count_by_history_ow(unsigned char room_id,
         if (kc == 7u) {
             unsigned int ptr = (unsigned int)(unsigned char)SAVEFILE_PTR_LO
                              | ((unsigned int)(unsigned char)SAVEFILE_PTR_HI << 8);
-            nes_ram[ptr + room_id] = (unsigned char)(flags & 0xF8u);
+            nes_ram[ptr + room_id] = (unsigned char)(flags & 0xF8u); /* native_ram bulk:dyn_ptr_table */
             return;
         }
     }
@@ -204,14 +204,14 @@ static void modify_count_by_history_uw(unsigned char room_id,
             /* Recurring: clear all-defeated bits + zero kill-counts. */
             unsigned int ptr = (unsigned int)(unsigned char)SAVEFILE_PTR_LO
                              | ((unsigned int)(unsigned char)SAVEFILE_PTR_HI << 8);
-            nes_ram[ptr + room_id] = (unsigned char)(flags & 0x3Fu);
-            RAM(0x0560u + room_id) = 0u;
+            nes_ram[ptr + room_id] = (unsigned char)(flags & 0x3Fu); /* native_ram bulk:dyn_ptr_table */
+            F_ram_0560_R(room_id) = 0u;
             return;
         }
         /* Not-all-defeated path falls through to subtract LevelKillCounts. */
     }
     /* @CalcObjCount — subtract LevelKillCounts[room]. */
-    unsigned char lkc = (unsigned char)RAM(0x0560u + room_id);
+    unsigned char lkc = (unsigned char)F_ram_0560_R(room_id);
     if (*count_io >= lkc) {
         *count_io = (unsigned char)(*count_io - lkc);
     } else {
@@ -267,7 +267,7 @@ unsigned char enemy_room_load_objects(unsigned char room_id)
 
     /* NES Z_05.asm:1750 — mode 9 cellar override. nes_ram is the
      * a4-register substrate base from src/abi/platform_abi.h. */
-    unsigned char game_mode = nes_ram[0x0012u];
+    unsigned char game_mode = F_ram_0012;
     if (game_mode == 0x09u) {
         template_id = 0u;
         count = 0u;
@@ -285,7 +285,7 @@ unsigned char enemy_room_load_objects(unsigned char room_id)
         /* Repeat single template across slots 1..count. */
         unsigned char x;
         for (x = 0u; x < count; ++x) {
-            OBJ(NES_OBJ_TYPE, (unsigned int)(x + 1u)) = template_id;
+            F_ram_034F_O2((unsigned int)(x + 1u)) = template_id;
         }
     } else {
         /* Copy ObjList[N] into slots 1..count. */
@@ -296,12 +296,12 @@ unsigned char enemy_room_load_objects(unsigned char room_id)
         }
         unsigned char y;
         for (y = 0u; y < count; ++y) {
-            OBJ(NES_OBJ_TYPE, (unsigned int)(y + 1u)) = src[y];
+            F_ram_034F_O2((unsigned int)(y + 1u)) = src[y];
         }
     }
 
     /* Step 8 — RoomObjTemplateType = first template. */
-    DUNGEON_ROOM_TEMPLATE_TYPE = (unsigned char)OBJ(NES_OBJ_TYPE, 1u);
+    DUNGEON_ROOM_TEMPLATE_TYPE = (unsigned char)F_ram_034F_O2(1u);
     return 1u;
 }
 
@@ -348,7 +348,7 @@ static const unsigned char cellar_keese_ys[4] = { 0x9Du, 0x5Du, 0x7Du, 0x9Du };
  * InitObject, after the cell is stored. */
 void enemy_edge_spawn_next(unsigned int slot)
 {
-    const unsigned char start = (unsigned char)RAM(0x0525u);
+    const unsigned char start = (unsigned char)F_ram_0525_R;
     unsigned char cell = start;
     for (;;) {
         const unsigned char low = (unsigned char)(cell & 0x0Fu);
@@ -364,15 +364,15 @@ void enemy_edge_spawn_next(unsigned int slot)
                 (unsigned short)(cell & 0x0Fu) * (2u * NES_TILE_COL_STRIDE));
             /* 8-bit SEC / SBC #$40 / LSR x3. */
             const unsigned char row = (unsigned char)((unsigned char)((cell & 0xF0u) - 0x40u) >> 3);
-            RAM(0x0000u) = (unsigned char)(addr & 0xFFu);
-            RAM(0x0001u) = (unsigned char)(addr >> 8);
-            if ((unsigned char)RAM(addr + row) < 0x84u)
+            F_ram_0000_R = (unsigned char)(addr & 0xFFu);
+            F_ram_0001_R = (unsigned char)(addr >> 8);
+            if ((unsigned char)RAM(addr + row) < 0x84u) /* native_ram bulk:dyn_addr */
                 break;
         }
         if (cell == start) break;
     }
-    RAM(0x000Au) = cell;                       /* [0A]: the search cell */
-    RAM(0x0525u) = cell;
+    F_ZP_TMPA_R = cell;                       /* [0A]: the search cell */
+    F_ram_0525_R = cell;
     ENEMY_X(slot) = (unsigned char)((cell & 0x0Fu) << 4);
     ENEMY_Y(slot) = (unsigned char)((cell & 0xF0u) - 3u);
 }
@@ -389,9 +389,9 @@ static unsigned char nes_abs_sub(unsigned char a, unsigned char b)
  * on either axis. */
 unsigned char enemy_edge_distance_safe(unsigned int slot)
 {
-    if (nes_abs_sub((unsigned char)OBJ(NES_OBJ_X, 0u), (unsigned char)ENEMY_X(slot)) >= 0x22u)
+    if (nes_abs_sub((unsigned char)F_ram_0070_O2(0u), (unsigned char)ENEMY_X(slot)) >= 0x22u)
         return 1u;
-    return (unsigned char)(nes_abs_sub((unsigned char)OBJ(NES_OBJ_Y, 0u),
+    return (unsigned char)(nes_abs_sub((unsigned char)F_ram_0084_O2(0u),
                                        (unsigned char)ENEMY_Y(slot)) >= 0x22u);
 }
 
@@ -402,11 +402,11 @@ static unsigned char is_safe_to_spawn(unsigned int slot)
     unsigned char tile  = (unsigned char)ENEMY_COLLIDED_TILE(slot);
     unsigned char floor = (unsigned char)ENEMY_DUNGEON_TILE_FLOOR;
     if (tile >= floor) return 1u;
-    unsigned char dx = nes_abs_sub((unsigned char)OBJ(NES_OBJ_X, 0u),
-                                   (unsigned char)OBJ(NES_OBJ_X, slot));
+    unsigned char dx = nes_abs_sub((unsigned char)F_ram_0070_O2(0u),
+                                   (unsigned char)F_ram_0070_O2(slot));
     if (dx >= 0x22u) return 0u;
-    unsigned char dy = nes_abs_sub((unsigned char)OBJ(NES_OBJ_Y, 0u),
-                                   (unsigned char)OBJ(NES_OBJ_Y, slot));
+    unsigned char dy = nes_abs_sub((unsigned char)F_ram_0084_O2(0u),
+                                   (unsigned char)F_ram_0084_O2(slot));
     if (dy < 0x22u) return 1u;
     return 0u;
 }
@@ -470,7 +470,7 @@ void enemy_assign_spawn_positions(unsigned char room_id, unsigned char template_
          * spawn-list index was effectively random.
          * Read the right cell ($0098 = Link's slot-0 ObjDir). */
         unsigned char list_idx =
-            dir_to_spawn_list_index((unsigned char)nes_ram[0x0098u]);
+            dir_to_spawn_list_index((unsigned char)F_ram_0098);
         const unsigned char *list = spawn_pos_lists[list_idx];
         unsigned char y = (unsigned char)DUNGEON_SPAWN_CYCLE;
         unsigned int x;
@@ -478,8 +478,8 @@ void enemy_assign_spawn_positions(unsigned char room_id, unsigned char template_
             unsigned int iter_cap = 0u;
             for (x = 1u; x < 0x0Au; ) {
                 unsigned char b = list[y];
-                OBJ(NES_OBJ_X, x) = (unsigned char)((b & 0x0Fu) << 4);
-                OBJ(NES_OBJ_Y, x) = (unsigned char)((b & 0xF0u) | 0x0Du);
+                F_ram_0070_O2(x) = (unsigned char)((b & 0x0Fu) << 4);
+                F_ram_0084_O2(x) = (unsigned char)((b & 0xF0u) | 0x0Du);
                 unsigned char unsafe = is_safe_to_spawn(x);
                 if (!unsafe) {
                     ++x;
@@ -504,7 +504,7 @@ void enemy_assign_spawn_positions(unsigned char room_id, unsigned char template_
     }
 
     /* NES @AssignSpecialPositions @ Z_05.asm:1946. */
-    unsigned char game_mode = nes_ram[0x0012u];
+    unsigned char game_mode = F_ram_0012;
     if (game_mode == 0x09u) {
         /* Cellar — 4 blue keese. NES bug-feature: cellar_keese_ys[Y]
          * uses Y-cycle-index, NOT loop X. When mode 9 hits via the
@@ -513,9 +513,9 @@ void enemy_assign_spawn_positions(unsigned char room_id, unsigned char template_
         unsigned char y_idx_clamped = (y_cycle < 4u) ? y_cycle : 0u;
         int xx;
         for (xx = 3; xx >= 0; --xx) {
-            OBJ(NES_OBJ_TYPE, (unsigned int)(xx + 1)) = 0x1Bu;
-            OBJ(NES_OBJ_X,    (unsigned int)(xx + 1)) = cellar_keese_xs[xx];
-            OBJ(NES_OBJ_Y,    (unsigned int)(xx + 1)) = cellar_keese_ys[y_idx_clamped];
+            F_ram_034F_O2((unsigned int)(xx + 1)) = 0x1Bu;
+            F_ram_0070_O2((unsigned int)(xx + 1)) = cellar_keese_xs[xx];
+            F_ram_0084_O2((unsigned int)(xx + 1)) = cellar_keese_ys[y_idx_clamped];
         }
         /* RoomObjCount stays 0 (mode 9 zeroed it above): SaveKillCountUW
          * then marks the cellar cleared, as on the NES (T-171 lockstep,
@@ -528,12 +528,12 @@ void enemy_assign_spawn_positions(unsigned char room_id, unsigned char template_
     if (game_mode == 0x0Bu || game_mode == 0x0Cu) {
         unsigned int xx;
         for (xx = 1u; xx <= 8u; ++xx) {
-            OBJ(NES_OBJ_TYPE, xx) = 0u;
+            F_ram_034F_O2(xx) = 0u;
         }
         unsigned char lba_b = (unsigned char)(DUNGEON_LBA_B(room_id) & 0xFCu);
         /* SBC #$40 → wraparound subtraction on u8. */
         unsigned char cave_idx = (unsigned char)((lba_b - 0x40u) >> 2);
-        OBJ(NES_OBJ_TYPE, 1u) = (unsigned char)(0x6Au + cave_idx);
+        F_ram_034F_O2(1u) = (unsigned char)(0x6Au + cave_idx);
         /* RoomObjCount keeps the OW room's count (NES writes only
          * ObjType+1 here). */
     }

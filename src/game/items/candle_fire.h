@@ -15,6 +15,8 @@ void roomrom_candle_fire_init(void);
 void roomrom_candle_fire_spawn(link_face_t face, short link_x, short link_y);
 void roomrom_candle_fire_update(void);
 unsigned char roomrom_candle_fire_active(void);
+/* Contact only, with the selected player's slot-0 context loaded. */
+void roomrom_candle_fire_check_player_contact(void);
 
 /* NES UsedCandle ($0513): blocks a second blue-candle fire. Cleared on
  * room entry (InitMode_EnterRoom clears $0300-$051F). */

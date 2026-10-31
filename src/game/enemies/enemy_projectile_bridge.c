@@ -12,6 +12,35 @@
 #include "world/draw_dispatch.h"            /* draw_object_not_mirrored, draw_arrow, draw_boomerang, draw_sword_shot_or_magic_shot */
 #include "world/object_dispatch.h"          /* object_bound_by_room, object_move_object, object_move_shot */
 #include "world/sprite_dispatch.h"          /* sprite_anim_fetch_obj_pos */
+#include "enemy_dispatch.h"
+#include "../../state/player_state.h"
+#include "../../state/enemy_state.h"
+#include "../../state/combat_state.h"
+
+/* NES source: CheckShotLinkCollision / UpdateFireball / UpdateMonsterShot /
+ * UpdateMonsterArrow / DrawBoomerangAndCheckCollision.
+ * Drained C: enemy_projectile_runtime.c contact tails, unchanged outcomes.
+ * Coverage: PARTIAL extra-player contact completion, no movement/draw tick.
+ * Stance: EXTEND the existing collision-only party boundary. */
+void enemy_finish_party_projectile_contact(unsigned int slot)
+{
+    const unsigned char type = ENEMY_TYPE(slot);
+    if (type < 0x53u || type > 0x5Cu || ROOM_MONSTER_COLLISION_COUNT == 0u) return;
+    if (type == 0x5Cu) {
+        F_ram_03D0_O2(slot) = 3u;
+        F_ram_00AC_O(slot) = 0x20u;
+        return;
+    }
+    F_ram_0394_O3(slot) = 0u;
+    F_ram_0380_O(slot) = F_ram_0098_R;
+    F_ram_00AC_O(slot) = 0x30u;
+    if (type == 0x55u || type == 0x56u) {
+        core_destroy_monster(slot);
+    } else if (COMBAT_COLLIDED != 0u) {
+        extern void enrt_destroy_monster_shot(unsigned int slot);
+        enrt_destroy_monster_shot(slot);
+    }
+}
 
 void c_move_object(unsigned short slot)
 {
@@ -72,6 +101,19 @@ unsigned int z01_get_opposite_dir(unsigned int dir)
 
 void z01_get_directions_and_distances_to_target(unsigned char target_slot, unsigned int origin_slot)
 {
+    /* NES source: UpdateFireball -> GetDirectionsAndDistancesToTarget(0).
+     * Drained C: targeting_dispatch point arithmetic is unchanged.
+     * Coverage: PARTIAL party fireball aim; returning shots retain owner.
+     * Stance: EXTEND target adapter, without borrowing P1 coordinates. */
+    if (g_player_count > 1u && target_slot == 0u &&
+        origin_slot >= 1u && origin_slot <= 11u &&
+        (ENEMY_TYPE(origin_slot) == 0x55u || ENEMY_TYPE(origin_slot) == 0x56u)) {
+        const unsigned char player = enemy_nearest_party_player(origin_slot);
+        G_OBJECT_PLAYER_REFS[origin_slot].target_player = player;
+        targeting_get_directions_and_distances_to_point(
+            (unsigned char)PLAYER(player).x, (unsigned char)PLAYER(player).y, origin_slot);
+        return;
+    }
     targeting_get_directions_and_distances_to_target(target_slot, origin_slot);
 }
 

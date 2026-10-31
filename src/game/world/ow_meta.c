@@ -29,7 +29,7 @@ unsigned char roomrom_ow_meta_attr_b(unsigned char room_id)
     /* HandleWarpOW reads installed LevelBlockAttrsB. Quest 2 patches
      * selected bytes after the ROM blob is copied to NES SRAM; using the
      * unpatched blob routes Q2 cave doors to Q1 destinations. */
-    return (unsigned char)RAM(0x68FEu + room_id);
+    return (unsigned char)F_ram_68FE_R(room_id);
 }
 
 unsigned char roomrom_ow_meta_level_selector(unsigned char room_id)

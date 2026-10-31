@@ -75,16 +75,16 @@ typedef struct CaveState {
  * Not yet wired into consumers; consumers migrate per-callsite.
  * -------------------------------------------------------------------- */
 
-static inline uint8_t  cave_random_a_get(void)            { return RAM(0x0019); }
-static inline void     cave_random_a_set(uint8_t v)       { RAM(0x0019) = v; }
-static inline uint8_t  cave_random_b_get(void)            { return RAM(0x001A); }
-static inline void     cave_random_b_set(uint8_t v)       { RAM(0x001A) = v; }
-static inline uint8_t  cave_room_type_get(void)           { return RAM(0x0350); }
-static inline void     cave_room_type_set(uint8_t v)      { RAM(0x0350) = v; }
-static inline uint8_t  cave_flags_get(void)               { return RAM(0x0413); }
-static inline void     cave_flags_set(uint8_t v)          { RAM(0x0413) = v; }
-static inline uint8_t  cave_active_ware_index_get(void)   { return RAM(0x0421); }
-static inline void     cave_active_ware_index_set(uint8_t v) { RAM(0x0421) = v; }
+static inline uint8_t  cave_random_a_get(void)            { return F_ram_0019_R2; }
+static inline void     cave_random_a_set(uint8_t v)       { F_ram_0019_R2 = v; }
+static inline uint8_t  cave_random_b_get(void)            { return F_ZP_RNG_B_R2; }
+static inline void     cave_random_b_set(uint8_t v)       { F_ZP_RNG_B_R2 = v; }
+static inline uint8_t  cave_room_type_get(void)           { return F_CAVE_ROOM_TYPE_R; }
+static inline void     cave_room_type_set(uint8_t v)      { F_CAVE_ROOM_TYPE_R = v; }
+static inline uint8_t  cave_flags_get(void)               { return F_ram_0413_R2; }
+static inline void     cave_flags_set(uint8_t v)          { F_ram_0413_R2 = v; }
+static inline uint8_t  cave_active_ware_index_get(void)   { return F_CAVE_ACTIVE_WARE_INDEX_R; }
+static inline void     cave_active_ware_index_set(uint8_t v) { F_CAVE_ACTIVE_WARE_INDEX_R = v; }
 
 /* ----------------------------------------------------------------------
  * Legacy macro view — kept until Phase 3 close gate confirms all
@@ -98,40 +98,40 @@ static inline void     cave_active_ware_index_set(uint8_t v) { RAM(0x0421) = v; 
 #define CAVE_TMP4                        ZP_TMP4
 #define CAVE_RANDOM_A                    ZP_RNG_A
 #define CAVE_RANDOM_B                    ZP_RNG_B
-#define CAVE_DELAY_TIMER                 RAM(0x0029)
-#define CAVE_LINK_ACTION_TIMER           RAM(0x00AC)
-#define CAVE_PERSON_STATE                RAM(0x00AD)
-#define CAVE_LINK_INPUT_FLAGS            RAM(0x00F8)
-#define CAVE_ROOM_TYPE                   RAM(0x0350)
-#define CAVE_FLAGS                       RAM(0x0413)
-#define CAVE_TEXT_SELECTOR               RAM(0x0415)
-#define CAVE_TEXT_CHAR_INDEX             RAM(0x0416)
-#define CAVE_ACTIVE_WARE_INDEX           RAM(0x0421)
-#define CAVE_WARE_ITEM(idx)              RAM(0x0422 + (idx))
-#define CAVE_TRANSFER_PRICE_COUNT        RAM(0x042E)
-#define CAVE_TRANSFER_PRICE_OFFSET       RAM(0x042F)
-#define CAVE_PRICE(idx)                  RAM(0x0430 + (idx))
-#define CAVE_SELECTED_WARE_INDEX         RAM(0x0438)
-#define CAVE_PRIZE_ORDER(idx)            RAM(0x0448 + (idx))
-#define CAVE_TEXT_LINE_ADDR_LO           RAM(0x045F)
-#define CAVE_MONEY_GAME_PERM(idx)        RAM(0x046C + (idx))
-#define CAVE_MONEY_GAME_AMOUNT(idx)      RAM(0x046F + (idx))
-#define CAVE_TEXT_TICK_SFX               RAM(0x0604)
-#define LINK_RUPEES                      RAM(0x066D)
+#define CAVE_DELAY_TIMER                 F_ram_0029_R2
+#define CAVE_LINK_ACTION_TIMER           F_ram_00AC_R3
+#define CAVE_PERSON_STATE                F_CAVE_PERSON_STATE_R2
+#define CAVE_LINK_INPUT_FLAGS            F_ram_00F8_R2
+#define CAVE_ROOM_TYPE                   F_CAVE_ROOM_TYPE_R
+#define CAVE_FLAGS                       F_ram_0413_R2
+#define CAVE_TEXT_SELECTOR               F_ram_0415_R2
+#define CAVE_TEXT_CHAR_INDEX             F_ram_0416_R2
+#define CAVE_ACTIVE_WARE_INDEX           F_CAVE_ACTIVE_WARE_INDEX_R
+#define CAVE_WARE_ITEM(idx)              F_ram_0422_R2((idx))
+#define CAVE_TRANSFER_PRICE_COUNT        F_CAVE_TRANSFER_PRICE_COUNT_R
+#define CAVE_TRANSFER_PRICE_OFFSET       F_CAVE_TRANSFER_PRICE_OFFSET_R
+#define CAVE_PRICE(idx)                  F_ram_0430_R3((idx))
+#define CAVE_SELECTED_WARE_INDEX         F_CAVE_SELECTED_WARE_INDEX_R
+#define CAVE_PRIZE_ORDER(idx)            F_ram_0448_R2((idx))
+#define CAVE_TEXT_LINE_ADDR_LO           F_CAVE_TEXT_LINE_ADDR_LO_R2
+#define CAVE_MONEY_GAME_PERM(idx)        F_ram_046C_R((idx))
+#define CAVE_MONEY_GAME_AMOUNT(idx)      F_ram_046F_R((idx))
+#define CAVE_TEXT_TICK_SFX               F_ram_0604_R2
+#define LINK_RUPEES                      F_ram_066D_R
 /* NES name: InvLetter (Variables.inc). $0666 holds inventory letter
  * state (used / unused / received) globally; cave runtime aliases it
  * as CAVE_ROOM_SCRIPT_STATE because medicine-shop script logic reads
  * + bumps it on letter-use (Z_01.asm:UpdateCavePerson @UseLetter).
  * Both names refer to the SAME byte. Per Gate 1 finding 3_2b. */
-#define CAVE_ROOM_SCRIPT_STATE           RAM(0x0666)
-#define INV_LETTER                       RAM(0x0666)  /* canonical NES name */
-#define CAVE_DOOR_REPAIR_RUPEE_DELTA     RAM(0x067E)
+#define CAVE_ROOM_SCRIPT_STATE           F_ram_0666_R
+#define INV_LETTER                       F_ram_0666_R  /* canonical NES name */
+#define CAVE_DOOR_REPAIR_RUPEE_DELTA     F_ram_067E_R
 
 /* CAVE_TRANSFER_BUF_CHAR_BASE moved above with the typed view's constants. */
-#define CAVE_TRANSFER_BUF_PRICE_SIGN(off) RAM(0x0306 + (off))
-#define CAVE_TRANSFER_BUF_PRICE_HUNDREDS(off) RAM(0x0307 + (off))
-#define CAVE_TRANSFER_BUF_PRICE_TENS(off) RAM(0x0308 + (off))
-#define CAVE_TRANSFER_BUF_PRICE_UNITS(off) RAM(0x0309 + (off))
+#define CAVE_TRANSFER_BUF_PRICE_SIGN(off) F_ram_0306_R((off))
+#define CAVE_TRANSFER_BUF_PRICE_HUNDREDS(off) F_ram_0307_R((off))
+#define CAVE_TRANSFER_BUF_PRICE_TENS(off) F_ram_0308_R2((off))
+#define CAVE_TRANSFER_BUF_PRICE_UNITS(off) F_ram_0309_R((off))
 
 /* CAVE_WARE_DRAW_SLOT and CAVE_WARES_PER_ROOM moved above. */
 

@@ -80,51 +80,51 @@ static unsigned char opposite_dir(unsigned char dir)
 /* T-172 option A: inlined into its callers (call overhead). */
 __attribute__((always_inline)) static void mask_input_in_border(unsigned char mask, unsigned char y)
 {
-    unsigned char coord = nes_ram[TMP_02];
+    unsigned char coord = F_ram_0002_N;
     unsigned char crossed;
-    nes_ram[TMP_01] = mask;
-    if (nes_ram[TMP_00] & 0x0Au) crossed = (coord >= k_border_bounds[y]) ? 1u : 0u;
+    F_ram_0001_N = mask;
+    if (F_ram_0000_N & 0x0Au) crossed = (coord >= k_border_bounds[y]) ? 1u : 0u;
     else                         crossed = (coord <  k_border_bounds[y]) ? 1u : 0u;
     if (!crossed) {
-        nes_ram[TMP_01] = 0xFFu;
+        F_ram_0001_N = 0xFFu;
         return;
     }
-    nes_ram[BUTTONS_PRESSED] = (unsigned char)(nes_ram[BUTTONS_PRESSED] & mask);
-    if (nes_ram[CUR_LEVEL] == 0u || mask != 0u) return;
-    nes_ram[LINK_INPUT_DIR] = (unsigned char)(nes_ram[LINK_INPUT_DIR] &
-        ((nes_ram[LINK_DIR] & 0x0Cu) ? 0x0Cu : 0x03u));
+    F_ram_00F8_N2 = (unsigned char)(F_ram_00F8_N2 & mask);
+    if (F_ram_0010_N3 == 0u || mask != 0u) return;
+    F_ram_03F8_N2 = (unsigned char)(F_ram_03F8_N2 &
+        ((F_ram_0098_N4 & 0x0Cu) ? 0x0Cu : 0x03u));
 }
 
 void link_filter_input(void)
 {
-    unsigned char opp = opposite_dir(nes_ram[LINK_DIR]);
+    unsigned char opp = opposite_dir(F_ram_0098_N4);
     unsigned char y = rev_index(opp);
-    if (nes_ram[LINK_STATE] != 0u) return;
-    nes_ram[TMP_00] = opp;
-    nes_ram[TMP_02] = (y >= 2u && y < 4u) ? nes_ram[LINK_X] : nes_ram[LINK_Y];
+    if (F_ram_00AC_N3 != 0u) return;
+    F_ram_0000_N = opp;
+    F_ram_0002_N = (y >= 2u && y < 4u) ? F_ram_0070_N4 : F_ram_0084_N4;
     mask_input_in_border(0x80u, (unsigned char)(y + 8u));
-    if (nes_ram[TMP_01] == 0xFFu) {
-        nes_ram[TMP_00] = nes_ram[LINK_DIR];
-        y = rev_index(nes_ram[LINK_DIR]);
+    if (F_ram_0001_N == 0xFFu) {
+        F_ram_0000_N = F_ram_0098_N4;
+        y = rev_index(F_ram_0098_N4);
     }
-    if (nes_ram[CUR_LEVEL] != 0u) y = (unsigned char)(y + 4u);
+    if (F_ram_0010_N3 != 0u) y = (unsigned char)(y + 4u);
     mask_input_in_border(0x00u, y);
 }
 
 void link_modify_dir_in_doorway(void)
 {
-    if (nes_ram[CUR_LEVEL] != 0u) room_player_link_modify_dir_in_doorway();
+    if (F_ram_0010_N3 != 0u) room_player_link_modify_dir_in_doorway();
 }
 
 /* Z_05.asm GetPlayerCoordsForDirection: [00] perpendicular, [01] axis. */
 static void player_coords_for_dir(unsigned char dir)
 {
     if (dir & 0x03u) {
-        nes_ram[TMP_00] = nes_ram[LINK_Y];
-        nes_ram[TMP_01] = nes_ram[LINK_X];
+        F_ram_0000_N = F_ram_0084_N4;
+        F_ram_0001_N = F_ram_0070_N4;
     } else {
-        nes_ram[TMP_00] = nes_ram[LINK_X];
-        nes_ram[TMP_01] = nes_ram[LINK_Y];
+        F_ram_0000_N = F_ram_0070_N4;
+        F_ram_0001_N = F_ram_0084_N4;
     }
 }
 
@@ -132,8 +132,8 @@ static signed char search_doorways(const unsigned char *mins, const unsigned cha
 {
     signed char y;
     for (y = 3; y >= 0; --y) {
-        if (nes_ram[TMP_00] == k_doorway_coord[y] &&
-            nes_ram[TMP_01] >= mins[y] && nes_ram[TMP_01] < maxs[y])
+        if (F_ram_0000_N == k_doorway_coord[y] &&
+            F_ram_0001_N >= mins[y] && F_ram_0001_N < maxs[y])
             return y;
     }
     return -1;
@@ -143,46 +143,46 @@ static signed char search_doorways(const unsigned char *mins, const unsigned cha
  * BlockUntilTime). [0C] door bit; blocks by [0E] = $FF. */
 static void touch_door(unsigned char attr)
 {
-    unsigned char bit = nes_ram[TMP_0C];
+    unsigned char bit = F_ram_000C_N;
     switch (attr & 7u) {
     case DOOR_TYPE_OPEN:
         return;
     case DOOR_TYPE_FALSE:
     case DOOR_TYPE_FALSE2:
-        if (nes_ram[LINK_TIMER] == 0u) nes_ram[LINK_TIMER] = 0x18u;
-        else if (nes_ram[LINK_TIMER] == 1u) return;
+        if (F_ram_0028_N2 == 0u) F_ram_0028_N2 = 0x18u;
+        else if (F_ram_0028_N2 == 1u) return;
         break;
     case DOOR_TYPE_BOMBABLE:
-        if (bit & nes_ram[CUR_OPENED_DOORS]) return;
+        if (bit & F_ram_00EE_N4) return;
         break;
     case DOOR_TYPE_SHUTTER:
-        if (nes_ram[TRIGGERED_DOOR_CMD] != 0u) break;
-        if ((bit & nes_ram[CUR_OPENED_DOORS]) == 0u) break;
-        if (bit & nes_ram[SHUTTER_PASSED]) {
-            if (nes_ram[LINK_TIMER] == 0u) return;         /* BlockUntilTime */
+        if (F_ram_0054_N3 != 0u) break;
+        if ((bit & F_ram_00EE_N4) == 0u) break;
+        if (bit & F_ram_0519_N2) { /* native_ram bulk:dyn_addr */
+            if (F_ram_0028_N2 == 0u) return;         /* BlockUntilTime */
             break;
         }
-        nes_ram[SHUTTER_PASSED] = (unsigned char)(nes_ram[SHUTTER_PASSED] | bit);
+        F_ram_0519_N2 = (unsigned char)(F_ram_0519_N2 | bit);
         return;
     case DOOR_TYPE_KEY:
     case DOOR_TYPE_KEY2:
-        if (bit & nes_ram[CUR_OPENED_DOORS]) return;
-        if (nes_ram[TRIGGERED_DOOR_CMD] != 0u) {
-            if (nes_ram[LINK_TIMER] == 0u) return;         /* BlockUntilTime */
+        if (bit & F_ram_00EE_N4) return;
+        if (F_ram_0054_N3 != 0u) {
+            if (F_ram_0028_N2 == 0u) return;         /* BlockUntilTime */
             break;
         }
-        if (nes_ram[INV_MAGIC_KEY] == 0u) {
-            if (nes_ram[INV_KEYS] == 0u) break;             /* BlockAtWall */
-            nes_ram[INV_KEYS] = (unsigned char)(nes_ram[INV_KEYS] - 1u);
+        if (F_ram_0664_N2 == 0u) {
+            if (F_ram_066E_N2 == 0u) break;             /* BlockAtWall */
+            F_ram_066E_N2 = (unsigned char)(F_ram_066E_N2 - 1u);
         }
-        nes_ram[TRIGGERED_DOOR_DIR] = bit;                  /* TriggerOpenDoor */
-        nes_ram[TRIGGERED_DOOR_CMD] = 0x06u;
-        nes_ram[LINK_TIMER] = 0x20u;
+        F_ram_0055_N3 = bit;                  /* TriggerOpenDoor */
+        F_ram_0054_N3 = 0x06u;
+        F_ram_0028_N2 = 0x20u;
         break;
     default:                                                /* TouchDoorWall */
         break;
     }
-    nes_ram[TMP_0E] = 0xFFu;
+    F_ram_000E_N = 0xFFu;
 }
 
 /* Z_05.asm FindDoorAttrByDoorBit for a single door bit: the door type,
@@ -199,7 +199,7 @@ static unsigned char find_door_attr(unsigned char bit)
 /* Z_05.asm CheckDoorway. Returns 1 for GoToNextModeFromPlay. */
 static unsigned char check_doorway(void)
 {
-    unsigned char dd = nes_ram[DOORWAY_DIR];
+    unsigned char dd = F_ram_0053_N;
     signed char y;
     unsigned char in, attr, t;
 
@@ -208,35 +208,35 @@ static unsigned char check_doorway(void)
         player_coords_for_dir(dd);
         yi = rev_index(dd);
         if (yi < 4u &&
-            nes_ram[TMP_01] >= k_doorway_min_over[yi] &&
-            nes_ram[TMP_01] <  k_doorway_max_over[yi] &&
-            dd == nes_ram[LINK_DIR]) {
-            player_coords_for_dir(nes_ram[LINK_DIR]);
+            F_ram_0001_N >= k_doorway_min_over[yi] &&
+            F_ram_0001_N <  k_doorway_max_over[yi] &&
+            dd == F_ram_0098_N4) {
+            player_coords_for_dir(F_ram_0098_N4);
             y = search_doorways(k_doorway_min_over, k_doorway_max_over);
         } else {
             y = search_doorways(k_doorway_min_under, k_doorway_max_under);
         }
     } else {
-        player_coords_for_dir(nes_ram[LINK_DIR]);
+        player_coords_for_dir(F_ram_0098_N4);
         y = search_doorways(k_doorway_min_over, k_doorway_max_over);
     }
     if (y < 0) {
-        nes_ram[DOORWAY_DIR] = 0u;
+        F_ram_0053_N = 0u;
         return 0u;
     }
     /* @TestDoorwayDoor */
-    nes_ram[TMP_0E] = (unsigned char)y;
-    in = (unsigned char)(nes_ram[LINK_INPUT_DIR] & 0x0Fu);
-    nes_ram[TMP_02] = in;
-    nes_ram[TMP_0C] = in;
+    F_ram_000E_N = (unsigned char)y;
+    in = (unsigned char)(F_ram_03F8_N2 & 0x0Fu);
+    F_ram_0002_N = in;
+    F_ram_000C_N = in;
     if (in != k_rev_dirs[y]) return 0u;
     attr = find_door_attr(in);
-    nes_ram[TMP_0D] = attr;
+    F_ram_000D_N = attr;
     touch_door(attr);
-    if (nes_ram[TMP_0E] & 0x80u) return 0u;
-    nes_ram[LINK_DIR]    = k_rev_dirs[y];
-    nes_ram[TMP_0F]      = k_rev_dirs[y];
-    nes_ram[DOORWAY_DIR] = k_rev_dirs[y];
+    if (F_ram_000E_N & 0x80u) return 0u;
+    F_ram_0098_N4    = k_rev_dirs[y];
+    F_ram_000F_N      = k_rev_dirs[y];
+    F_ram_0053_N = k_rev_dirs[y];
     t = (unsigned char)(attr & 7u);
     return (t == 2u || t == 3u || t == 4u) ? 1u : 0u;
 }
@@ -244,20 +244,20 @@ static unsigned char check_doorway(void)
 /* Z_07.asm GoToNextModeFromPlay. */
 static void go_to_next_mode_from_play(void)
 {
-    nes_ram[GAME_MODE] = (unsigned char)(nes_ram[GAME_MODE] + 1u);
-    nes_ram[GAME_SUBMODE] = 0u;
-    nes_ram[IS_UPDATING_MODE] = 0u;
-    nes_ram[TMP_0F] = 0u;
-    nes_ram[LINK_STATE] = 0u;
-    nes_ram[LINK_SHOVE_DIR] = 0u;
-    nes_ram[LINK_SHOVE_DIST] = 0u;
-    nes_ram[LINK_INVINCIBILITY] = 0u;
+    F_ram_0012_N3 = (unsigned char)(F_ram_0012_N3 + 1u);
+    F_ram_0013_N2 = 0u;
+    F_ram_0011_N2 = 0u;
+    F_ram_000F_N = 0u;
+    F_ram_00AC_N3 = 0u;
+    F_ram_00C0_N2 = 0u;
+    F_ram_00D3_N2 = 0u;
+    F_ram_04F0_N3 = 0u;
 }
 
 unsigned char link_uw_walker_checks(void)
 {
-    if (nes_ram[CUR_LEVEL] == 0u || nes_ram[GAME_MODE] == 9u) return 0u;
-    if (nes_ram[DOORWAY_DIR] == 0u) (void)object_bound_by_room(0u);
+    if (F_ram_0010_N3 == 0u || F_ram_0012_N3 == 9u) return 0u;
+    if (F_ram_0053_N == 0u) (void)object_bound_by_room(0u);
     if (check_doorway()) {
         go_to_next_mode_from_play();
         return 1u;
@@ -269,34 +269,34 @@ unsigned char link_uw_walker_checks(void)
 static unsigned char go_walkable_dir(signed char grid_offset)
 {
     unsigned char in, y, d, coord;
-    if (nes_ram[GAME_MODE] != 5u) return 0u;
-    if (nes_ram[LADDER_SLOT] != 0u) return 0u;
+    if (F_ram_0012_N3 != 5u) return 0u;
+    if (F_ram_0064_N != 0u) return 0u;
     if (grid_offset != 0) return 0u;
-    in = nes_ram[LINK_INPUT_DIR];
+    in = F_ram_03F8_N2;
     if (in == 0u) return 0u;
     y = rev_index(in);
     if (y >= 4u) return 0u;
     d = k_rev_dirs[y];
-    coord = (d & 0x0Cu) ? nes_ram[LINK_Y] : nes_ram[LINK_X];
+    coord = (d & 0x0Cu) ? F_ram_0084_N4 : F_ram_0070_N4;
     if (coord != k_screen_edge[y]) return 0u;
-    nes_ram[LINK_DIR] = d;
+    F_ram_0098_N4 = d;
     go_to_next_mode_from_play();
     return d;
 }
 
 unsigned char link_walker_check_tile_collision(signed char grid_offset)
 {
-    if (nes_ram[DOORWAY_DIR] != 0u) return go_walkable_dir(grid_offset);
-    if (nes_ram[TMP_0E] & 0x80u) return 0u;
+    if (F_ram_0053_N != 0u) return go_walkable_dir(grid_offset);
+    if (F_ram_000E_N & 0x80u) return 0u;
     if (grid_offset != 0) return 0u;
-    nes_ram[TMP_0E] = 0u;
-    if (nes_ram[TMP_0F] == 0u) return 0u;
-    if (collision_get_colliding_tile_moving(0u) < nes_ram[FIRST_UNWALKABLE])
+    F_ram_000E_N = 0u;
+    if (F_ram_000F_N == 0u) return 0u;
+    if (collision_get_colliding_tile_moving(0u) < F_ram_034A_N)
         return go_walkable_dir(grid_offset);
     /* PlayerUnwalkable. The OW CheckPassiveTileObjects step belongs to
      * the OW caller; this entry is used in the UW. */
-    nes_ram[TMP_0F] = 0u;
-    nes_ram[BUTTONS_PRESSED] = 0u;
-    if (nes_ram[CUR_LEVEL] == 0u) return go_walkable_dir(grid_offset);
+    F_ram_000F_N = 0u;
+    F_ram_00F8_N2 = 0u;
+    if (F_ram_0010_N3 == 0u) return go_walkable_dir(grid_offset);
     return 0u;
 }

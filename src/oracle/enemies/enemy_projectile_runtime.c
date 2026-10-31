@@ -1,6 +1,7 @@
 #include "enemy_projectile_runtime.h"
 #include "legacy_bridge.h"
 #include "combat_state.h"
+#include "../../game/enemies/enemy_loop.h"
 
 /* Bounce-displacement tables for L_BounceShot. The bounce direction
  * index (0..3 from GetOppositeDir) selects width/height pairs.
@@ -194,7 +195,7 @@ __attribute__((always_inline)) void enrt_draw_shot(unsigned int slot) {
  * fall through to L_DrawShot.
  */
 void enrt_bounce_shot(unsigned int slot) {
-    unsigned char bounce_dir = OBJ(0x0380, slot);
+    unsigned char bounce_dir = F_ram_0380_O(slot);
     /* GetOppositeDir packs: low byte = opposite direction, bits 8..15 =
      * direction index (D3 in asm). The bounce tables are indexed by D3. */
     unsigned int packed = z01_get_opposite_dir((unsigned int)bounce_dir);
@@ -212,8 +213,8 @@ void enrt_bounce_shot(unsigned int slot) {
 
     /* Tick bounce counter; destroy when it crosses $20. */
     {
-        unsigned char counter = (unsigned char)(OBJ(0x0394, slot) + 2);
-        OBJ(0x0394, slot) = counter;
+        unsigned char counter = (unsigned char)(F_ram_0394_O3(slot) + 2);
+        F_ram_0394_O3(slot) = counter;
         if (counter >= 0x20) {
             enrt_destroy_monster_shot(slot);
             return;
@@ -227,13 +228,13 @@ void enrt_bounce_shot(unsigned int slot) {
  * if hit, prime bounce direction and switch to bounce state $30.
  */
 void enrt_check_shot_link_collision(unsigned int slot) {
-    OBJ(0x0394, slot) = 0;
+    F_ram_0394_O3(slot) = 0;
     z01_check_link_collision(slot);
     if (ROOM_MONSTER_COLLISION_COUNT == 0)
         return;
     /* Bounce off Link's shield: copy Link's facing direction into the
      * shot's bounce-direction slot and put it into bounce state $30. */
-    OBJ(0x0380, slot) = LINK_DIR;
+    F_ram_0380_O(slot) = LINK_DIR;
     ENEMY_STATE_TIMER(slot) = 48;
 }
 
@@ -256,8 +257,8 @@ void enrt_update_monster_arrow(unsigned int slot) {
      * draw + check if shooter is alive. If shooter dead (ObjType==0),
      * reset arrow timer so it flies next frame. */
     if (ENEMY_MOVE_TIMER(slot) != 0u) {
-        unsigned char shooter_slot = OBJ(0x042Cu, slot);   /* ObjRefId */
-        if (OBJ(NES_OBJ_TYPE, shooter_slot) == 0u) {
+        unsigned char shooter_slot = F_ram_042C_O(slot);   /* ObjRefId */
+        if (F_ram_034F_O2(shooter_slot) == 0u) {
             ENEMY_MOVE_TIMER(slot) = 0u;
         }
         enrt_draw_shot(slot);
@@ -270,7 +271,7 @@ void enrt_update_monster_arrow(unsigned int slot) {
     {
         unsigned char state_hi = (unsigned char)ENEMY_STATE_TIMER(slot) & 0xF0u;
         if (state_hi == 0x10u)
-            RAM(0x000Fu) = (unsigned char)ENEMY_DIR(slot);
+            F_ram_000F_R = (unsigned char)ENEMY_DIR(slot);
         else if (state_hi != 0x20u) {
             if (state_hi == 0x30u)
                 enrt_bounce_shot(slot);
@@ -343,8 +344,8 @@ static void set_boomerang_speed(unsigned int slot, unsigned char q)
     ENEMY_WALK_SPEED(slot) = q;
     if (((unsigned char)ENEMY_STATE_TIMER(slot) & 0xF0u) != 0x40u) return;
     ENEMY_WALK_SPEED(slot) = (unsigned char)(q >> 1);
-    OBJ(0x0380u, slot) = (unsigned char)(OBJ(0x0380u, slot) - 1u);
-    if ((unsigned char)OBJ(0x0380u, slot) == 0u)
+    F_ram_0380_O2(slot) = (unsigned char)(F_ram_0380_O2(slot) - 1u);
+    if ((unsigned char)F_ram_0380_O2(slot) == 0u)
         ENEMY_STATE_TIMER(slot) = 0x50u;
 }
 
@@ -383,18 +384,18 @@ static unsigned char enrt_boomerang_move_outbound(unsigned int slot)
     const unsigned char dir = (unsigned char)ENEMY_DIR(slot);
     unsigned char blocked = 0u;
 
-    RAM(0x000Eu) = 0u;
+    F_ram_000E_R2 = 0u;
     if ((dir & 0x03u) != 0u) {
-        RAM(NES_OBJ_DIR) = dir;
+        F_ram_000F_R2 = dir;
         c_move_shot(dir, slot);
-        if (((unsigned char)RAM(0x000Eu) & 0x80u) != 0u)
+        if (((unsigned char)F_ram_000E_R2 & 0x80u) != 0u)
             blocked = 1u;
-        RAM(0x000Eu) = (unsigned char)(RAM(0x000Eu) + 1u);
+        F_ram_000E_R2 = (unsigned char)(F_ram_000E_R2 + 1u);
     }
     if (blocked == 0u && (dir & 0x0Cu) != 0u) {
-        RAM(NES_OBJ_DIR) = dir;
+        F_ram_000F_R2 = dir;
         c_move_shot(dir, slot);
-        if (((unsigned char)RAM(0x000Eu) & 0x80u) != 0u)
+        if (((unsigned char)F_ram_000E_R2 & 0x80u) != 0u)
             blocked = 1u;
     }
     return blocked;
@@ -428,7 +429,7 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
      * GetDirectionsAndDistancesToTarget uses $00 as an output count, so
      * leaving it dirty can make a later boomerang appear to have reached
      * its thrower before either axis is actually within catch range. */
-    RAM(0x0000u) = 0u;
+    F_ram_0000_R = 0u;
 
     /* State $10 → fly out through NES MoveShot once per active axis,
      * retaining cumulative ObjGridOffset. Z_07.asm:3881-3905 compares
@@ -456,11 +457,11 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
          * state $20 (limit $10), so the boomerang slows down in $30.
          * T-013: both went to $30 and counted down that frame. */
         if (blocked == 0u) {
-            unsigned char grid = OBJ(NES_OBJ_GRID_OFFSET, slot);
+            unsigned char grid = F_ram_0394_O(slot);
             unsigned char abs_grid = (grid & 0x80u) ? (unsigned char)(0u - grid) : grid;
-            unsigned char limit = OBJ(0x0380u, slot);
+            unsigned char limit = F_ram_0380_O2(slot);
             if (abs_grid >= limit) {
-                OBJ(0x0380u, slot) = 0x10u;
+                F_ram_0380_O2(slot) = 0x10u;
                 ENEMY_STATE_TIMER(slot) = 0x20u;
                 blocked = 1u;
             }
@@ -503,26 +504,26 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
 
     /* State $30 → slow down. NES Z_07.asm:4052-4099. */
     if (state_hi == 0x30u) {
-        OBJ(NES_OBJ_GRID_OFFSET, slot) = 0u;
+        F_ram_0394_O(slot) = 0u;
         ENEMY_WALK_SPEED(slot) = 0x40u;        /* qspeed = 1 px/frame */
         /* Edge-guard: facing-left + X<2 → state $40 to avoid wrap. */
         if (((unsigned char)ENEMY_DIR(slot) & 0x02u) != 0u
             && (unsigned char)ENEMY_X(slot) < 0x02u) {
             ENEMY_STATE_TIMER(slot) = 0x40u;
-            OBJ(0x0380u, slot) = 0x20u;        /* ObjMovingLimit reset */
+            F_ram_0380_O2(slot) = 0x20u;        /* ObjMovingLimit reset */
             enrt_boomerang_animate_draw(slot);
             return;
         }
-        RAM(NES_OBJ_DIR) = (unsigned char)ENEMY_DIR(slot);
+        F_ram_000F_R2 = (unsigned char)ENEMY_DIR(slot);
         c_move_object((unsigned short)slot);
         /* ObjMovingLimit decrement; on 0 → state $40. */
         {
-            unsigned char ml = OBJ(0x0380u, slot);
+            unsigned char ml = F_ram_0380_O2(slot);
             ml = (unsigned char)(ml - 1u);
-            OBJ(0x0380u, slot) = ml;
+            F_ram_0380_O2(slot) = ml;
             if (ml == 0u) {
                 ENEMY_STATE_TIMER(slot) = 0x40u;
-                OBJ(0x0380u, slot)      = 0x20u;
+                F_ram_0380_O2(slot)      = 0x20u;
             }
         }
         enrt_boomerang_animate_draw(slot);
@@ -532,15 +533,15 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
     /* State $40/$50 → return to thrower. NES Z_07.asm:4101-4180.
      * Monster boomerang reads ObjRefId for thrower slot. */
     {
-        unsigned char thrower_slot = OBJ(0x042Cu, slot);  /* ObjRefId */
-        OBJ(NES_OBJ_GRID_OFFSET, slot) = 0u;
+        unsigned char thrower_slot = F_ram_042C_O(slot);  /* ObjRefId */
+        F_ram_0394_O(slot) = 0u;
 
         z01_get_directions_and_distances_to_target(thrower_slot, slot);
 
         /* RAM[$00] = #axes where distance <= 8. If == 2, reached. */
-        if (RAM(0x0000u) == 0x02u) {
+        if (F_ram_0000_R == 0x02u) {
             /* Reached thrower. Reset ObjMovingLimit + handle catch. */
-            OBJ(0x0380u, slot) = 0u;
+            F_ram_0380_O2(slot) = 0u;
             /* Monster catch path (NES @CatchBoomerang). Set thrower
              * idle timer based on Random+slot. */
             {
@@ -549,8 +550,8 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
                 if (rng < 0x30u)      timer = 0x30u;
                 else if (rng < 0x70u) timer = 0x50u;
                 else                  timer = 0x70u;
-                OBJ(0x0028u, thrower_slot) = timer;    /* ObjTimer */
-                OBJ(0x00ACu, thrower_slot) = 0u;        /* ObjState idle */
+                F_ram_0028_O(thrower_slot) = timer;    /* ObjTimer */
+                F_ram_00AC_O(thrower_slot) = 0u;        /* ObjState idle */
             }
             enrt_destroy_counted_monster_shot(slot);
             return;
@@ -559,20 +560,20 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
         /* @MoveTowardThrower (NES Z_07.asm:4182). Diagonal speed index
          * 4 (equal X/Y); BoomerangQSpeedFracs tables. */
         {
-            unsigned char vdir = (unsigned char)RAM(0x000Au);  /* vertical dir from target probe */
-            unsigned char hdir = (unsigned char)RAM(0x000Bu);  /* horizontal dir */
+            unsigned char vdir = (unsigned char)F_ZP_TMPA_R;  /* vertical dir from target probe */
+            unsigned char hdir = (unsigned char)F_ZP_TMPB_R;  /* horizontal dir */
             /* _CalcDiagonalSpeedIndex from the middle index 4, on the
              * distances GetDirectionsAndDistancesToTarget left in $03/$04
              * (T-013: a fixed index 4 flew diagonally). */
             const unsigned char idx = (unsigned char)z01_calc_diagonal_speed_index(4u);
             /* Vertical move. */
             set_boomerang_speed(slot, k_boomerang_qspeed_y[idx]);
-            RAM(NES_OBJ_DIR)       = vdir;
+            F_ram_000F_R2       = vdir;
             ENEMY_DIR(slot)        = vdir;
             c_move_object((unsigned short)slot);
             /* Horizontal move. */
             set_boomerang_speed(slot, k_boomerang_qspeed_x[idx]);
-            RAM(NES_OBJ_DIR)       = hdir;
+            F_ram_000F_R2       = hdir;
             ENEMY_DIR(slot)        = hdir;
             c_move_object((unsigned short)slot);
         }
@@ -583,6 +584,9 @@ void enrt_update_arrow_or_boomerang(unsigned int slot) {
 }
 
 void enrt_update_monster_shot(unsigned int slot) {
+    /* T392: monster shots share the source object-loop slots1..11, never
+     * Link's slot0. Bound the shared movement helpers at this owner entry. */
+    if(slot==0u || slot>ENEMY_LOOP_SLOT_LAST)return;
     /* Sync transient direction byte with this object's facing. */
     ENEMY_FRAME_FLAGS = ENEMY_DIR(slot);
 
@@ -646,29 +650,32 @@ void enrt_update_monster_shot(unsigned int slot) {
  *   returns updated position fraction (D0 in asm).
  */
 unsigned char enrt_fireball_move_one_axis(unsigned char qspeed, unsigned char pos_frac, unsigned int slot) {
-    OBJ(0x03BC, slot) = qspeed;
-    OBJ(0x03A8, slot) = pos_frac;
+    F_ram_03BC_O2(slot) = qspeed;
+    F_ram_03A8_O3(slot) = pos_frac;
     c_move_object((unsigned short)slot);
-    return OBJ(0x03A8, slot);
+    return F_ram_03A8_O3(slot);
 }
 
 /* UpdateFireball — two-state monster shot: state 0 chooses an aim and
  * q-speeds, state 1 ticks the delay/move and checks for collision.
  */
 void enrt_update_fireball(unsigned int slot) {
+    /* T392: monster shots share the source object-loop slots1..11, never
+     * Link's slot0. Bound the shared movement helpers at this owner entry. */
+    if(slot==0u || slot>ENEMY_LOOP_SLOT_LAST)return;
     if (ENEMY_STATE_TIMER(slot) == 0) {
         /* State 0: pick direction & speeds. */
 
         /* Reset horizontal/vertical position fractions. */
-        OBJ(0x0451, slot) = 0;
-        OBJ(0x045E, slot) = 0;
+        F_ram_0451_O(slot) = 0;
+        F_ram_045E_O(slot) = 0;
 
         /* Aim at Link (slot 0). Returns Link's vertical dir at RAM[$0A]
          * and horizontal dir at RAM[$0B] in the original ABI. */
         z01_get_directions_and_distances_to_target(0, slot);
 
-        OBJ(0x0412, slot) = COMBAT_ABS_DY; /* horizontal direction */
-        OBJ(0x0437, slot) = COMBAT_ABS_DX; /* vertical direction */
+        F_ram_0412_O(slot) = COMBAT_ABS_DY; /* horizontal direction */
+        F_ram_0437_O2(slot) = COMBAT_ABS_DX; /* vertical direction */
 
         /* Combined facing = horizontal | vertical. */
         ENEMY_DIR(slot) = (unsigned char)(COMBAT_ABS_DX | COMBAT_ABS_DY);
@@ -677,8 +684,8 @@ void enrt_update_fireball(unsigned int slot) {
          * paired q-speeds. */
         {
             unsigned int idx = z01_calc_diagonal_speed_index(4) & 0xFF;
-            OBJ(0x041F, slot) = enrt_fireball_qspeeds_x[idx];
-            OBJ(0x0444, slot) = enrt_fireball_qspeeds_y[idx];
+            F_ram_041F_O(slot) = enrt_fireball_qspeeds_x[idx];
+            F_ram_0444_O2(slot) = enrt_fireball_qspeeds_y[idx];
         }
 
         /* Enter state $10 with timer $10 (visible delay before motion). */
@@ -696,12 +703,12 @@ void enrt_update_fireball(unsigned int slot) {
         }
 
         /* Move along horizontal axis. */
-        ENEMY_FRAME_FLAGS = OBJ(0x0412, slot);
-        OBJ(0x0451, slot) = enrt_fireball_move_one_axis(OBJ(0x041F, slot), OBJ(0x0451, slot), slot);
+        ENEMY_FRAME_FLAGS = F_ram_0412_O(slot);
+        F_ram_0451_O(slot) = enrt_fireball_move_one_axis(F_ram_041F_O(slot), F_ram_0451_O(slot), slot);
 
         /* Move along vertical axis. */
-        ENEMY_FRAME_FLAGS = OBJ(0x0437, slot);
-        OBJ(0x045E, slot) = enrt_fireball_move_one_axis(OBJ(0x0444, slot), OBJ(0x045E, slot), slot);
+        ENEMY_FRAME_FLAGS = F_ram_0437_O2(slot);
+        F_ram_045E_O(slot) = enrt_fireball_move_one_axis(F_ram_0444_O2(slot), F_ram_045E_O(slot), slot);
     }
 
     /* Collision check + draw. */
