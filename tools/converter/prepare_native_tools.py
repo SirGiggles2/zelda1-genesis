@@ -141,7 +141,7 @@ def prepare_compiler(prefix: Path, work: Path, jobs: int) -> None:
             targets, install = ["all"], ["install"]
         if not (out / "Makefile").exists():
             run([source / "configure", "--target=m68k-elf", f"--prefix={installed}",
-                 "--disable-nls", "--disable-shared", *flags], out, env)
+                 "--disable-nls", "--disable-shared", "--with-system-zlib", *flags], out, env)
         run(["make", f"-j{jobs}", "MAKEINFO=true", *targets], out, env)
         run(["make", "MAKEINFO=true", *install], out, env)
     shutil.copytree(installed, prefix, dirs_exist_ok=True)

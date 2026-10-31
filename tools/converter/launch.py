@@ -26,6 +26,11 @@ def main():
                           'workspace': str(root), 'modules': modules}))
         return 0
     if getattr(sys, 'frozen', False):
+        if os.name == 'nt':
+            import ctypes
+            window = ctypes.windll.kernel32.GetConsoleWindow()
+            if window:
+                ctypes.windll.user32.ShowWindow(window, 0)
         from package_workspace import prepare_workspace
         from web_builder import main as serve
         return serve(root=prepare_workspace())
@@ -38,4 +43,6 @@ def main():
 
 
 if __name__ == '__main__':
+    import multiprocessing
+    multiprocessing.freeze_support()
     raise SystemExit(main())

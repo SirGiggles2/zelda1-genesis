@@ -7,9 +7,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 import package_workspace as workspace
+import package_app
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_packager_includes_stdlib_used_only_by_child_scripts(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "extract.py").write_text("import wave\nfrom xml.etree import ElementTree\nimport scipy.signal\n")
+            modules = package_app.script_stdlib_imports(root)
+            self.assertIn("wave", modules)
+            self.assertIn("xml.etree.ElementTree", modules)
+            self.assertNotIn("scipy.signal", modules)
+
     def test_payload_copies_and_reuses_a_writable_release(self):
         with tempfile.TemporaryDirectory(prefix="builder paths ") as td:
             base = Path(td)

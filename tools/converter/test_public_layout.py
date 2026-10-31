@@ -45,10 +45,22 @@ def main():
     assert is_banned("data/graphics/other.json")[0]
     script = export_repo.ROOT / ('tools/build/build_rom.py' if public_layout.is_public(export_repo.ROOT)
                                  else 'tools/debug/build_debug.py')
+    def rooted_path(node):
+        if isinstance(node, ast.Name) and node.id == 'ROOT':
+            return ''
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            left = rooted_path(node.left)
+            if left is not None and isinstance(node.right, ast.Constant) and isinstance(node.right.value, str):
+                return '/'.join(p for p in (left, node.right.value) if p)
+        return None
+
     for node in ast.walk(ast.parse(script.read_text(encoding='utf-8'))):
+        helper = rooted_path(node)
+        if helper and helper.endswith('.py'):
+            assert public_layout.rename(helper) in files, f'missing build helper: {helper}'
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             source = node.value
-            if source.endswith(('.c', '.s', '.asm')) and '/' in source:
+            if source.endswith(('.c', '.s', '.asm', '.py')) and '/' in source:
                 if not is_banned(source)[0] and not source.startswith('build/'):
                     assert public_layout.rename(source) in files, f'missing build source: {source}'
     # The GUI and command-line paths must select the same converter build.

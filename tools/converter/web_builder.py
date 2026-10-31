@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import binascii
 from collections import deque
+import errno
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -22,6 +23,34 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSETS = Path(__file__).resolve().parent / 'web'
 MAX_FILE = 16 * 1024 * 1024
 MAX_BODY = (MAX_FILE * 4 // 3) + 4096
+
+
+def acquire_workspace_lock(root: Path):
+    """Hold an OS lock across all converter stages; closing releases ownership.
+
+    The persistent file is never removed: operating-system ownership, rather
+    than stale PID files, also makes process crashes release the workspace.
+    """
+    path = root / 'build' / 'builder.lock'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open('a+b')
+    try:
+        if os.name == 'nt':
+            import msvcrt
+            if handle.seek(0, os.SEEK_END) == 0:
+                handle.write(b'\0')
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        handle.close()
+        if exc.errno in (errno.EACCES, errno.EAGAIN):
+            raise RuntimeError('Another builder is building in this workspace. Wait for it to finish, then try again.') from None
+        raise
+    return handle
 
 
 def verified_patch(root: Path, download=None, expected_hash=None) -> bytes:
@@ -117,7 +146,9 @@ class BuilderApplication:
 
     def _run(self):
         target = self.output_dir / (secrets.token_hex(12) + '.md')
+        workspace_lock = None
         try:
+            workspace_lock = acquire_workspace_lock(self.root)
             if self.prepare:
                 self.prepare(self.root, self._log)
             if self.cancelled.is_set():
@@ -159,14 +190,18 @@ class BuilderApplication:
                 self.logs.append(str(exc)[:4000])
                 self.state.update(status='error', stage='Build needs attention', error=str(exc)[:1000])
         finally:
-            with self.lock:
-                if self.process and self.process.stdout:
-                    self.process.stdout.close()
-                self.process = None
-                if self.cancelled.is_set():
-                    self.output = None
-                    self.state.update(status='cancelled', stage='Build cancelled', error='')
-                    target.unlink(missing_ok=True)
+            try:
+                with self.lock:
+                    if self.process and self.process.stdout:
+                        self.process.stdout.close()
+                    self.process = None
+                    if self.cancelled.is_set():
+                        self.output = None
+                        self.state.update(status='cancelled', stage='Build cancelled', error='')
+                        target.unlink(missing_ok=True)
+            finally:
+                if workspace_lock is not None:
+                    workspace_lock.close()
 
     def _log(self, line):
         with self.lock:

@@ -449,6 +449,7 @@ tools/converter/gen_uw_collision_c.py
 tools/converter/ips.py
 tools/converter/item_chr_manifest.py
 tools/converter/local_music.py
+tools/converter/mp_link_poses.py
 tools/converter/nes_music.py
 tools/converter/platform_tools.py
 tools/converter/redux_graphics.py

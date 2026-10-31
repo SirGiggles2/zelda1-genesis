@@ -61,11 +61,23 @@ def check_app(directory: Path) -> None:
         raise RuntimeError("Packaged runtime self-test failed")
     with tempfile.TemporaryDirectory(prefix="bundled script with spaces ") as temp:
         script = Path(temp) / "probe script.py"
-        script.write_text("import json,sys,numpy,scipy,py65\nprint(json.dumps({'args':sys.argv[1:],'ok':True}))\n")
+        script.write_text("import json,sys,wave,numpy,scipy,py65\nfrom scipy.signal import resample_poly\nassert len(resample_poly(numpy.ones(4),2,1)) == 8\nprint(json.dumps({'args':sys.argv[1:],'ok':True}))\n")
         result = subprocess.run([str(executable.resolve()), str(script), "path with spaces"], capture_output=True, text=True, timeout=60, check=True)
         if json.loads(result.stdout) != {"args": ["path with spaces"], "ok": True}:
             raise RuntimeError("Packaged Python script dispatch failed")
-    print("Packaged runtime and child-script dispatch: PASS")
+        # Real extraction uses ProcessPoolExecutor. Frozen workers must reach
+        # multiprocessing.freeze_support rather than opening another UI.
+        script.write_text(
+            "from concurrent.futures import ProcessPoolExecutor\n"
+            "import json\n"
+            "def square(n): return n*n\n"
+            "if __name__ == '__main__':\n"
+            " with ProcessPoolExecutor(max_workers=2) as pool:\n"
+            "  print(json.dumps(list(pool.map(square,[2,3,4]))))\n")
+        result = subprocess.run([str(executable.resolve()), str(script)], capture_output=True, text=True, timeout=60, check=True)
+        if json.loads(result.stdout) != [4, 9, 16]:
+            raise RuntimeError("Packaged extraction workers did not start correctly")
+    print("Packaged runtime, child scripts and multiprocessing workers: PASS")
 
 
 if __name__ == "__main__":

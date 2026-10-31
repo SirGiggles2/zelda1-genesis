@@ -37,12 +37,18 @@ jobs:
           python-version: '3.14'
       - name: Python runtime and app packager
         run: python -m pip install -r tools/converter/requirements.txt pyinstaller==6.22.0
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: native_cache
         with:
           path: toolchains/native
           key: native-13.2-${{ matrix.label }}-${{ hashFiles('tools/converter/prepare_native_tools.py', 'tools/sgdk_pin.json') }}
       - name: Native compiler, music tool and JavaScript runtime
         run: python tools/converter/prepare_native_tools.py
+      - uses: actions/cache/save@v4
+        if: steps.native_cache.outputs.cache-hit != 'true'
+        with:
+          path: toolchains/native
+          key: native-13.2-${{ matrix.label }}-${{ hashFiles('tools/converter/prepare_native_tools.py', 'tools/sgdk_pin.json') }}
       - name: Native tool and local API tests
         run: python -m unittest discover -s tools/converter -p "test_platform_tools.py" -v
       - name: Browser API tests

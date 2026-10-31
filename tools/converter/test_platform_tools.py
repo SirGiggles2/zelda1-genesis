@@ -49,7 +49,7 @@ class PlatformToolTests(unittest.TestCase):
             ("nm", "m68k-elf-nm"), ("xgmtool", "xgmtool"), ("node", "node"))}
 
     def load_debug(self):
-        path = Path(__file__).resolve().parents[1] / "debug" / "build_rom.py"
+        path = Path(__file__).resolve().parents[2] / "tools/build/build_rom.py"
         spec = importlib.util.spec_from_file_location("native_test_build_rom", path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

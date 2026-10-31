@@ -134,6 +134,33 @@ class BuilderHTTPTests(unittest.TestCase):
 
 
 class PatchAndLaunchTests(unittest.TestCase):
+    def test_freeze_support_runs_before_child_script_dispatch(self):
+        with temporary_directory() as d:
+            path = Path(d)
+            shutil.copyfile(HERE / 'launch.py', path / 'launch.py')
+            (path / 'multiprocessing.py').write_text("def freeze_support():\n print('freeze support ready')\n")
+            (path / 'child.py').write_text("print('child dispatched')\n")
+            run = subprocess.run([sys.executable, str(path / 'launch.py'), str(path / 'child.py')], capture_output=True, text=True)
+            self.assertEqual(0, run.returncode, run.stderr)
+            self.assertEqual(['freeze support ready', 'child dispatched'], run.stdout.splitlines())
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows console API')
+    def test_frozen_ui_hides_console_before_server_without_hiding_child_scripts(self):
+        with temporary_directory() as d:
+            path = Path(d)
+            shutil.copyfile(HERE / 'launch.py', path / 'launch.py')
+            (path / 'package_workspace.py').write_text("from pathlib import Path\ndef prepare_workspace():\n return Path(__file__).parent\n")
+            (path / 'web_builder.py').write_text("def main(root):\n print('server ready')\n return 0\n")
+            (path / 'ctypes.py').write_text("class Kernel:\n def GetConsoleWindow(self): return 123\nclass User:\n def ShowWindow(self,handle,mode): print('hide console',handle,mode)\nclass DLL:\n kernel32=Kernel()\n user32=User()\nwindll=DLL()\n")
+            (path / 'runner.py').write_text("import sys,runpy\nsys.frozen=True\nsys.argv=[__file__.replace('runner.py','launch.py')]+sys.argv[1:]\nrunpy.run_path(sys.argv[0],run_name='__main__')\n")
+            run = subprocess.run([sys.executable, str(path / 'runner.py')], capture_output=True, text=True)
+            self.assertEqual(0, run.returncode, run.stderr)
+            self.assertEqual(['hide console 123 0', 'server ready'], run.stdout.splitlines())
+            (path / 'child.py').write_text("print('child stdout visible')\n")
+            run = subprocess.run([sys.executable, str(path / 'runner.py'), str(path / 'child.py')], capture_output=True, text=True)
+            self.assertEqual(0, run.returncode, run.stderr)
+            self.assertEqual(['child stdout visible'], run.stdout.splitlines())
+
     @unittest.skipUnless(os.name == 'nt', 'Windows launcher')
     def test_windows_launcher_finds_python_and_runs_from_path_with_spaces(self):
         with temporary_directory() as d:
@@ -191,6 +218,45 @@ class PatchAndLaunchTests(unittest.TestCase):
             run = subprocess.run([sys.executable, str(HERE / 'launch.py'), str(path / 'child.py'), 'with spaces'], capture_output=True, text=True)
             self.assertEqual(0, run.returncode, run.stderr)
             self.assertIn("17 ['with spaces']", run.stdout)
+
+
+class WorkspaceLockTests(unittest.TestCase):
+    def test_separate_applications_cannot_build_the_same_workspace_concurrently(self):
+        import web_builder
+        with temporary_directory() as d:
+            root = Path(d)
+            fixture = root / 'slow_build.py'
+            fixture.write_text("import pathlib,sys,time\nr=pathlib.Path(sys.argv[2])\nif sys.argv[3]=='first':\n (r/'started').write_text('ready')\n while not (r/'release').exists(): time.sleep(.02)\nelse:\n (r/'second-output').write_text('built')\npathlib.Path(sys.argv[1]).write_bytes(b'GENESIS')\n")
+            first = web_builder.BuilderApplication(root, command_factory=lambda rom, patch, out: [sys.executable, str(fixture), str(out), str(root), 'first'], patch_provider=lambda: b'PATCHfirst')
+            second = web_builder.BuilderApplication(root, command_factory=lambda rom, patch, out: [sys.executable, str(fixture), str(out), str(root), 'second'], patch_provider=lambda: b'PATCHsecond', prepare=lambda *_: (root / 'second-prepared').write_text('prepared'))
+            payload = {'kind': 'rom', 'data': base64.b64encode(b'NES\x1a' + bytes(131084)).decode()}
+            first.upload(payload)
+            second.upload(payload)
+            try:
+                first.start()
+                deadline = time.monotonic() + 5
+                while not (root / 'started').exists() and time.monotonic() < deadline:
+                    time.sleep(.02)
+                self.assertTrue((root / 'started').exists())
+                second.start()
+                second.worker.join(timeout=5)
+                state = second.snapshot()
+                self.assertEqual('error', state['status'])
+                self.assertIn('Another builder', state['error'])
+                self.assertFalse((root / 'second-prepared').exists())
+                self.assertFalse((root / 'second-output').exists())
+                self.assertEqual('running', first.snapshot()['status'])
+                (root / 'release').write_text('go')
+                first.worker.join(timeout=5)
+                self.assertEqual('success', first.snapshot()['status'])
+                # The persistent lock file is safe to reuse after the holder exits.
+                second.start()
+                second.worker.join(timeout=5)
+                self.assertEqual('success', second.snapshot()['status'])
+            finally:
+                (root / 'release').write_text('go')
+                first.close()
+                second.close()
 
 
 if __name__ == '__main__':

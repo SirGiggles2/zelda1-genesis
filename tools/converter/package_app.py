@@ -7,7 +7,9 @@ same executable also hosts the converter's child Python scripts.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -19,6 +21,33 @@ import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def script_stdlib_imports(payload: Path) -> list[str]:
+    """Freeze dependencies of scripts which are executed later with runpy."""
+    modules = set()
+    for script in payload.rglob("*.py"):
+        relative = script.relative_to(payload)
+        if relative.parts[0] in ("sgdk", "toolchains") or script.name.startswith("test_") or script.name == "gui.py":
+            continue
+        for node in ast.walk(ast.parse(script.read_text(encoding="utf-8-sig"), filename=str(relative))):
+            candidates = []
+            if isinstance(node, ast.Import):
+                candidates = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
+                candidates = [node.module]
+                # e.g. from xml.etree import ElementTree imports a module;
+                # from pathlib import Path imports a class and is ignored.
+                for alias in node.names:
+                    name = node.module + "." + alias.name
+                    if node.module.split(".")[0] in sys.stdlib_module_names:
+                        try:
+                            if importlib.util.find_spec(name) is not None:
+                                candidates.append(name)
+                        except (ImportError, ModuleNotFoundError, ValueError):
+                            pass
+            modules.update(name for name in candidates if name.split(".")[0] in sys.stdlib_module_names)
+    return sorted(modules)
 
 
 def copy_tree(source: Path, target: Path) -> None:
@@ -82,6 +111,8 @@ def main() -> int:
                "--add-data", f"{entry.parent / 'web'}{os.pathsep}web",
                "--collect-all", "numpy", "--collect-all", "scipy", "--collect-all", "py65",
                "--hidden-import", "py65.devices.mpu6502", "--hidden-import", "py65.memory"]
+    for module in script_stdlib_imports(payload):
+        command += ["--hidden-import", module]
     if platform.system() == "Darwin":
         command += ["--windowed", "--osx-bundle-identifier", "org.sirgiggles.zelda-genesis-builder"]
     # Keep Python stdout available in Windows child-script mode. The launcher
