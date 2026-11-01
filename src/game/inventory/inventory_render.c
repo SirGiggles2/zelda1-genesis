@@ -360,6 +360,12 @@ unsigned char inventory_get_pal_for_slot(unsigned char cursor_slot)
 
 /* Resolve a NES tile_id to its Genesis VRAM tile via sparse LUT.
  * Returns BLANK_TILE if not in atlas. */
+/* "TRIFORCE OF WISDOM" in NES font tiles (Redux 2025, NT row 29 cols 7..24). */
+static const unsigned char k_redux_triforce_label[18] = {
+    0x1Du, 0x1Bu, 0x12u, 0x0Fu, 0x18u, 0x1Bu, 0x0Cu, 0x0Eu, 0x24u,
+    0x18u, 0x0Fu, 0x24u, 0x20u, 0x12u, 0x1Cu, 0x0Du, 0x18u, 0x16u
+};
+
 static unsigned short tile_for(unsigned char nes_tile, unsigned char sub_pal)
 {
     unsigned short slot = bg_sparse_tile_lut[nes_tile][sub_pal];
@@ -706,6 +712,18 @@ static void write_inventory_row(unsigned short gen_row)
                 RENDER_TILE_ATTR_FULL(0u, 0, 0, 0,
                     tile_for(map[i - 12u], k_inventory_uw_subpal[nes_row][i]));
         for (i = 28u; i < 32u; ++i) *((volatile unsigned short *)0xC00000) = cells[i];
+        return;
+    }
+    /* Redux 2025 (hud_and_subscreen.asm, commit 443e0ea841): the label reads
+     * "TRIFORCE OF WISDOM" from column 7. Tiles from a live Mesen capture of
+     * the 2025 Redux subscreen (NT page 1 row 29); attributes unchanged. */
+    if (game_profile_is_remix() && !s_subscreen_uw && nes_row == 29u) {
+        for (i = 0u; i < 32u; ++i)
+            *((volatile unsigned short *)0xC00000) =
+                (i >= 7u && i < 7u + sizeof k_redux_triforce_label)
+                ? RENDER_TILE_ATTR_FULL(0u, 0, 0, 0,
+                      tile_for(k_redux_triforce_label[i - 7u], k_inventory_subpal[29][i]))
+                : cells[i];
         return;
     }
     /* T-252: Vanilla/Original shows the item on A (left) and the sword on B

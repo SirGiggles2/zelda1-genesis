@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-REDUX_SHA = "f3df57365d6f04e7a8947a2393b46c7e94dc971d99146f2d4c69e6047a23ed21"
+REDUX_SHA = "bcc19820e7101d2a3a74a05713c1d523c4020016768bc545f39c730cf6f7bbe6"
 # PRG-relative seams from Redux code/gfx/graphics.asm (same as Original).
 BLOCKS = {
     "common": (0x807F, 0xEE0),
@@ -495,6 +495,11 @@ def generate(rom: Path, output: Path) -> dict:
             val=image[16+cursor+(0 if ctrl&64 else i)];pos=addr-0x2000
             if 0<=pos<960: tiles[pos]=val
             elif 960<=pos<1024: attrs[pos-960]=val
+            # Redux 2025 placed its subscreen "TRIFORCE OF WISDOM" records at $ADA0,
+            # where this program's $FF used to be, so the NES also writes them to
+            # NT2 ($2B6A, $2BB0) here. They never show on the caution screen, and the
+            # pause screen draws that label itself (inventory_render.c). Skip them.
+            elif 0x0800<=pos<0x0C00: pass
             else: raise ValueError("unsupported caution transfer")
             addr+=32 if ctrl&128 else 1
         cursor+=1 if ctrl&64 else count

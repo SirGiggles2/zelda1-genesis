@@ -75,6 +75,9 @@
 extern const unsigned char nes_frontend_text[217];
 extern const unsigned char nes_frontend_credits[460];
 #define k_ending_flash_colors       (nes_frontend_text + 51u)
+/* Redux 2025 photosensitivity patch (palettes.asm, commit 3f8b7c8869; Redux
+ * PRG $0AA2F EndingFlashColors): darker ending flash for Remix. */
+static const unsigned char k_redux_ending_flash_colors[4] = { 0x0Fu, 0x02u, 0x06u, 0x0Au };
 #define k_peace_textbox_template     (nes_frontend_text + 55u)
 #define k_peace_textbox_addrs_lo     (nes_frontend_text + 60u)
 #define k_peace_text                 (nes_frontend_text + 112u)
@@ -345,7 +348,9 @@ static void mode13_sub0_flash(void)
         M13_DYN_TILE_BUF(i) = nes_ram[M13_NES_SRAM_BASE + /* native_ram bulk:dyn_addr */
                                       M13_LEVEL_INFO_PALETTES_TRANSFER + i];
     }
-    M13_DYN_TILE_BUF(19u) = k_ending_flash_colors[timer & 0x03u];
+    M13_DYN_TILE_BUF(19u) = game_profile_is_remix()
+        ? k_redux_ending_flash_colors[timer & 0x03u]
+        : k_ending_flash_colors[timer & 0x03u];
 }
 
 /* UpdatePeaceTextbox (Z_02.asm:3404). Emits one char every 8 frames

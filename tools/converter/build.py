@@ -46,9 +46,10 @@ SUPPORTED_ROMS = {
 # The Redux option's assets come from the user's Zelda Redux ROM (same pin
 # as engine/data/rom_inputs.lock); nothing Redux-derived ships.
 SUPPORTED_REDUX_ROMS = {
-    # Release v3.3.3 patches/Zelda1_Redux.ips applied to the supported ROM.
-    "f3df57365d6f04e7a8947a2393b46c7e94dc971d99146f2d4c69e6047a23ed21":
-        "The Legend of Zelda Redux v3.3.3, iNES",
+    # Redux v3.3.3 as downloaded from its releases page (Zelda1-Redux.zip, re-uploaded
+    # 2025-04-11): Zelda1_Redux.ips applied to the supported ROM (T-419, user 2026-11-01).
+    "bcc19820e7101d2a3a74a05713c1d523c4020016768bc545f39c730cf6f7bbe6":
+        "The Legend of Zelda Redux v3.3.3 (2025), iNES",
 }
 
 
@@ -183,12 +184,12 @@ def check_python_deps() -> int:
 # must hash to SUPPORTED_REDUX_ROMS. The patch that does is patches/
 # Zelda1_Redux.ips at the repository's v3.3.3 tag (REDUX_PATCH_SHA256); a
 # user's release-page download did not (2026-10-09), so point to the file.
-REDUX_DOWNLOAD = "https://raw.githubusercontent.com/ShadowOne333/The-Legend-of-Zelda-Redux/v3.3.3/patches/Zelda1_Redux.ips"
-REDUX_PATCH_SHA256 = "97703146e386c07c440493aaaa3259b97f9128adb78f0718a4fee727094ea171"
+REDUX_DOWNLOAD = "https://github.com/ShadowOne333/The-Legend-of-Zelda-Redux/releases/download/v3.3.3/Zelda1-Redux.zip"
+REDUX_PATCH_SHA256 = "04baf0e9834ed5470b719c09d2ce35baf38eb2b281f6326d964c41ff1e4cdb06"
 # Known look-alikes: same name, different file (user report 2026-10-09).
 REDUX_WRONG_PATCHES = {
-    "04baf0e9834ed5470b719c09d2ce35baf38eb2b281f6326d964c41ff1e4cdb06":
-        "the Zelda1_Redux.ips from the Redux release page",
+    "97703146e386c07c440493aaaa3259b97f9128adb78f0718a4fee727094ea171":
+        "the older 2023 Zelda1_Redux.ips from the Redux source tree",
 }
 
 

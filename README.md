@@ -14,16 +14,17 @@ You need two files:
 
 - **Your Zelda NES ROM.** It has to be the USA version (the first release,
   called "PRG0"). The file ends in `.nes`.
-- **The Zelda Redux patch.** Get
-  [Zelda1_Redux.ips](https://raw.githubusercontent.com/ShadowOne333/The-Legend-of-Zelda-Redux/v3.3.3/patches/Zelda1_Redux.ips)
-  (version 3.3.3). The Redux `.zip` from their releases page works too.
+- **The Zelda Redux patch.** Download **Zelda1-Redux.zip** from the
+  [Redux v3.3.3 releases page](https://github.com/ShadowOne333/The-Legend-of-Zelda-Redux/releases/tag/v3.3.3).
+  You don't need to unzip it.
 
 Then:
 
 1. Go to [Releases](https://github.com/SirGiggles2/zelda1-genesis/releases) and
    download **Zelda-Genesis-Builder.html**. It's one file.
 2. Double-click it. It opens in your web browser.
-3. Drag both files onto the page (or click the box and pick them).
+3. Drop your NES ROM in box **1** and the Redux zip in box **2** (or click a
+   box to pick the file).
 4. Click **Build**.
 5. About a minute later, your browser saves **Zelda Genesis.md**. That's your game.
 
@@ -46,7 +47,9 @@ A few things worth knowing:
 - **"This is not the USA PRG0 ROM."** Your ROM is a different version (like
   Europe, Japan or PRG1) or it's already been patched. You need the plain USA
   PRG0 one.
-- **"This is not the Zelda Redux v3.3.3 patch."** Use the patch linked above.
+- **"This is an older Redux patch."** You have the old patch from the Redux
+  source code. Download Zelda1-Redux.zip from the releases page linked above.
+- **"This is not the Zelda Redux v3.3.3 patch."** Use the zip linked above.
   Other Redux versions won't work.
 - **"Connect to the internet once…"** The page couldn't download its helper.
   Check your connection and click Build again.

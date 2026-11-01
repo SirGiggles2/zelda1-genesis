@@ -18,6 +18,8 @@ ADD_ROM = "Add your Zelda NES ROM (USA, PRG0)."
 NOT_PRG0 = "This is not the USA PRG0 ROM."
 ADD_REDUX = "Add the Zelda Redux patch (.ips or the Redux .zip)."
 NOT_REDUX = "This is not the Zelda Redux v3.3.3 patch."
+OLD_REDUX = ("This is an older Redux patch. Download Zelda1-Redux.zip from the "
+             "Redux releases page instead.")
 
 
 class InputError(ValueError):
@@ -80,5 +82,6 @@ def prepare(files: list[tuple[str, bytes]], known: dict) -> tuple[bytes, bytes]:
                 redux = out
                 break
         if redux is None:
-            raise InputError(NOT_REDUX)
+            old = known.get("old_patches", {})
+            raise InputError(OLD_REDUX if any(_sha(p) in old for p in patches) else NOT_REDUX)
     return rom, redux

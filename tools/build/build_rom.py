@@ -784,7 +784,17 @@ def main() -> int:
 
     print("[Build][CHR-1 gate] check_generated_freshness.py")
     run([sys.executable, ROOT / "tools" / "probes" / "check_generated_freshness.py"])
-    if (ROOT / "docs/audit/2026-10-18_T352_room_inventory.json").is_file():
+    receipt = ROOT / "docs/audit/2026-10-18_T352_room_inventory.json"
+    redux_rom = ROOT / "roms" / "Zelda Redux.nes"
+    receipt_matches = False
+    if receipt.is_file() and redux_rom.is_file():
+        import hashlib  # noqa: PLC0415
+        import json  # noqa: PLC0415
+        receipt_matches = (json.loads(receipt.read_text(encoding="utf-8")).get("source_rom_sha256")
+                           == hashlib.sha256(redux_rom.read_bytes()).hexdigest())
+    # T-419: the T-352 receipt was recorded from the 2023 Redux; with another pinned
+    # Redux (2025, dungeon data identical) prove coverage from fresh captures instead.
+    if receipt_matches:
         print("[Build][UW coverage gate] Redux Q2 L1 normal destinations")
         run([sys.executable, ROOT / "tools" / "audit" / "check_redux_q2_l1_coverage.py"])
         print("[Build][UW coverage gate] both Redux quests, all eighteen installed inventories")

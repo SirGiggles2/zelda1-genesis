@@ -10,7 +10,8 @@
     internal: "Something went wrong while building. Please report it.",
   };
   const selftest = location.hash === "#selftest";
-  let files = [], queued = null, running = false;
+  const slots = { rom: null, patch: null };  // one file per drop box
+  let queued = null, running = false;
 
   function b64bytes(s) {
     const bin = atob(s.trim()), out = new Uint8Array(bin.length);
@@ -36,22 +37,30 @@
     $("details").textContent = extra || "";
   }
 
+  const files = () => [slots.rom, slots.patch].filter(Boolean);
+
   function listFiles() {
-    $("files").textContent = files.length ? files.map(f => f.name).join(" + ") : "";
-    $("build").disabled = running || files.length === 0;
+    for (const slot of ["rom", "patch"]) {
+      const f = slots[slot];
+      $("zone-" + slot).classList.toggle("ready", !!f);
+      $("picked-" + slot).textContent = f ? "✓ " + f.name : "Drop it here, or click to choose";
+    }
+    $("build").disabled = running || !(slots.rom && slots.patch);
   }
 
-  async function take(list) {
-    const picked = await Promise.all([...list].map(async f => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) })));
-    if (running) { queued = picked; return; }  // applied when the current build ends
-    files = picked;
-    show("idle", "Ready. Click Build.");
+  async function take(slot, list) {
+    const f = [...list][0];
+    if (!f) return;
+    const picked = { name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) };
+    if (running) { queued = [slot, picked]; return; }  // applied when the current build ends
+    slots[slot] = picked;
+    show("idle", slots.rom && slots.patch ? "Ready. Click Build." : "");
     listFiles();
   }
 
   function finish() {
     running = false;
-    if (queued) { files = queued; queued = null; }
+    if (queued) { slots[queued[0]] = queued[1]; queued = null; }
     listFiles();
   }
 
@@ -65,7 +74,7 @@
   }
 
   function build() {
-    if (running || files.length === 0) return;
+    if (running || !(slots.rom && slots.patch)) return;
     running = true;
     listFiles();
     $("save").hidden = true;
@@ -108,15 +117,20 @@
     };
     const base = b64bytes(text("base"));
     const xgm = b64bytes(text("xgmtool"));
-    worker.postMessage({ type: "build", files, recipe, bundle: JSON.parse(text("bundle")), base, xgmtool: xgm },
+    worker.postMessage({ type: "build", files: files(), recipe, bundle: JSON.parse(text("bundle")), base, xgmtool: xgm },
                        [base.buffer, xgm.buffer]);
   }
 
-  $("pick").addEventListener("change", e => take(e.target.files));
-  const zone = $("zone");
-  zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("over"); });
-  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
-  zone.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("over"); take(e.dataTransfer.files); });
+  for (const slot of ["rom", "patch"]) {
+    const zone = $("zone-" + slot);
+    $("pick-" + slot).addEventListener("change", e => take(slot, e.target.files));
+    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+    zone.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("over"); take(slot, e.dataTransfer.files); });
+  }
+  // A file dropped anywhere else on the page must not make the browser navigate away.
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("drop", e => e.preventDefault());
   $("build").addEventListener("click", build);
   $("version").textContent = "Release " + JSON.parse(text("recipe")).commit;
   listFiles();

@@ -24,8 +24,10 @@ from tools.release.make_builder import known_inputs  # noqa: E402
 
 NES = ROOT / "roms" / "Legend of Zelda, The (USA).nes"
 REDUX = ROOT / "roms" / "Zelda Redux.nes"
-IPS = ROOT / "reference" / "Zelda1-Redux" / "patches" / "Zelda1_Redux.ips"
-ZIP = ROOT / "reference" / "Zelda1-Redux" / "The-Legend-of-Zelda-Redux-3.3.3.zip"
+# What players download: Zelda1-Redux.zip from the Redux v3.3.3 releases page (2025-04-11).
+ZIP = ROOT / "reference" / "Zelda1-Redux" / "release-page" / "Zelda1-Redux.zip"
+IPS = ROOT / "reference" / "Zelda1-Redux" / "release-page" / "Zelda1_Redux_2025-04.ips"
+OLD_IPS = ROOT / "reference" / "Zelda1-Redux" / "patches" / "Zelda1_Redux.ips"  # 2023 source-tree patch
 pytestmark = pytest.mark.skipif(not all(p.is_file() for p in (NES, REDUX, IPS)), reason="needs local ROMs + patch")
 KNOWN = known_inputs()
 
@@ -54,6 +56,11 @@ def test_patched_redux_rom_accepted():
 def test_zip_with_ips_accepted():
     _, redux = _prepare(NES, ZIP)
     assert redux == REDUX.read_bytes()
+
+
+def test_old_2023_patch_explains_where_to_get_the_right_one():
+    with pytest.raises(inputs.InputError, match=r"older Redux patch.*releases page"):
+        _prepare(NES, OLD_IPS)
 
 
 def test_wrong_revision_message():

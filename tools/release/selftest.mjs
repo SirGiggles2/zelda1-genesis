@@ -76,15 +76,18 @@ try {
   for (let attempt = 0; ; attempt++) {  // the 9 MB page can still swap documents right after load
     try {
       const { root } = await send("DOM.getDocument");
-      const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "#pick" });
-      await send("DOM.setFileInputFiles", { nodeId, files: inputs.map(f => resolve(f)) });
+      // One file per drop box: first argument is the NES ROM, second the Redux patch.
+      for (const [selector, file] of [["#pick-rom", inputs[0]], ["#pick-patch", inputs[1]]]) {
+        const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector });
+        await send("DOM.setFileInputFiles", { nodeId, files: [resolve(file)] });
+      }
       break;
     } catch (e) {
       if (attempt >= 5) throw e;
       await sleep(500);
     }
   }
-  await evaluate("document.getElementById('pick').dispatchEvent(new Event('change'))");
+  await evaluate("for (const id of ['pick-rom', 'pick-patch']) document.getElementById(id).dispatchEvent(new Event('change'))");
   for (let i = 0; i < 50 && await evaluate("document.getElementById('build').disabled"); i++) await sleep(200);
   const t0 = Date.now();
   await evaluate("document.getElementById('build').click()");

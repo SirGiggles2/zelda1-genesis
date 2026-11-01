@@ -14,13 +14,21 @@
   main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
   h1 { font-size: 26px; margin: 0 0 4px; }
   .sub { color: var(--muted); margin: 0 0 24px; }
-  #zone { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 32px 16px; text-align: center;
-          background: var(--panel); cursor: pointer; }
-  #zone.over { border-color: var(--accent); }
-  #zone strong { display: block; font-size: 18px; margin-bottom: 4px; }
-  #zone span { color: var(--muted); font-size: 14px; }
-  #pick { position: absolute; width: 1px; height: 1px; opacity: 0; }
-  #files { min-height: 24px; margin: 12px 0; color: var(--muted); word-break: break-word; }
+  .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 560px) { .drops { grid-template-columns: 1fr; } }
+  .zone { position: relative; display: flex; flex-direction: column; gap: 4px; border: 2px dashed var(--line);
+          border-radius: 12px; padding: 20px 16px; text-align: center; background: var(--panel); cursor: pointer; }
+  .zone.over { border-color: var(--accent); }
+  .zone.ready { border-style: solid; border-color: var(--accent); }
+  .zone strong { font-size: 17px; }
+  .zone .num { align-self: center; width: 28px; height: 28px; border-radius: 50%; background: var(--line);
+               color: var(--fg); font-weight: 700; line-height: 28px; }
+  .zone.ready .num { background: var(--accent); color: var(--bg); }
+  .zone .hint { color: var(--muted); font-size: 14px; }
+  .zone .hint a { color: var(--accent); }
+  .zone .picked { margin-top: 6px; font-size: 14px; word-break: break-word; color: var(--muted); }
+  .zone.ready .picked { color: var(--accent); font-weight: 600; }
+  .pick { position: absolute; width: 1px; height: 1px; opacity: 0; }
   #build { width: 100%; padding: 14px; font-size: 18px; font-weight: 600; border: 0; border-radius: 10px;
            background: var(--accent); color: var(--bg); cursor: pointer; }
   #build:disabled { opacity: .45; cursor: default; }
@@ -38,12 +46,23 @@
 <main>
   <h1>Zelda Genesis Builder</h1>
   <p class="sub">Makes the Sega Genesis version from your own NES Zelda ROM. Everything stays on this computer.</p>
-  <label id="zone" for="pick">
-    <strong>Drop your Zelda NES ROM and the Redux patch here</strong>
-    <span>or click to choose them (USA PRG0 .nes, plus Zelda1_Redux.ips or the Redux .zip)</span>
-    <input id="pick" type="file" multiple>
-  </label>
-  <div id="files"></div>
+  <div class="drops">
+    <label class="zone" id="zone-rom" for="pick-rom">
+      <span class="num">1</span>
+      <strong>Your Zelda NES ROM</strong>
+      <span class="hint">The USA version. The file ends in .nes</span>
+      <span class="picked" id="picked-rom">Drop it here, or click to choose</span>
+      <input id="pick-rom" class="pick" type="file" accept=".nes,application/octet-stream">
+    </label>
+    <label class="zone" id="zone-patch" for="pick-patch">
+      <span class="num">2</span>
+      <strong>The Zelda Redux patch</strong>
+      <span class="hint">Zelda1-Redux.zip from the
+        <a href="https://github.com/ShadowOne333/The-Legend-of-Zelda-Redux/releases/tag/v3.3.3" target="_blank" rel="noopener">Redux releases page</a></span>
+      <span class="picked" id="picked-patch">Drop it here, or click to choose</span>
+      <input id="pick-patch" class="pick" type="file" accept=".zip,.ips,.bps,.nes">
+    </label>
+  </div>
   <button id="build" type="button" disabled>Build</button>
   <div id="status" data-state="idle"></div>
   <div id="details"></div>

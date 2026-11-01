@@ -97,6 +97,7 @@ def known_inputs() -> dict:
     if hashlib.sha256(data).hexdigest() not in build.SUPPORTED_ROMS:
         raise SystemExit("ERROR: roms/ does not hold the supported PRG0 ROM")
     return {"roms": build.SUPPORTED_ROMS, "redux_roms": build.SUPPORTED_REDUX_ROMS,
+            "old_patches": build.REDUX_WRONG_PATCHES,
             "prg0_header_hex": data[:16].hex(), "prg0_body_size": len(data) - 16,
             "prg0_body_sha256": hashlib.sha256(data[16:]).hexdigest()}
 

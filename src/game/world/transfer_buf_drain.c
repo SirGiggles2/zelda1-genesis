@@ -130,6 +130,14 @@ static const unsigned char k_white_palette_bottom_half[] = {
     0x30u, 0x30u, 0x30u, 0xFFu
 };
 
+/* Redux 2025 photosensitivity patch (palettes.asm, commits 90d0a04c2b and
+ * 3f8b7c8869; Redux PRG $1A282): the Triforce-get / Ganon flash fades to grey
+ * $2D/$10 instead of white $30. */
+static const unsigned char k_redux_dim_palette_bottom_half[] = {
+    0x3Fu, 0x08u, 0x08u, 0x0Fu, 0x2Du, 0x2Du, 0x10u, 0x0Fu,
+    0x2Du, 0x2Du, 0x10u, 0xFFu
+};
+
 /* Z_06.asm:718, selector $26: all cellar play-area attributes = 2. */
 static const unsigned char k_cellar_attrs[] = {
     0x23u, 0xD0u, 0x60u, 0xAAu, 0x23u, 0xF0u, 0x50u, 0xAAu, 0xFFu
@@ -259,6 +267,10 @@ static const unsigned char *resolve_static_buffer(unsigned char selector,
         *out_len = 36u;
         return (const unsigned char *)&nes_ram[LEVEL_PALETTES_TRANSFER_BUF]; /* native_ram bulk:src/game/world/transfer_buf_drain.c:260 */
     case 0x78u:
+        if (game_profile_is_remix()) {
+            *out_len = (unsigned char)sizeof k_redux_dim_palette_bottom_half;
+            return k_redux_dim_palette_bottom_half;
+        }
         *out_len = (unsigned char)sizeof k_white_palette_bottom_half;
         return k_white_palette_bottom_half;
     case 0x5Eu:
