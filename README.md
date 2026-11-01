@@ -133,6 +133,13 @@ with direction and playtesting by SirGiggles. Automated comparisons against the
 NES game help catch mistakes, but they don't replace playing it. Bug reports
 and feedback are welcome.
 
+It should be noted. 
+
+The music by Inglebard and Cyberdeous was made WITHOUT AI. 
+
+Zelda Redux was made without AI. The project lead gave me the ok to use its patch and I give them FULL CREDIT for the amazing work that team did above.
+
+
 ## Legal
 
 The Legend of Zelda belongs to Nintendo. This is an unofficial fan project and
