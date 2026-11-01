@@ -27,6 +27,8 @@
 #include "inventory_sprite_chr.h"
 #include "world/render/redux_chr.h"
 #include "world/render/sprite_render.h"
+#include "world/render/mp_sprite_runtime.h"
+#include "world/render/sprite_slots.h"
 #include "../../../engine/src/engine_state.h"  /* roomrom_main_current_scene */
 #include "../world/draw_dispatch.h"
 #include "../world/render/subpal_routing.h"
@@ -36,6 +38,10 @@
 #include "../../state/game_profile.h"
 #include "../dungeon/uw_render.h"  /* roomrom_uw_room_render_get_level */
 #include "../dungeon/uw_map_builder.h"
+#include "pause_actions.h"
+#include "pause_map.h"
+#include "../options/options_consumer.h"
+#include "inventory_pause_internal.h"
 static unsigned char s_dungeon_map[8][16];
 
 /* Scene captured on subscreen enter: 0 = OW (triforce), 1 = UW (dungeon
@@ -116,6 +122,7 @@ static void sat_write(unsigned char slot, unsigned short y,
  * 6/7 ladder $76 (inventory_sprite_chr.c). */
 #define DSPR_BASE ROOMROM_SUBSCREEN_SPRITE_TILE_BASE
 #define DSPR(idx) (unsigned short)(DSPR_BASE + (idx))
+#define CURSOR_NES_TILE_ID  0x1Eu
 /* V3.0 (2026-05-30): byte-exact remap. The SUBSCREEN tile for each item
  * slot is Anim_ItemFrameTiles[Anim_ItemFrameOffsets[slot]] (Z_01.asm:5194-
  * 5207), NOT the item PICKUP tile the old table used. Atlas indices below
@@ -341,7 +348,7 @@ static unsigned char inv_slot_pal(unsigned char slot)
         item_slot = g_inventory.boomerang_magic ? 0x1Eu : 0x1Du;
     else if (slot != 0x02u && slot != 0x04u && slot != 0x07u && slot != 0x0Bu)
         return k_inv_slot_to_pal[slot];
-    (void)draw_item_icon(item_slot, nes_ram[0x0657u + item_slot], &nes_attr);
+    (void)draw_item_icon(item_slot, F_ram_0657_X(item_slot), &nes_attr);
     return roomrom_spr_subpal_to_pal(nes_attr);
 }
 
@@ -358,6 +365,99 @@ static unsigned short tile_for(unsigned char nes_tile, unsigned char sub_pal)
     unsigned short slot = bg_sparse_tile_lut[nes_tile][sub_pal];
     if (slot == 0xFFFFu) return BLANK_TILE;
     return (unsigned short)(ROOMROM_BG_TILE_BASE + slot);
+}
+
+/* NES source: DrawItemInInventory, authenticated inventory tile/palette LUTs
+ *above. Drained C: existing inventory renderer and mp_sprite_limit_lines.
+ *Coverage: shared art; ring layout/animation is an explicit Redux extension.
+ *Stance: EXTEND. No object, room tile, palette or resource writes. */
+typedef struct {
+    short x,y;
+    unsigned short owned;
+    unsigned char animation,highlight,b,c;
+} RingView;
+static RingView s_ring_view[4];
+static unsigned char s_ring_mask,s_ring_phase;
+
+void inventory_ring_clear_all(void) { s_ring_mask=0u; }
+
+void inventory_ring_present(unsigned char player,short x,short y,
+    const LoadoutRing *ring,unsigned char b,unsigned char c,unsigned short owned)
+{
+    RingView *v;
+    if(player>=4u || !ring || !loadout_ring_visible(ring)) return;
+    v=&s_ring_view[player]; v->x=x; v->y=y; v->owned=(unsigned short)(owned&0x81F7u);
+    /* The letter and potion occupy one shared cell. Prefer the actual live
+     *selection if both ownership bits are present during a discovery update. */
+    if((v->owned&0x8080u)==0x8080u) v->owned&=(unsigned short)~0x8000u;
+    v->animation=ring->animation; v->highlight=ring->highlight; v->b=b; v->c=c;
+    s_ring_mask|=(unsigned char)(1u<<player);
+}
+
+static void ring_entry(render_sprite_entry_t *e,short x,short y,
+    unsigned short size,unsigned short attr)
+{
+    e->x=(short)(x+128); e->y=(short)(y+ROOMROM_PLAY_SPRITE_DY+128);
+    e->size=(unsigned char)size; e->attribut=attr; e->link=0u;
+}
+
+void inventory_ring_draw(void)
+{
+    /* At most8 usable equipment cells plus two highlight halves and two
+     *assignment glyphs per actor:48 candidates, admitted by H32 policy. */
+    render_sprite_entry_t entries[48];
+    unsigned char p,n=0u;
+    static const signed char dx[8]={0,28,40,28,0,-28,-40,-28};
+    static const signed char dy[8]={-40,-28,0,28,40,28,0,-28};
+    static const unsigned char angle[9][8]={
+        {0},{0},{0,4},{0,3,5},{0,2,4,6},{0,2,3,5,6},
+        {0,1,3,4,5,7},{0,1,2,3,5,6,7},{0,1,2,3,4,5,6,7}};
+    for(p=0u;p<4u;++p) if(s_ring_mask&(1u<<p)) {
+        const RingView *v=&s_ring_view[p];
+        unsigned char slots[8],count=0u,i,s;
+        short cx=(short)(v->x+8),cy=(short)(v->y+8);
+        unsigned char progress=v->animation>LOADOUT_RING_ANIM_TICKS?
+            LOADOUT_RING_ANIM_TICKS:v->animation;
+        /* Keep the expanded ring entirely in the gameplay viewport. Translate
+         *the center gradually so opening/closing starts at the actual actor. */
+        /* Highlight spans x-4..x+12 and the badge sits clear of it at
+         *x+12..x+20; the uppermost icon must stay below the eight-row NES
+         *status strip (Y64). */
+        short target_x=cx<48?48:(cx>200?200:cx);
+        short target_y=cy<112?112:(cy>176?176:cy);
+        cx+=(short)((target_x-cx)*progress/(short)LOADOUT_RING_ANIM_TICKS);
+        cy+=(short)((target_y-cy)*progress/(short)LOADOUT_RING_ANIM_TICKS);
+        for(s=0u;s<16u;++s) if(v->owned&(1u<<s)) slots[count++]=s;
+        for(i=0u;i<count;++i) {
+            unsigned char a=angle[count][i]; s=slots[i];
+            short x=(short)(cx-4+dx[a]*progress/(short)LOADOUT_RING_ANIM_TICKS);
+            short y=(short)(cy-8+dy[a]*progress/(short)LOADOUT_RING_ANIM_TICKS);
+            ring_entry(&entries[n++],x,y,RENDER_SPRITE_SIZE(1,2),
+                RENDER_TILE_ATTR_FULL(inv_slot_pal(s),1,0,0,inventory_get_vram_tile_for_slot(s)));
+            if(loadout_same_cell(s,v->highlight)) {
+                unsigned char side;
+                for(side=0u;side<2u;++side)
+                    ring_entry(&entries[n++],(short)(x-4+side*8u),y,
+                        RENDER_SPRITE_SIZE(1,2),RENDER_TILE_ATTR_FULL(RENDER_PAL2,1,0,side,
+                            ROOMROM_SPR_TILE_BASE+CURSOR_NES_TILE_ID));
+            }
+            if(loadout_same_cell(s,v->b) || loadout_same_cell(s,v->c))
+                ring_entry(&entries[n++],(short)(x+12),y,RENDER_SPRITE_SIZE(1,1),
+                    RENDER_TILE_ATTR_FULL(RENDER_PAL0,1,0,0,
+                        tile_for(loadout_same_cell(s,v->b)?0x0Bu:0x0Cu,0u)));
+        }
+    }
+    mp_sprite_overlay_compose(entries,n,s_ring_phase++);
+    if(n) {
+        extern unsigned char g_enemy_render_last_sat_slot;
+        g_enemy_render_last_sat_slot=ROOMROM_SPRITE_UPLOAD_COUNT_H32;
+    }
+}
+
+void inventory_ring_capture(unsigned char captured_hand)
+{
+    mp_sprite_overlay_capture(captured_hand);
+    inventory_ring_draw();
 }
 
 /* Convert ASCII char to NES Z1 tile_id. Z1 BG glyph layout per common.c:
@@ -536,7 +636,7 @@ static void build_ow_triforce_cells(void)
     const unsigned char *empty = misc_ui_layout + 135u;
     unsigned char tiles[38];
     unsigned char i, r, c;
-    const unsigned char mask = nes_ram[0x0671u];
+    const unsigned char mask = F_ram_0671;
     inventory_menu_cells_build();
     for (r = 0u; r < 4u; ++r)
         for (c = 0u; c < 10u; ++c)
@@ -578,20 +678,15 @@ static void write_inventory_row(unsigned short gen_row)
     inventory_menu_cells_build();
     cells = s_menu_cells[s_subscreen_uw ? 1u : 0u][gen_row];
     render_vram_open_write(addr);
-    /* NES source: Redux menus/hud_and_subscreen.asm:b_button/blank.
-     * Drained C: write_inventory_row and immutable Original menu cache.
-     * Coverage: FULL(B-button label); other Redux menu changes separate.
-     * Stance: EXTEND at emission so cached Original rows cannot leak. */
-    if (game_profile_is_remix() && (nes_row == 18u || nes_row == 19u)) {
-        static const unsigned char label[8] = {0x0Bu,0x24u,0x0Bu,0x1Eu,0x1Du,0x1Du,0x18u,0x17u};
-        for (i = 0u; i < 32u; ++i) {
-            unsigned short word = cells[i];
-            if (nes_row == 18u && i >= 2u && i < 14u)
-                word = RENDER_TILE_ATTR_FULL(0u,0,0,0,tile_for(i >= 5u && i < 13u ? label[i-5u] : 0x24u,0u));
-            if (nes_row == 19u && i >= 4u && i < 12u)
-                word = RENDER_TILE_ATTR_FULL(0u,0,0,0,tile_for(0x24u,0u));
-            *((volatile unsigned short *)0xC00000) = word;
-        }
+    /* T-256 (user 2026-10-29): Remix shows B/C on the status bar, so the
+     * NES "USE B BUTTON" box block (rows13..19, cols0..14) holds the pause
+     * actions list instead. Stance: EXTEND at emission so cached Original
+     * rows cannot leak. */
+    if (game_profile_is_remix() &&
+        nes_row >= PAUSE_ACTIONS_FIRST_ROW && nes_row <= PAUSE_ACTIONS_LAST_ROW) {
+        for (i = 0u; i < 32u; ++i)
+            *((volatile unsigned short *)0xC00000) = (i < PAUSE_ACTIONS_COLS)
+                ? pause_actions_cell((unsigned char)nes_row, (unsigned char)i) : cells[i];
         return;
     }
     if (!s_subscreen_uw && nes_row >= 23u && nes_row < 27u) {
@@ -822,7 +917,7 @@ static void draw_status_marker(unsigned char room, unsigned char uw,
                                unsigned short disp, unsigned short tile)
 {
     unsigned char x = (unsigned char)(((room & 0x0Fu) << (uw ? 3u : 2u)) +
-                                      (uw ? 0x12u : 0x11u) + nes_ram[0x6BACu]);
+                                      (uw ? 0x12u : 0x11u) + F_NES_SRAM_BASE_6BAC);
     /* T-360: Remix moved the HUD map from cols22-29 to cols2-9; the NES
      * offset byte still points at the old right-side origin. Shift it with
      * the map. A room outside the new box has no cell; do not draw a stray. */
@@ -838,8 +933,8 @@ static void draw_status_marker(unsigned char room, unsigned char uw,
 /* Player marker on the UW map sheet (final slide position). */
 static void draw_map_marker(void)
 {
-    unsigned char room  = nes_ram[0x00EBu];
-    unsigned char rot   = uw_map_rotation(nes_ram[0x0010u]);
+    unsigned char room  = F_ram_00EB;
+    unsigned char rot   = uw_map_rotation(F_ram_0010);
     unsigned short rx   = (rot < 8u)
         ? (unsigned short)(rot << 3)
         : (unsigned short)(0u - (unsigned short)((16u - rot) << 3));
@@ -855,9 +950,9 @@ static void draw_scroll_markers(unsigned short disp, unsigned char map)
 {
     s_next_sat_slot = 0u;
     if (map && s_subscreen_uw) draw_map_marker();
-    draw_status_marker(nes_ram[0x00EBu], s_subscreen_uw, disp, DSPR(8));
+    draw_status_marker(F_ram_00EB, s_subscreen_uw, disp, DSPR(8));
     if (s_subscreen_uw && room_has_compass())
-        draw_status_marker(uw_map_triforce_room(nes_ram[0x0010u]), 1u, disp, DSPR(14));
+        draw_status_marker(uw_map_triforce_room(F_ram_0010), 1u, disp, DSPR(14));
     sat_write(s_next_sat_slot, 0u, 0u, 0u, 0u, 0u);
     render_pause_frame_deferred(SAT_VRAM_BASE_GAMEPLAY,s_vscroll,
                                 (unsigned short)(s_next_sat_slot+1u));
@@ -915,7 +1010,7 @@ static void draw_item_sprites(void)
      * which test the CURRENT level's bit — present in UW (dungeon), never
      * in OW. Gate on CurLevel ($10) so OW matches NES (no compass/map). */
     {
-        unsigned char room = nes_ram[0x00EBu];
+        unsigned char room = F_ram_00EB;
         /* Z_05.asm:UpdateMenuCommon1 reuses Z_01.asm:UpdatePositionMarker,
          * which adds the installed LevelInfo offset to both status markers. */
         if (!s_subscreen_uw) {
@@ -926,7 +1021,7 @@ static void draw_item_sprites(void)
             /* UW dungeon-map markers (Z_05.asm:295-355) + compass/map. */
             /* CurLevel ($0010) is set reliably on the MODE toggle (s_uw_level
              * is not), so index the per-level map config by it. */
-            unsigned char  level = nes_ram[0x0010u];
+            unsigned char  level = F_ram_0010;
             /* Player marker on the map sheet (final scroll-end position). */
             draw_map_marker();
             /* Status-bar map marker (UW cols *8 + $12; Y scrolled). */
@@ -949,11 +1044,12 @@ static void draw_item_sprites(void)
      * "USE B BUTTON" equipped indicator. */
     /* Z_05 UpdateSubmenuSelection only draws an owned breakout item.
      * Empty inventory still has cursor slot0, but no boomerang preview. */
-    if (slot_owned(nes_ram[0x0656u]))
-        draw_inv_slot(nes_ram[0x0656u], 0x40u, 0x36u);
+    /* T-256: Remix replaced the box with the actions list. */
+    if (!game_profile_is_remix() && slot_owned(F_ram_0656))
+        draw_inv_slot(F_ram_0656, 0x40u, 0x36u);
 
     if (game_profile_is_remix()) {
-        draw_assignment_box(nes_ram[0x0656u], RENDER_PAL2);
+        draw_assignment_box(F_ram_0656, RENDER_PAL2);
         draw_assignment_box(loadout_c_slot(), RENDER_PAL3);
     }
     s_cursor_sat = s_next_sat_slot;
@@ -966,26 +1062,30 @@ void inventory_subscreen_enter(void)
 {
     /* Native pickup/count ownership must be visible on the entry frame. */
     inventory_sync_from_native();
+    pause_actions_open();
     hud_move_inventory_item(0u);
     if (game_profile_is_remix()) {
         unsigned char c = loadout_c_slot();
-        if (c > 8u || c == nes_ram[0x0656u] ||
+        if (c == 0x0Fu && g_inventory.potion != 0u) c = 7u;
+        if (c == 7u && g_inventory.potion == 0u && g_inventory.letter != 0u) c = 0x0Fu;
+        if (loadout_same_cell(c, F_ram_0656) ||
             !hud_inventory_item_selectable(c))
             loadout_set_c_slot(LOADOUT_SLOT_NONE);
+        else loadout_set_c_slot(c);
     } else {
         loadout_set_c_slot(LOADOUT_SLOT_NONE);
     }
-    g_inventory.selected_b_item = nes_ram[0x0656u];
+    g_inventory.selected_b_item = F_ram_0656;
     /* Capture scene: UW (dungeon) renders the map subscreen, OW the
      * triforce subscreen. Latched here so the whole open uses one source. */
     s_subscreen_uw = (roomrom_main_current_scene() == ROOMROM_MAIN_SCENE_UW) ? 1u : 0u;
 
-    if (s_subscreen_uw) uw_map_build(nes_ram[0x0010u], s_dungeon_map);
+    if (s_subscreen_uw) uw_map_build(F_ram_0010, s_dungeon_map);
     else build_ow_triforce_cells();
 
     /* L4 (Phase 7 v2): swap CRAM to NES subscreen palette before any
      * BG/sprite write so first rendered frame is correctly colored. */
-    inventory_palette_load_subscreen(s_subscreen_uw, nes_ram[0x0010u],
+    inventory_palette_load_subscreen(s_subscreen_uw, F_ram_0010,
                                      roomrom_main_current_quest());
 
     /* G4: load the per-level triforce-marker tint into the otherwise-free
@@ -995,9 +1095,9 @@ void inventory_subscreen_enter(void)
      * table byte-for-byte (as do $2D rot, $2E sbx, $2F start, $30 tri). */
     if (s_subscreen_uw) {
         extern unsigned short roomrom_bg_palette_nes_to_cram(unsigned char);
-        unsigned char lvl = nes_ram[0x0010u];
+        unsigned char lvl = F_ram_0010;
         unsigned short c = (lvl >= 1u && lvl <= 9u)
-            ? roomrom_bg_palette_nes_to_cram(nes_ram[0x6B9Eu]) : 0u;
+            ? roomrom_bg_palette_nes_to_cram(F_ram_6B9E) : 0u;
         render_cram_write_color(25u, c);
     }
 
@@ -1065,7 +1165,7 @@ void inventory_subscreen_enter(void)
     s_scroll_state = SCROLL_IN;
     s_scroll_row   = 0u;
     s_prev_joy     = 0u;
-    s_cursor_slot  = nes_ram[0x0656u];
+    s_cursor_slot  = F_ram_0656;
 }
 
 /* L3 (Phase 7 v2): NES SubmenuCursorXs from Z_05.asm:7909.
@@ -1079,15 +1179,16 @@ static const unsigned char k_submenu_cursor_xs[9] = {
 /* Genesis VRAM slot for NES sprite tile $1E (small white square).
  * NES SPR tile_id $1E lives in Common SPR pattern table; Genesis port
  * maps via ROOMROM_SPR_TILE_BASE (533) + nes_tile. */
-#define CURSOR_NES_TILE_ID  0x1Eu
 #define CURSOR_VRAM_TILE    (ROOMROM_SPR_TILE_BASE + CURSOR_NES_TILE_ID)
 
 /* Frame counter for flash animation. Phase 7 v2 L3: cursor PAL alternates
  * every 8 frames per Z_05.asm:7942 (AND #$08, LSR x3, ADC #$01). */
 static void draw_cursor(void)
 {
-    /* Empty inventory has a native slot0 sentinel, not a selectable item. */
-    if (!hud_inventory_item_selectable(s_cursor_slot)) {
+    /* Empty inventory has a native slot0 sentinel, not a selectable item.
+     * T-256: no grid cursor while the actions list has focus. */
+    if (!hud_inventory_item_selectable(s_cursor_slot) ||
+        (game_profile_is_remix() && pause_actions_list_focused())) {
         sat_write(s_cursor_sat, 0u, 0u, 0u, 0u, 0u);
         return;
     }
@@ -1103,7 +1204,7 @@ static void draw_cursor(void)
      * bit 3 (Z_05.asm:7990-7999) -> Genesis SPR PAL2/PAL3. */
     /* The NES draws before its NMI advances FrameCounter: it sees the value
      * this tick leaves one lower (flip at FrameCounter 9 / 17, not 8 / 16). */
-    unsigned char  pal = (unsigned char)((((nes_ram[0x0015u] - 1u) >> 3) & 1u) ?
+    unsigned char  pal = (unsigned char)((((F_ram_0015 - 1u) >> 3) & 1u) ?
                                           RENDER_PAL3 : RENDER_PAL2);
 
     /* NES draws the cursor as TWO $1E sprites forming the selection box:
@@ -1126,9 +1227,9 @@ static void draw_assignment_box(unsigned char slot, unsigned char pal)
     unsigned char s;
     unsigned char nes_y, nes_x, s0, s1;
     unsigned short lx;
-    if (slot > 8u || !slot_owned(slot) || !hud_inventory_item_selectable(slot))
+    if ((slot > 8u && slot != 0x0Fu) || !slot_owned(slot) || !hud_inventory_item_selectable(slot))
         return;
-    s = slot;
+    s = (slot == 0x0Fu) ? 7u : slot;
     nes_y = (s < 5u) ? 0x36u : 0x46u;
     nes_x = k_submenu_cursor_xs[s];
     lx = (unsigned short)(nes_x + 0x80u);
@@ -1137,8 +1238,9 @@ static void draw_assignment_box(unsigned char slot, unsigned char pal)
     sat_write(s0, (unsigned short)(nes_y + SUBSCREEN_SAT_Y_OFFSET),
               RENDER_SPRITE_SIZE(1, 2), s1,
               RENDER_TILE_ATTR_FULL(pal, 0, 0, 0, CURSOR_VRAM_TILE), lx);
+    /* Link on: the C box and the cursor follow in the same chain. */
     sat_write(s1, (unsigned short)(nes_y + SUBSCREEN_SAT_Y_OFFSET),
-              RENDER_SPRITE_SIZE(1, 2), 0u,
+              RENDER_SPRITE_SIZE(1, 2), (unsigned char)(s1 + 1u),
               RENDER_TILE_ATTR_FULL(pal, 0, 0, 1, CURSOR_VRAM_TILE),
               (unsigned short)(lx + 8u));
     s_next_sat_slot = (unsigned char)(s1 + 1u);
@@ -1164,17 +1266,17 @@ static void draw_assignment_labels(void)
 {
     unsigned char b, c, b_row = 0xFFu, c_row, b_col = 0xFFu, c_col;
     if (!game_profile_is_remix() || !s_active) return;
-    b = nes_ram[0x0656u];
+    b = F_ram_0656;
     c = loadout_c_slot();
-    if (b <= 8u && slot_owned(b) && hud_inventory_item_selectable(b)) {
+    if ((b <= 8u || b == 0x0Fu) && slot_owned(b) && hud_inventory_item_selectable(b)) {
         b_row = (b < 5u) ? 6u : 8u;
-        b_col = assignment_label_col(b);
+        b_col = assignment_label_col(b == 0x0Fu ? 7u : b);
         write_assignment_letter(b_row, b_col, 0x0Bu);
     }
-    if (c <= 8u && c != b && slot_owned(c) &&
+    if ((c <= 8u || c == 0x0Fu) && !loadout_same_cell(c,b) && slot_owned(c) &&
         hud_inventory_item_selectable(c)) {
         c_row = (c < 5u) ? 6u : 8u;
-        c_col = assignment_label_col(c);
+        c_col = assignment_label_col(c == 0x0Fu ? 7u : c);
         if (c_col == b_col && c_row == b_row) ++c_col;
         write_assignment_letter(c_row, c_col, 0x0Cu);
     }
@@ -1187,6 +1289,103 @@ static void redraw_assignment_rows(void)
     write_inventory_row(8u);
     draw_assignment_labels();
 }
+
+/* ---- T-256 pause actions services (inventory_pause_internal.h) ------- */
+
+/* Remix item grid cells (hud_runtime.c inventory_cell_slot): row0 cells
+ * 0..3, row1 cells 4..7; letter shares the potion cell. */
+static const unsigned char k_grid_slots[8] = {0u,1u,2u,4u,5u,6u,7u,8u};
+
+static unsigned char grid_slot(unsigned char cell)
+{
+    unsigned char s = k_grid_slots[cell];
+    if (s == 7u && g_inventory.potion == 0u && g_inventory.letter != 0u) s = 0x0Fu;
+    return s;
+}
+
+static unsigned char grid_cell_of(unsigned char slot)
+{
+    unsigned char cell;
+    if (slot == 0x0Fu) slot = 7u;
+    for (cell = 0u; cell < 8u; ++cell)
+        if (k_grid_slots[cell] == slot) return cell;
+    return 0xFFu;
+}
+
+static unsigned char grid_row_of(unsigned char slot)
+{
+    unsigned char cell = grid_cell_of(slot);
+    return (unsigned char)((cell != 0xFFu && (cell & 4u)) ? 1u : 0u);
+}
+
+/* No selectable cell left of the cursor in its row (or none at all). */
+static unsigned char grid_at_left_edge(void)
+{
+    unsigned char cell, c;
+    if (!hud_inventory_item_selectable(s_cursor_slot)) return 1u;
+    cell = grid_cell_of(s_cursor_slot);
+    if (cell == 0xFFu) return 1u;
+    for (c = (unsigned char)(cell & 4u); c < cell; ++c)
+        if (hud_inventory_item_selectable(grid_slot(c))) return 0u;
+    return 1u;
+}
+
+/* Back from the list: leftmost selectable cell of `row`, else the other. */
+static void grid_enter_row(unsigned char row)
+{
+    unsigned char pass, c;
+    for (pass = 0u; pass < 2u; ++pass, row ^= 1u)
+        for (c = 0u; c < 4u; ++c) {
+            unsigned char slot = grid_slot((unsigned char)(row * 4u + c));
+            if (hud_inventory_item_selectable(slot)) { s_cursor_slot = slot; return; }
+        }
+}
+
+unsigned short inventory_pause_glyph(char c, unsigned char sub_pal)
+{
+    return RENDER_TILE_ATTR_FULL(0u, 0, 0, 0, tile_for(ascii_to_tile(c), sub_pal));
+}
+
+unsigned short inventory_pause_tile(unsigned char nes_tile, unsigned char sub_pal)
+{
+    return RENDER_TILE_ATTR_FULL(0u, 0, 0, 0, tile_for(nes_tile, sub_pal));
+}
+
+void inventory_pause_write_row(unsigned char row, const unsigned short *cells)
+{
+    unsigned char i;
+    render_vram_open_write((unsigned short)(PLANE_A_BASE + row * 128u + s_col_base * 2u));
+    for (i = 0u; i < 32u; ++i) *((volatile unsigned short *)0xC00000) = cells[i];
+}
+
+void inventory_pause_refresh_actions(void)
+{
+    unsigned short r;
+    for (r = PAUSE_ACTIONS_FIRST_ROW; r <= PAUSE_ACTIONS_LAST_ROW; ++r)
+        write_inventory_row((unsigned short)(r - NES_VSCROLL_NES_ROW_OFFSET));
+    draw_assignment_labels();   /* rows 6/8 carry the B/C letters */
+}
+
+void inventory_pause_redraw_sheet(void)
+{
+    unsigned short r;
+    for (r = 0u; r < SCROLL_TOTAL_ROWS; ++r) write_inventory_row(r);
+    draw_assignment_labels();
+}
+
+void inventory_pause_page_sprites(unsigned char show, unsigned short x, unsigned short y)
+{
+    s_next_sat_slot = 0u;
+    if (show) draw_marker_sprite(x, y, RENDER_PAL1, DSPR(8));
+    draw_status_marker(F_ram_00EB, s_subscreen_uw, STATUS_MARKER_REST, DSPR(8));
+    if (s_subscreen_uw && room_has_compass())
+        draw_status_marker(uw_map_triforce_room(F_ram_0010), 1u, STATUS_MARKER_REST, DSPR(14));
+    sat_write(s_next_sat_slot, 0u, 0u, 0u, 0u, 0u);
+    render_pause_frame_deferred(SAT_VRAM_BASE_GAMEPLAY, s_vscroll,
+                                (unsigned short)(s_next_sat_slot + 1u));
+}
+
+unsigned char inventory_pause_scene_uw(void) { return s_subscreen_uw; }
 
 void inventory_subscreen_exit(void)
 {
@@ -1206,7 +1405,27 @@ void inventory_subscreen_exit(void)
  * takes input. */
 unsigned char inventory_subscreen_menu_active(void)
 {
-    return (unsigned char)(s_active && s_scroll_state == SCROLL_ACTIVE);
+    /* T-256: a Remix page (options/map) owns Start and the pad until it
+     * closes back onto the sheet. */
+    return (unsigned char)(s_active && s_scroll_state == SCROLL_ACTIVE &&
+                           !pause_actions_page_open() && !pause_map_flute_busy());
+}
+
+unsigned char inventory_subscreen_take_quit(void)
+{
+    return pause_actions_take_quit();
+}
+
+/* T-258: the flute whirlwind asked for the destination picker. */
+unsigned char inventory_subscreen_flute_pick_pending(void)
+{
+    return pause_map_flute_pending();
+}
+
+/* T-258: destination chosen and the map is back on the sheet. */
+unsigned char inventory_subscreen_take_flute_done(void)
+{
+    return (unsigned char)(!pause_actions_page_open() && pause_map_flute_take_done());
 }
 
 /* T-013: UpdateMenuActive pad 2 Up+A -> GameMode 8 (MenuState 0): the
@@ -1236,6 +1455,12 @@ unsigned char inventory_subscreen_scrolled_out(void)
         return (unsigned char)(s_exit_phase == 0u);
     }
     return 1u;
+}
+
+/* SGDK pad low byte: A $40 <-> B $10. */
+static unsigned char swap_ab_bits(unsigned char b)
+{
+    return (unsigned char)((b & (unsigned char)~0x50u) | ((b & 0x40u) >> 2) | ((b & 0x10u) << 2));
 }
 
 void inventory_subscreen_tick(unsigned char joy_state)
@@ -1300,15 +1525,43 @@ void inventory_subscreen_tick(unsigned char joy_state)
      * A writes SelectedItemSlot to nes_ram[$656]. */
     if (!game_profile_is_remix()) {
         hud_move_inventory_item(0u);
-        s_cursor_slot = nes_ram[0x0656u];
+        s_cursor_slot = F_ram_0656;
     } else if (s_cursor_slot > 8u && s_cursor_slot != 0x0Fu) {
-        s_cursor_slot = nes_ram[0x0656u];
+        s_cursor_slot = F_ram_0656;
     }
 
     /* Joy bits per SGDK joy.h: UP=$01 DOWN=$02 LEFT=$04 RIGHT=$08
      * B=$10 C=$20 A=$40 START=$80. */
     unsigned char pressed = (unsigned char)(joy_state & ~s_prev_joy);
     s_prev_joy = joy_state;
+
+    /* T-256: the Remix actions list / pages take the pad while focused;
+     * Left at the grid's left edge (or with nothing selectable) enters it. */
+    if (game_profile_is_remix()) {
+        unsigned char focused = (unsigned char)(pause_actions_list_focused() ||
+                                                pause_actions_page_open());
+        /* The list and pages read physical buttons ("A EDIT ... B BACK"):
+         * undo the Remix BUTTON SWAP the host applied for gameplay, or
+         * toggling it on the options page would turn B into A at once. */
+        unsigned char menu_joy = joy_state, menu_pressed = pressed;
+        if (options_consumer_get_ab_swap()) {
+            menu_joy = swap_ab_bits(joy_state);
+            menu_pressed = swap_ab_bits(pressed);
+        }
+        if (pause_actions_tick(menu_joy, focused ? menu_pressed : 0u) == PAUSE_ACTIONS_TO_GRID) {
+            grid_enter_row(pause_actions_return_row());
+            F_ram_0602 = 1u;
+            pressed = 0u;
+        } else if (focused || pause_actions_page_open()) {
+            if (!pause_actions_page_open()) draw_item_sprites();
+            return;
+        } else if ((pressed & 0x0Fu) == 0x04u && grid_at_left_edge()) {
+            pause_actions_focus_from_grid(grid_row_of(s_cursor_slot));
+            F_ram_0602 = 1u;
+            draw_item_sprites();
+            return;
+        }
+    }
 
     /* NES source: Z_05.asm:UpdateSubmenuSelection / CheckLetter.
      * Drained C: hud_runtime.c:find_and_select_occupied_item_slot.
@@ -1321,39 +1574,49 @@ void inventory_subscreen_tick(unsigned char joy_state)
             /* Remix: the cursor is independent of the B assignment. Move
              * the shared selector only to reuse its grid navigation, then
              * restore the B slot. */
-            unsigned char b_slot = nes_ram[0x0656u];
-            nes_ram[0x0656u] = s_cursor_slot;
+            unsigned char b_slot = F_ram_0656;
+            F_ram_0656 = s_cursor_slot;
             hud_move_inventory_item((unsigned char)(pressed & 0x0Fu));
-            s_cursor_slot = nes_ram[0x0656u];
-            nes_ram[0x0656u] = b_slot;
+            s_cursor_slot = F_ram_0656;
+            F_ram_0656 = b_slot;
             g_inventory.selected_b_item = b_slot;
         } else {
             hud_move_inventory_item((unsigned char)(pressed & 0x0Fu));
-            s_cursor_slot = nes_ram[0x0656u];
+            s_cursor_slot = F_ram_0656;
             g_inventory.selected_b_item = s_cursor_slot;
             extern void roomrom_set_b_item_from_inv_cursor(unsigned char);
             roomrom_set_b_item_from_inv_cursor(s_cursor_slot);
         }
         if (s_cursor_slot != old_slot)
-            nes_ram[0x0602u] = 1u;       /* Tune1Request: selection changed */
+            F_ram_0602 = 1u;       /* Tune1Request: selection changed */
     }
 
     if (game_profile_is_remix()) {
-        unsigned char cur = (s_cursor_slot == 0x0Fu) ? 7u : s_cursor_slot;
-        unsigned char b = (nes_ram[0x0656u] == 0x0Fu) ? 7u : nes_ram[0x0656u];
+        unsigned char cur = s_cursor_slot;
+        unsigned char b = F_ram_0656;
+        unsigned char c = loadout_c_slot();
         extern void roomrom_set_b_item_from_inv_cursor(unsigned char);
-        if ((pressed & 0x10u) && cur <= 8u && cur != loadout_c_slot() &&
-            slot_owned(cur) && hud_inventory_item_selectable(cur)) {
-            nes_ram[0x0656u] = cur;
+        /* T-255 plan rule 2: assigning the other button's item swaps the
+         * two slots. B has no empty state, so giving C the B item needs a
+         * C item to hand back. */
+        if ((pressed & 0x10u) && slot_owned(cur) &&
+            hud_inventory_item_selectable(cur) && !loadout_same_cell(cur,b)) {
+            if (loadout_same_cell(cur,c)) loadout_set_c_slot(b);
+            F_ram_0656 = cur;
             g_inventory.selected_b_item = cur;
             roomrom_set_b_item_from_inv_cursor(cur);
-            nes_ram[0x0602u] = 1u;
+            F_ram_0602 = 1u;
             redraw_assignment_rows();
-        }
-        if ((pressed & 0x20u) && cur <= 8u && cur != b &&
-            slot_owned(cur) && hud_inventory_item_selectable(cur)) {
+        } else if ((pressed & 0x20u) && slot_owned(cur) &&
+            hud_inventory_item_selectable(cur) && !loadout_same_cell(cur,c) &&
+            (!loadout_same_cell(cur,b) || c != LOADOUT_SLOT_NONE)) {
+            if (loadout_same_cell(cur,b)) {
+                F_ram_0656 = c;
+                g_inventory.selected_b_item = c;
+                roomrom_set_b_item_from_inv_cursor(c);
+            }
             loadout_set_c_slot(cur);
-            nes_ram[0x0602u] = 1u;
+            F_ram_0602 = 1u;
             redraw_assignment_rows();
         }
     }

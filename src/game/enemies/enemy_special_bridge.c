@@ -28,16 +28,47 @@
                                          * k_sprite_offsets */
 #include "world/sprite_dispatch.h"      /* sprite_show_link_sprites_behind_horizontal_doors */
 #include "world/render/sprite_render.h"  /* roomrom_sprites_set_link_pose */
+#include "combat/link_collision_dispatch.h"
 #include "enemies/enemy_dispatch.h"     /* enemy_hide_sprites_over_link */
+#include "../../state/player_state.h"
+#include "../../state/input_state.h"
 #include "../options/options_consumer.h" /* options_consumer_get_like_like_behavior */
 #include "../options/options_state.h"    /* OPTIONS_LIKELIKE_VANILLA */
 #include "game_profile.h"
 #include "core/core_dispatch.h"          /* core_update_dead_dummy */
 
+/* NES source: UpdateMode5Play chase point -> each monster's drained AI.
+ * Drained C: enemy_loop_tick / existing chase consumers.
+ * Coverage: PARTIAL nearest-player party policy; food remains world-owned.
+ * Stance: EXTEND per-object caller, with stable lowest-index ties. */
+unsigned char enemy_nearest_party_player(unsigned int slot)
+{
+    unsigned char i, best = 0u;
+    unsigned short distance = 0xFFFFu;
+    const short x = (short)ENEMY_X(slot);
+    const short y = (short)ENEMY_Y(slot);
+    for (i = 0u; i < g_player_count; ++i) {
+        const short dx = (short)(PLAYER(i).x - x);
+        const short dy = (short)(PLAYER(i).y - y);
+        const unsigned short d = (unsigned short)
+            ((dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy));
+        if (d < distance) { distance = d; best = i; }
+    }
+    return best;
+}
+
+void enemy_target_party_player(unsigned int slot, unsigned char mirror)
+{
+    const unsigned char best = enemy_nearest_party_player(slot);
+    G_OBJECT_PLAYER_REFS[slot].target_player = best;
+    CHASE_TARGET_X = (unsigned char)PLAYER(best).x ^ (mirror ? 0xFFu : 0u);
+    CHASE_TARGET_Y = (unsigned char)PLAYER(best).y ^ (mirror ? 0xFFu : 0u);
+}
+
 /* NES RAM cell aliases not yet in enemy_state.h. */
-#define LIKELIKE_CAPTURE_TIMER(slot)    OBJ(0x042Cu, (slot))  /* ObjCaptureTimer */
-#define LINK_PARALYZED_FLAG             RAM(0x0512u)          /* LinkParalyzed */
-#define INV_MAGIC_SHIELD                RAM(0x0676u)          /* InvMagicShield */
+#define LIKELIKE_CAPTURE_TIMER(slot)    F_ram_042C_O((slot))  /* ObjCaptureTimer */
+#define LINK_PARALYZED_FLAG             F_ram_0512_R          /* LinkParalyzed */
+#define INV_MAGIC_SHIELD                F_ram_0676_R          /* InvMagicShield */
 /* NES source: UpdateLikeLike's actual shield-removal boundary.
  * Drained C: enrt_update_like_like / native_set_up_dropped_item.
  * Coverage: PARTIAL theft/death/lifecycle; Stance: EXTEND. The user requests
@@ -52,8 +83,12 @@ void enemy_like_like_shields_reset(void)
 
 void enemy_like_like_shield_forget(unsigned int slot)
 {
-    if (slot >= 1u && slot <= 11u)
+    if (slot >= 1u && slot <= 11u) {
+        if (g_player_count > 1u &&
+            G_OBJECT_PLAYER_REFS[slot].capture_player < g_player_count)
+            enemy_capture_release(slot);
         s_like_like_shields &= (unsigned short)~(1u << slot);
+    }
 }
 
 unsigned char enemy_like_like_shield_take(unsigned int slot)
@@ -65,21 +100,21 @@ unsigned char enemy_like_like_shield_take(unsigned int slot)
     s_like_like_shields &= (unsigned short)~bit;
     return 1u;
 }
-#define LIKELIKE_OBJ_SHOVE_DIR(slot)    OBJ(0x00C0u, (slot))  /* ObjShoveDir */
-#define LIKELIKE_OBJ_SHOVE_DIST(slot)   OBJ(0x00D3u, (slot))  /* ObjShoveDistance */
+#define LIKELIKE_OBJ_SHOVE_DIR(slot)    F_ram_00C0_O5((slot))  /* ObjShoveDir */
+#define LIKELIKE_OBJ_SHOVE_DIST(slot)   F_ram_00D3_O((slot))  /* ObjShoveDistance */
 
 /* PolsVoice RAM cell aliases (NES ObjVars.inc + Variables.inc). */
-#define POLS_OBJ_REM_DISTANCE(slot)     OBJ(0x0394u, (slot))  /* ObjRemDistance */
-#define POLS_OBJ_STATE(slot)            OBJ(0x00ACu, (slot))  /* ObjState */
-#define POLS_STUN_TIMER(slot)           OBJ(0x003Du, (slot))  /* ObjStunTimer */
-#define POLS_OBJ_SPEED_WHOLE(slot)      OBJ(0x0412u, (slot))  /* PolsVoice_ObjSpeedWhole */
-#define POLS_OBJ_LAST_TILE(slot)        OBJ(0x041Fu, (slot))  /* PolsVoice_ObjLastTile (alias of ENEMY_AIR_SPEED) */
-#define POLS_OBJ_TARGET_Y(slot)         OBJ(0x042Cu, (slot))  /* PolsVoice_ObjTargetY (alias of ObjCaptureTimer) */
-#define POLS_OBJ_SPEED_FRAC(slot)       OBJ(0x0444u, (slot))  /* PolsVoice_ObjSpeedFrac */
-#define POLS_INV_CLOCK                  RAM(0x066Cu)          /* InvClock */
-#define POLS_INVINCIBILITY_MASK(slot)   OBJ(0x04B2u, (slot))  /* ObjInvincibilityMask */
-#define POLS_FRAME_COUNTER              RAM(0x0015u)          /* FrameCounter */
-#define POLS_RANDOM(slot)               OBJ(0x0018u, (slot))  /* Random,X ($18; was $19, T-171) */
+#define POLS_OBJ_REM_DISTANCE(slot)     F_ram_0394_O4((slot))  /* ObjRemDistance */
+#define POLS_OBJ_STATE(slot)            F_ram_00AC_O((slot))  /* ObjState */
+#define POLS_STUN_TIMER(slot)           F_NES_OBJ_STUN_TIMER_O2((slot))  /* ObjStunTimer */
+#define POLS_OBJ_SPEED_WHOLE(slot)      F_ram_0412_O2((slot))  /* PolsVoice_ObjSpeedWhole */
+#define POLS_OBJ_LAST_TILE(slot)        F_ram_041F_O2((slot))  /* PolsVoice_ObjLastTile (alias of ENEMY_AIR_SPEED) */
+#define POLS_OBJ_TARGET_Y(slot)         F_ram_042C_O((slot))  /* PolsVoice_ObjTargetY (alias of ObjCaptureTimer) */
+#define POLS_OBJ_SPEED_FRAC(slot)       F_ram_0444_O((slot))  /* PolsVoice_ObjSpeedFrac */
+#define POLS_INV_CLOCK                  F_ram_066C_R          /* InvClock */
+#define POLS_INVINCIBILITY_MASK(slot)   F_ram_04B2_O((slot))  /* ObjInvincibilityMask */
+#define POLS_FRAME_COUNTER              F_ram_0015_R          /* FrameCounter */
+#define POLS_RANDOM(slot)               F_ram_0018_O((slot))  /* Random,X ($18; was $19, T-171) */
 
 /* PolsVoice tables (verbatim from NES Z_04.asm:6516-6531).
  *
@@ -104,30 +139,30 @@ static const unsigned char k_pols_voice_directions[4] = {
 };
 
 /* Wallmaster RAM cell aliases (NES ObjVars.inc + Variables.inc). */
-#define WM_OBJ_STATE(slot)              OBJ(0x00ACu, (slot))  /* ObjState */
-#define WM_OBJ_SHOVE_DIR(slot)          OBJ(0x00C0u, (slot))  /* ObjShoveDir */
-#define WM_OBJ_INPUT_DIR                RAM(0x03F8u)          /* ObjInputDir, slot 0 (Link) */
-#define WM_OBJ_TIMER_SLOT1              RAM(0x0029u)          /* ObjTimer + 1 (slot 1) */
-#define WM_INV_CLOCK                    RAM(0x066Cu)          /* InvClock */
-#define WM_OBJ_STUN_TIMER(slot)         OBJ(0x003Du, (slot))  /* ObjStunTimer */
-#define WM_OBJ_GRID_OFFSET(slot)        OBJ(0x0394u, (slot))  /* ObjGridOffset */
-#define WM_OBJ_QSPEED_FRAC(slot)        OBJ(0x03BCu, (slot))  /* ObjQSpeedFrac */
-#define WM_OBJ_ANIM_COUNTER(slot)       OBJ(0x03D0u, (slot))  /* ObjAnimCounter */
-#define WM_OBJ_ANIM_FRAME(slot)         OBJ(0x03E4u, (slot))  /* ObjAnimFrame */
-#define WM_OBJ_STEP(slot)               OBJ(0x0412u, (slot))  /* Wallmaster_ObjStep */
-#define WM_OBJ_TILES_CROSSED(slot)      OBJ(0x041Fu, (slot))  /* Wallmaster_ObjTilesCrossed (alias of ENEMY_AIR_SPEED) */
-#define WM_OBJ_CAPTURE_TIMER(slot)      OBJ(0x042Cu, (slot))  /* ObjCaptureTimer */
-#define WM_ROLLING_SPRITE_INDEX         RAM(0x0341u)          /* RollingSpriteIndex */
-#define WM_GAME_MODE                    RAM(0x0012u)          /* GameMode */
-#define WM_GAME_SUBMODE                 RAM(0x0013u)          /* GameSubmode */
-#define WM_IS_UPDATING_MODE             RAM(0x0011u)          /* IsUpdatingMode */
-#define WM_SPRITES(off)                 RAM(0x0200u + (unsigned char)(off))
-#define WM_SCRATCH_INSTR_AXIS           RAM(0x0002u)          /* [02] axis decrease bit */
-#define WM_SCRATCH_LINK_MINOR           RAM(0x0000u)          /* [00] Link's minor coord */
-#define WM_SCRATCH_LINK_MAJOR           RAM(0x0001u)          /* [01] Link's major coord */
-#define WM_SCRATCH_INIT_MINOR_COORD     RAM(0x0004u)          /* [04] init minor coord */
-#define WM_SCRATCH_PATCH_LEFT_OFFSET    RAM(0x0000u)          /* [00] left sprite OAM off (PatchSprites) */
-#define WM_SCRATCH_PATCH_RIGHT_OFFSET   RAM(0x0001u)          /* [01] right sprite OAM off (PatchSprites) */
+#define WM_OBJ_STATE(slot)              F_ram_00AC_O((slot))  /* ObjState */
+#define WM_OBJ_SHOVE_DIR(slot)          F_ram_00C0_O5((slot))  /* ObjShoveDir */
+#define WM_OBJ_INPUT_DIR                F_ram_03F8_R          /* ObjInputDir, slot 0 (Link) */
+#define WM_OBJ_TIMER_SLOT1              F_ram_0029_R          /* ObjTimer + 1 (slot 1) */
+#define WM_INV_CLOCK                    F_ram_066C_R          /* InvClock */
+#define WM_OBJ_STUN_TIMER(slot)         F_NES_OBJ_STUN_TIMER_O2((slot))  /* ObjStunTimer */
+#define WM_OBJ_GRID_OFFSET(slot)        F_ram_0394_O4((slot))  /* ObjGridOffset */
+#define WM_OBJ_QSPEED_FRAC(slot)        F_ram_03BC_O3((slot))  /* ObjQSpeedFrac */
+#define WM_OBJ_ANIM_COUNTER(slot)       F_ram_03D0_O((slot))  /* ObjAnimCounter */
+#define WM_OBJ_ANIM_FRAME(slot)         F_ram_03E4_O((slot))  /* ObjAnimFrame */
+#define WM_OBJ_STEP(slot)               F_ram_0412_O2((slot))  /* Wallmaster_ObjStep */
+#define WM_OBJ_TILES_CROSSED(slot)      F_ram_041F_O2((slot))  /* Wallmaster_ObjTilesCrossed (alias of ENEMY_AIR_SPEED) */
+#define WM_OBJ_CAPTURE_TIMER(slot)      F_ram_042C_O((slot))  /* ObjCaptureTimer */
+#define WM_ROLLING_SPRITE_INDEX         F_ram_0341_R          /* RollingSpriteIndex */
+#define WM_GAME_MODE                    F_ram_0012_R          /* GameMode */
+#define WM_GAME_SUBMODE                 F_ram_0013_R          /* GameSubmode */
+#define WM_IS_UPDATING_MODE             F_ram_0011_R          /* IsUpdatingMode */
+#define WM_SPRITES(off)                 F_ram_0200_R2((unsigned char)(off))
+#define WM_SCRATCH_INSTR_AXIS           F_ram_0002_R          /* [02] axis decrease bit */
+#define WM_SCRATCH_LINK_MINOR           F_ram_0000_R          /* [00] Link's minor coord */
+#define WM_SCRATCH_LINK_MAJOR           F_ram_0001_R          /* [01] Link's major coord */
+#define WM_SCRATCH_INIT_MINOR_COORD     F_ram_0004_R          /* [04] init minor coord */
+#define WM_SCRATCH_PATCH_LEFT_OFFSET    F_ram_0000_R          /* [00] left sprite OAM off (PatchSprites) */
+#define WM_SCRATCH_PATCH_RIGHT_OFFSET   F_ram_0001_R          /* [01] right sprite OAM off (PatchSprites) */
 
 /* Wallmaster tables (verbatim from NES Z_04.asm:4099-4119).
  *
@@ -191,10 +226,10 @@ static void wm_link_end_move_and_animate_bank4(void)
     unsigned char face = roomrom_main_current_link_face();
     roomrom_main_set_link_story_pose(x, y, face);
     roomrom_combat_animate_link_base();
-    if (RAM(0x04F0u) != 0u)
+    if (F_ram_04F0_R != 0u)
         roomrom_sprites_set_link_hurt_pose((short)x, (short)y,
             (link_face_t)face, (unsigned char)(WM_OBJ_ANIM_FRAME(0u) & 1u),
-            (unsigned char)RAM(0x04F0u));
+            (unsigned char)F_ram_04F0_R);
     else
         roomrom_sprites_set_link_pose((short)x, (short)y,
             (link_face_t)face, (unsigned char)(WM_OBJ_ANIM_FRAME(0u) & 1u));
@@ -204,6 +239,77 @@ static void wm_link_end_move_and_animate_bank4(void)
 #ifndef CARRY_SET
 #define CARRY_SET 0x10000u
 #endif
+
+/* NES source: CheckMonsterCollisions capture tail; UpdateLikeLike and
+ * UpdateWallmaster. Drained C: existing native bodies below.
+ * Coverage: PARTIAL explicit party capture/release; Stance: EXTEND.
+ * The enemy owns its one timer; the native role owns the captured body. */
+unsigned char enemy_capture_player(unsigned int slot)
+{
+    unsigned char player;
+    if (slot < 1u || slot > 11u || ENEMY_METASTATE(slot) != 0u ||
+        LIKELIKE_CAPTURE_TIMER(slot) == 0u ||
+        (ENEMY_TYPE(slot) != 0x17u && ENEMY_TYPE(slot) != 0x27u))
+        return PLAYER_REF_NONE;
+    player = G_OBJECT_PLAYER_REFS[slot].capture_player;
+    return player < g_player_count ? player : 0u; /* legacy P1 fixtures */
+}
+
+void enemy_capture_contact(unsigned int slot, unsigned char player)
+{
+    unsigned char type;
+    if (slot < 1u || slot > 11u || player >= g_player_count) return;
+    type = ENEMY_TYPE(slot);
+    if (type != 0x17u && type != 0x27u) return;
+    if (g_player_count > 1u && LIKELIKE_CAPTURE_TIMER(slot) != 0u) return;
+    LIKELIKE_CAPTURE_TIMER(slot)++;
+    if (g_player_count <= 1u) return; /* exact existing 1P timer owner */
+    G_OBJECT_PLAYER_REFS[slot].capture_player = player;
+    if (player == 0u) return; /* existing world updater seeds P1 */
+    if (type == 0x17u) {
+        ENEMY_X(slot) = ENEMY_X(0u);
+        ENEMY_Y(slot) = ENEMY_Y(0u);
+        ENEMY_MOVE_TIMER(0u) = 0u;
+        ENEMY_METASTATE(0u) = 0u;
+        LIKELIKE_OBJ_SHOVE_DIR(0u) = 0u;
+        LIKELIKE_OBJ_SHOVE_DIST(0u) = 0u;
+        ENEMY_DRAW_FRAME(slot) = 0u;
+        ENEMY_ANIM_TIMER(slot) = 4u;
+        LINK_PARALYZED_FLAG = 1u;
+        G_PLAYERS[player].paralyzed = 1u;
+    } else {
+        WM_OBJ_STATE(0u) = 0x40u;
+        WM_OBJ_SHOVE_DIR(0u) = 0u;
+    }
+}
+
+void enemy_capture_release(unsigned int slot)
+{
+    unsigned char player;
+    if (slot < 1u || slot > 11u) return;
+    player = G_OBJECT_PLAYER_REFS[slot].capture_player;
+    if (player >= g_player_count) player = 0u;
+    if (player == 0u) {
+        LINK_PARALYZED_FLAG = 0u;
+        /* Multiplayer rescue must release P1's Wallmaster halt too. */
+        if (g_player_count > 1u && WM_OBJ_STATE(0u) == 0x40u) WM_OBJ_STATE(0u) = 0u;
+        if (g_player_count > 1u && PLAYER(0u).state == 0x40u) PLAYER(0u).state = 0u;
+    } else {
+        G_PLAYERS[player].paralyzed = 0u;
+        if (PLAYER(player).state == 0x40u) PLAYER(player).state = 0u;
+    }
+    G_OBJECT_PLAYER_REFS[slot].capture_player = PLAYER_REF_NONE;
+}
+
+void enemy_capture_sync(void)
+{
+    unsigned char slot;
+    if (g_player_count <= 1u) return;
+    for (slot = 1u; slot <= 11u; ++slot)
+        if (G_OBJECT_PLAYER_REFS[slot].capture_player < g_player_count &&
+            enemy_capture_player(slot) == PLAYER_REF_NONE)
+            enemy_capture_release(slot);
+}
 
 /*--------------------------------------------------------------------
  * UpdateLikeLike (drained from Z_04.asm:6818)
@@ -280,7 +386,8 @@ void enrt_update_like_like(unsigned int slot)
         c_check_monster_collisions(slot);
         if ((unsigned char)ENEMY_METASTATE(slot) != 0u) {
             /* Monster died — release Link + hide over-Link sprites. */
-            LINK_PARALYZED_FLAG = 0u;
+            if (g_player_count > 1u) enemy_capture_release(slot);
+            else LINK_PARALYZED_FLAG = 0u;
             enemy_hide_sprites_over_link();
         }
         return;
@@ -502,10 +609,10 @@ draw_and_check:
      * Coverage: FULL(UsedFlute/timer/sign gate and native death handoff).
      * Stance: EXTEND the existing collision tail, preserving Original.
      * Redux runs this even when the clock or stun bypasses movement. */
-    if (game_profile_is_remix() && RAM(0x051Bu) != 0u) {
-        unsigned char timer = (unsigned char)OBJ(0x0028u, slot);
+    if (game_profile_is_remix() && F_ENEMY_USED_FLUTE_R != 0u) {
+        unsigned char timer = (unsigned char)F_ram_0028_O(slot);
         if (timer == 0u)
-            OBJ(0x0028u, slot) = 0xC3u;
+            F_ram_0028_O(slot) = 0xC3u;
         else if ((timer & 0x80u) == 0u)
             core_update_dead_dummy(slot);
     }
@@ -565,6 +672,28 @@ draw_and_check:
  * Link_EndMoveAndAnimate_Bank4 uses the native Link owner and drained
  * animation in the captured-Link branch (see helper above).
  *------------------------------------------------------------------*/
+/* The drained start-position leaf reads only facing/input from slot0.
+ * Adapt those two arguments for an extra target and restore P1 immediately. */
+static unsigned int wm_calc_for_player(unsigned char player, unsigned int table,
+                                       unsigned int major, unsigned int slot)
+{
+    unsigned int result;
+    unsigned char saved_dir, saved_input;
+    unsigned short held;
+    if (player == 0u) return enrt_wallmaster_calc_start_position(table, major, slot);
+    saved_dir = ENEMY_DIR(0u);
+    saved_input = WM_OBJ_INPUT_DIR;
+    held = input_state_held(player);
+    WM_OBJ_INPUT_DIR = (unsigned char)(((held & 8u) ? 1u : 0u) |
+        ((held & 4u) ? 2u : 0u) | ((held & 2u) ? 4u : 0u) | ((held & 1u) ? 8u : 0u));
+    ENEMY_DIR(0u) = PLAYER(player).face == LINK_FACE_UP ? 8u :
+        PLAYER(player).face == LINK_FACE_DOWN ? 4u : PLAYER(player).face == LINK_FACE_LEFT ? 2u : 1u;
+    result = enrt_wallmaster_calc_start_position(table, major, slot);
+    ENEMY_DIR(0u) = saved_dir;
+    WM_OBJ_INPUT_DIR = saved_input;
+    return result;
+}
+
 void enrt_update_wallmaster(unsigned int slot)
 {
     unsigned char link_x;
@@ -576,6 +705,7 @@ void enrt_update_wallmaster(unsigned int slot)
     unsigned char left_off;
     unsigned char right_off;
     unsigned char anim_frame;
+    unsigned char target = 0u;
 
     if ((unsigned char)WM_OBJ_STATE(slot) != 0u) {
         goto state1;
@@ -588,12 +718,24 @@ void enrt_update_wallmaster(unsigned int slot)
     /* NES: LDA ObjState / CMP #$40 / BNE @State0 -- a halted Link ($40)
      * holds them back (T-013: the test was inverted and no wallmaster
      * ever came out). */
-    if ((unsigned char)WM_OBJ_STATE(0u) == 0x40u) {
-        return;
+    if (g_player_count > 1u) {
+        for (target = 0u; target < g_player_count; ++target) {
+            const unsigned char state = target == 0u ? WM_OBJ_STATE(0u) : PLAYER(target).state;
+            const unsigned char paralyzed = target == 0u ? LINK_PARALYZED_FLAG : G_PLAYERS[target].paralyzed;
+            if (state == 0x40u || paralyzed) continue;
+            link_x = target == 0u ? ENEMY_X(0u) : (unsigned char)PLAYER(target).x;
+            link_y = target == 0u ? ENEMY_Y(0u) : (unsigned char)PLAYER(target).y;
+            if (((link_x == 0x20u || link_x == 0xD0u) && link_y >= 0x6Du && link_y < 0xB5u) ||
+                ((link_y == 0x5Du || link_y == 0xBDu) && link_x >= 0x29u && link_x < 0xC8u))
+                break;
+        }
+        if (target == g_player_count) return;
+        G_OBJECT_PLAYER_REFS[slot].target_player = target;
+    } else {
+        if ((unsigned char)WM_OBJ_STATE(0u) == 0x40u) return;
+        link_x = (unsigned char)ENEMY_X(0u);
+        link_y = (unsigned char)ENEMY_Y(0u);
     }
-
-    link_x = (unsigned char)ENEMY_X(0u);
-    link_y = (unsigned char)ENEMY_Y(0u);
 
     /* Out-of-corridor early-exit:
      *   if (link_x < $29 || link_x >= $C8) and (link_y < $6D || link_y >= $B5) -> exit.
@@ -613,7 +755,7 @@ void enrt_update_wallmaster(unsigned int slot)
         WM_SCRATCH_LINK_MINOR  = link_y;   /* [00] minor = Link Y */
         WM_SCRATCH_LINK_MAJOR  = link_x;   /* [01] major = Link X */
         WM_SCRATCH_INSTR_AXIS  = 0x08u;    /* [02] decreasing dir = up */
-        idx = enrt_wallmaster_calc_start_position(0x00u, 0x20u, slot);
+        idx = wm_calc_for_player(target, 0x00u, 0x20u, slot);
         ENEMY_Y(slot) = (uint8_t)WM_SCRATCH_INIT_MINOR_COORD;
         ENEMY_X(slot) = k_wallmaster_initial_xs[idx & 1u];
     } else {
@@ -624,7 +766,7 @@ void enrt_update_wallmaster(unsigned int slot)
         WM_SCRATCH_LINK_MINOR  = link_x;   /* [00] minor = Link X */
         WM_SCRATCH_LINK_MAJOR  = link_y;   /* [01] major = Link Y */
         WM_SCRATCH_INSTR_AXIS  = 0x02u;    /* [02] decreasing dir = left */
-        idx = enrt_wallmaster_calc_start_position(0x20u, 0x5Du, slot);
+        idx = wm_calc_for_player(target, 0x20u, 0x5Du, slot);
         ENEMY_Y(slot) = k_wallmaster_initial_ys[idx & 1u];
         ENEMY_X(slot) = (uint8_t)WM_SCRATCH_INIT_MINOR_COORD;
     }
@@ -660,7 +802,7 @@ state1:
      * scratch read by collision_get_colliding_tile_moving inside
      * MoveObject). object_move_object reads the dir from the slot's
      * cell directly; populate $0F for the collision probe path. */
-    RAM(0x000Fu) = (uint8_t)ENEMY_DIR(slot);
+    F_ram_000F_R = (uint8_t)ENEMY_DIR(slot);
     c_move_object((unsigned short)slot);
 
     {
@@ -687,7 +829,8 @@ state1:
         /* Link captured: hide sprites, force unfurl mode, reset Link/sub. */
         enemy_hide_sprites_over_link();
         WM_GAME_MODE        = 0x03u;
-        WM_OBJ_STATE(0u)    = 0u;
+        if (enemy_capture_player(slot) == 0u) WM_OBJ_STATE(0u) = 0u;
+        if (g_player_count > 1u) enemy_capture_release(slot);
         WM_IS_UPDATING_MODE = 0u;
         WM_GAME_SUBMODE     = 0u;
     }
@@ -744,11 +887,31 @@ patch_sprites:
     return;
 
 draw_with_captured_link:
+    /* NES source: captured-hand draw; user-requested multiplayer rescue.
+     * Drained C: existing weapon/death/capture release owners.
+     * Coverage: P1's weapon battery while another player is carried.
+     * Stance: EXTEND; an unrescued hand retains its original seven-tile trip. */
+    link_collision_check_wallmaster_rescue(slot);
+    if (g_player_count > 1u && ENEMY_METASTATE(slot) != 0u) {
+        enemy_capture_release(slot);
+        return;
+    }
     /* Reposition Link onto monster, retick/draw, then draw hand on top. */
-    ENEMY_X(0u) = (uint8_t)ENEMY_X(slot);
-    ENEMY_Y(0u) = (uint8_t)ENEMY_Y(slot);
-    wm_link_end_move_and_animate_bank4();
-    sprite_show_link_sprites_behind_horizontal_doors();
+    {
+        const unsigned char owner = enemy_capture_player(slot);
+        if (owner == 0u || owner == PLAYER_REF_NONE) {
+            ENEMY_X(0u) = (uint8_t)ENEMY_X(slot);
+            ENEMY_Y(0u) = (uint8_t)ENEMY_Y(slot);
+            wm_link_end_move_and_animate_bank4();
+            sprite_show_link_sprites_behind_horizontal_doors();
+        } else {
+            PLAYER(owner).x = ENEMY_X(slot);
+            PLAYER(owner).y = ENEMY_Y(slot);
+            roomrom_sprites_set_mp_link_pose(owner, PLAYER(owner).x, PLAYER(owner).y,
+                (link_face_t)PLAYER(owner).face, PLAYER(owner).anim_frame & 1u,
+                PLAYER(owner).invincibility_timer);
+        }
+    }
     enrt_wallmaster_prepare_to_draw(slot);
     WM_OBJ_ANIM_FRAME(slot) = 0x01u;        /* force closed hand */
     draw_object_not_mirrored_over_link(0x01u, slot);

@@ -18,6 +18,16 @@
  */
 #ifndef INVENTORY_RENDER_H
 #define INVENTORY_RENDER_H
+#include "../../state/loadout.h"
+
+/* T390: coordinates are the actor's NES play-space coordinates (the shared
+ * sprite renderer applies ROOMROM_PLAY_SPRITE_DY). Clear/present each UI poll.
+ * World sweeps capture+compose automatically; frozen1P calls draw explicitly. */
+void inventory_ring_clear_all(void);
+void inventory_ring_present(unsigned char player, short x, short y,
+    const LoadoutRing *ring, unsigned char b, unsigned char c, unsigned short owned);
+void inventory_ring_draw(void);
+void inventory_ring_capture(unsigned char captured_hand);
 
 void inventory_subscreen_enter(void);
 /* T-172: build the menu's static cells (both variants) ahead of the first pause. */
@@ -35,6 +45,12 @@ unsigned char inventory_subscreen_scrolled_out(void);
 unsigned char inventory_subscreen_menu_active(void);
 /* Drop the subscreen at once (GameMode 8 from the menu, T-013). */
 void inventory_subscreen_abort(void);
+/* T-256: 1 once after the Remix pause SAVE AND QUIT was confirmed. */
+unsigned char inventory_subscreen_take_quit(void);
+/* T-258 flute picker: requested (host opens the pause) / chosen (host
+ * closes it). */
+unsigned char inventory_subscreen_flute_pick_pending(void);
+unsigned char inventory_subscreen_take_flute_done(void);
 
 /* Phase 8: NES HUD B-item slot. Look up Genesis VRAM tile for given
  * cursor slot 0..8. Returns 0xFFFF if slot is unmapped (e.g. raft/ring

@@ -80,7 +80,21 @@ static const unsigned short s_heap_offsets[16] = {
 
 static unsigned char s_roomrom_map_id = ROOMROM_MAP_ORIGINAL;
 static unsigned char s_water_frame = 0xFFu;
-static unsigned char s_water_visible = 1u;
+static unsigned char s_water_phase = 0u; /* source selector, including dry ticks */
+/* Animated source tiles occupy two disjoint upload ranges. Gray extra
+ * copies belong to the second range (redux_graphics.py:extra_pairs[6:]). */
+static unsigned char s_water_banks = 3u;
+static unsigned char water_tile_banks(unsigned char tile)
+{
+    return (tile>=0x78u && tile<=0x83u)?1u:
+           (tile>=0x88u && tile<=0x99u)?2u:0u;
+}
+static void water_note_tile(unsigned char tile)
+{
+    const unsigned char banks=water_tile_banks(tile);
+    if(banks & (unsigned char)~s_water_banks)s_water_frame=0xFFu;
+    s_water_banks|=banks;
+}
 
 /* S5 collision: walkable metatile grid for the current OW room. Filled
  * during fill_plane_a; queried by main loop pre-step.
@@ -251,7 +265,7 @@ void roomrom_ow_room_render_load_palette(unsigned char room_id)
         static const unsigned char k_red[4]   = {0x0Fu, 0x0Fu, 0x1Cu, 0x16u};
         const unsigned char *row = k_red;
         unsigned char tile_type, tile_x, tile_y;
-        const unsigned char attrs_b = nes_ram[0x68FEu + room_id];
+        const unsigned char attrs_b = F_ram_68FE_X(room_id);
         roomrom_ow_room_tile_object(room_id, &tile_type, &tile_x, &tile_y);
         if (tile_type == 0x65u || (tile_type == 0x66u && (attrs_b & 1u)))
             row = k_ghost;
@@ -275,8 +289,8 @@ static unsigned char normalize_primary_tile(unsigned char raw, unsigned char roo
     if (raw >= 0xE5 && raw <= 0xEA) {
         unsigned char idx = (unsigned char)(raw - 0xE5);
         if (s_roomrom_map_id == ROOMROM_MAP_REDUX) {
-            const unsigned char attrs = nes_ram[0x6AFEu + room_id];
-            const unsigned char q2 = nes_ram[0x062Du + nes_ram[0x0016u]];
+            const unsigned char attrs = F_NES_SRAM_BASE_6AFE_X(room_id);
+            const unsigned char q2 = F_ram_062D_X(F_ram_0016);
             if ((attrs & 0x80u) ? q2 != 0u :
                 (attrs & 0x40u) ? q2 == 0u : 1u)
                 return s_tile_object_primary_ow_redux[idx];
@@ -319,11 +333,16 @@ static void water_bank_upload(unsigned short vram_addr, const unsigned char *src
         render_chr_upload(vram_addr, src, len);
 }
 
-/* NES source: Redux animate.asm:Hijack_HandleAnimation / Z_07:BeginUpdateWorld.
- * Drained C: src/oracle/world/world_runtime.c (no CHR animation consumer).
- * Coverage: PARTIAL (Original world fading adopted; Redux CHR hook missing).
- * Stance: EXTEND native world/render path using authenticated frame banks. */
-void roomrom_ow_room_render_animation_tick(void)
+static void water_transfer(unsigned short address,const unsigned char *data,
+                           unsigned short bytes,unsigned char immediate)
+{
+    if(immediate)render_chr_upload(address,data,bytes);
+    else water_bank_upload(address,data,bytes);
+}
+/* Source phase is independent of which banks the current room displays.
+ * Warm both banks before a scrolling room can expose either; a live tile
+ * mutation fills only its newly exposed range before publishing the tile. */
+static void water_upload_phase(unsigned char frame,unsigned char banks,unsigned char immediate)
 {
     static const unsigned char *const frames[4] = {
         core_redux_water0_chr, core_redux_water1_chr,
@@ -333,30 +352,41 @@ void roomrom_ow_room_render_animation_tick(void)
         core_redux_gray_water0_chr, core_redux_gray_water1_chr,
         core_redux_gray_water2_chr, core_redux_gray_water3_chr
     };
+    if(banks & 1u)
+        water_transfer((unsigned short)((ROOMROM_BG_TILE_BASE + bg_sparse_tile_lut[0x78][2]) * 32u),frames[frame],768u,immediate);
+    if(banks & 2u) {
+        water_transfer((unsigned short)((ROOMROM_BG_TILE_BASE + bg_sparse_tile_lut[0x88][2]) * 32u),frames[frame]+768u,1120u,immediate);
+        water_transfer((unsigned short)((ROOMROM_CORE_BG_EXTRA_TILE_BASE+6u)*32u),gray_frames[frame],128u,immediate);
+    }
+}
+
+/* NES source: Redux animate.asm:Hijack_HandleAnimation / Z_07:BeginUpdateWorld.
+ * Drained C: src/oracle/world/world_runtime.c (no CHR animation consumer).
+ * Coverage: PARTIAL (Original world fading adopted; Redux CHR hook missing).
+ * Stance: EXTEND native world/render path using authenticated frame banks. */
+void roomrom_ow_room_render_animation_tick(void)
+{
     unsigned char frame;
     if (!game_profile_is_remix()) return;
-    if (nes_ram[0x0010u] == 0u) {
-        frame = (unsigned char)((nes_ram[0x004Fu] >> 4) & 3u);
-        if (frame != s_water_frame && (!s_raw_tiles_stable || s_water_visible)) {
-            water_bank_upload((unsigned short)((ROOMROM_BG_TILE_BASE + bg_sparse_tile_lut[0x78][2]) * 32u),
-                              frames[frame], 768u);
-            water_bank_upload((unsigned short)((ROOMROM_BG_TILE_BASE + bg_sparse_tile_lut[0x88][2]) * 32u),
-                              frames[frame] + 768u, 1120u);
-            water_bank_upload((unsigned short)((ROOMROM_CORE_BG_EXTRA_TILE_BASE + 6u) * 32u),
-                              gray_frames[frame], 128u);
+    if (F_ram_0010 == 0u) {
+        frame = (unsigned char)((F_ram_004F >> 4) & 3u);
+        s_water_phase=frame;
+        const unsigned char banks=s_raw_tiles_stable?s_water_banks:3u;
+        if (frame != s_water_frame && banks) {
+            water_upload_phase(frame,banks,0u);
             s_water_frame = frame;
         }
         /* No displayed cell references this bank in dry rooms. Keep the
          * source timer running and force a fill when water becomes visible. */
-        if (s_raw_tiles_stable && !s_water_visible) s_water_frame = 0xFFu;
-        nes_ram[0x004Fu]++;
+        if (s_raw_tiles_stable && !s_water_banks) s_water_frame = 0xFFu;
+        F_ram_004F++;
     }
     /* Source lake-drain cadence follows the bank selection, including
      * the fully drained reset. No frame-counter substitution. */
-    if (nes_ram[0x051Au] != 0u) {
-        if (nes_ram[0x051Au] == 12u) nes_ram[0x004Fu] = 0u;
-        nes_ram[0x004Fu]++;
-        if (nes_ram[0x004Fu] == 4u) nes_ram[0x004Fu] = 15u;
+    if (F_ram_051A != 0u) {
+        if (F_ram_051A == 12u) F_ram_004F = 0u;
+        F_ram_004F++;
+        if (F_ram_004F == 4u) F_ram_004F = 15u;
     }
 }
 
@@ -532,7 +562,7 @@ void roomrom_cellar_render(void)
     const unsigned char *common = game_profile_is_remix() ?
         core_redux_common_chr : common_chr;
     const unsigned char *layout=rooms_dungeons+0x1800u+
-        ((nes_ram[0x69FEu+nes_ram[0xEBu]]&1u) ? 16u : 0u);
+        ((F_ram_69FE_X(F_ram_00EB_N2)&1u) ? 16u : 0u);
     unsigned char col,row,squares[11],i;
     static unsigned char patterns[64]; /* DMA source remains live through VBlank */
     for (i=0;i<64;++i) {
@@ -552,7 +582,7 @@ void roomrom_cellar_render(void)
                 unsigned char t=s_secondary_squares[base+j];
                 render_set_plane_a_word(x,(unsigned short)(ROOMROM_ROOM_FIRST_ROW+y),
                                         roomrom_cellar_tile_word(t));
-                nes_ram[NES_PLAY_AREA_BASE+x*NES_TILE_COL_STRIDE+y]=t;
+                F_NES_PLAY_AREA_BASE_6530_X2(x*NES_TILE_COL_STRIDE, y)=t;
             }
         }
     }
@@ -562,7 +592,7 @@ static unsigned char ow_layout_id(unsigned char room_id)
 {
     /* Z_05.asm:LayoutRoomOW reads the installed LevelBlockAttrsD. Quest 2
      * patches three entries after the base OW block is copied to SRAM. */
-    return nes_ram[0x69FEu + room_id] & 0x7Fu;
+    return F_ram_69FE_X2(room_id) & 0x7Fu;
 }
 
 static const unsigned char *ow_col_dirs(unsigned char room_id)
@@ -576,7 +606,7 @@ static const unsigned char *ow_col_dirs(unsigned char room_id)
 #define NES_OW_WORLD_FLAGS 0x067Fu
 static unsigned char ow_room_flags(unsigned char room_id)
 {
-    return nes_ram[NES_OW_WORLD_FLAGS + (room_id & 0x7Fu)];
+    return F_ram_067F_X((room_id & 0x7Fu));
 }
 
 /* LayoutRoomOW @LoopSquareOW secret substitution. In: square index `sq`.
@@ -633,7 +663,7 @@ static const ow_room_layout_t *ow_room_layout(unsigned char room_id)
     const unsigned char *col_dirs;
     unsigned char flags;
     unsigned char layout_id;
-    const unsigned char quest = nes_ram[0x062Du + nes_ram[0x0016u]];
+    const unsigned char quest = F_ram_062D_X(F_ram_0016);
     unsigned char col, row;
     unsigned char sqs[11];
     ow_room_layout_t *L = &s_layout_cache;
@@ -741,9 +771,9 @@ static void compute_metatile_col(unsigned char room_id,
      * roomrom_cave_room_render_fill_plane_a (CAVE_PALETTE_ROOM_ID $44
      * collides with real OW room $44, so we cannot gate on room_id). */
     unsigned char outer_pal = s_rendering_cave
-        ? 3u : (unsigned char)(nes_ram[0x687Eu + room_id] & 0x03u);
+        ? 3u : (unsigned char)(F_ram_687E_X2(room_id) & 0x03u);
     unsigned char inner_pal = s_rendering_cave
-        ? 2u : (unsigned char)(nes_ram[0x68FEu + room_id] & 0x03u);
+        ? 2u : (unsigned char)(F_ram_68FE_X(room_id) & 0x03u);
     const unsigned char *col_dirs = col_dirs_override
         ? col_dirs_override
         : ow_col_dirs(room_id);
@@ -975,16 +1005,12 @@ static void commit_fill_mapping(void)
      * Stance: EXTEND. Source bank switches cost no CHR copy; Genesis avoids
      * the2016-byte upload in rooms with no cells using those patterns. */
     unsigned char col, row;
-    s_water_visible = 0u;
-    for (col = 0u; col < ROOMROM_OW_RAW_TILE_COLS && !s_water_visible; ++col)
-        for (row = 0u; row < ROOMROM_OW_RAW_TILE_ROWS; ++row) {
-            const unsigned char tile = s_raw_tiles[col][row];
-            if ((tile >= 0x78u && tile <= 0x83u) ||
-                (tile >= 0x88u && tile <= 0x99u)) {
-                s_water_visible = 1u;
-                break;
-            }
-        }
+    const unsigned char previous_banks=s_water_banks;
+    s_water_banks = 0u;
+    for (col = 0u; col < ROOMROM_OW_RAW_TILE_COLS && s_water_banks!=3u; ++col)
+        for (row = 0u; row < ROOMROM_OW_RAW_TILE_ROWS; ++row)
+            s_water_banks|=water_tile_banks(s_raw_tiles[col][row]);
+    if(s_water_banks & (unsigned char)~previous_banks)s_water_frame=0xFFu;
     unsigned char c;
     for (c = 0u; c < 16u; ++c) s_act_dst_col[c] = s_fill_dst_col[c];
     s_act_row_base = s_fill_row_base;
@@ -1004,6 +1030,10 @@ unsigned char roomrom_ow_room_render_set_tile(unsigned char tile_col,
         tile_row >= ROOMROM_OW_RAW_TILE_ROWS) {
         return 0u;
     }
+    if(game_profile_is_remix() && F_ram_0010==0u) {
+        const unsigned char added=(unsigned char)(water_tile_banks(raw_tile)&~s_water_banks);
+        if(added)water_upload_phase(s_water_phase,added,1u);
+    }
     dst_col = s_act_dst_col[tile_col >> 1];
     saved_plane = s_target_plane;
     s_target_plane = s_act_plane;
@@ -1012,8 +1042,7 @@ unsigned char roomrom_ow_room_render_set_tile(unsigned char tile_col,
                   s_act_row_base, raw_tile, s_act_outer, s_act_inner);
     s_target_plane = saved_plane;
     s_raw_tiles[tile_col][tile_row] = raw_tile;
-    if ((raw_tile >= 0x78u && raw_tile <= 0x83u) ||
-        (raw_tile >= 0x88u && raw_tile <= 0x99u)) s_water_visible = 1u;
+    water_note_tile(raw_tile);
     if (((tile_col | tile_row) & 1u) == 0u) {
         s_walkable[dst_col & 0x0F][tile_row >> 1] = ow_walkable_primary(raw_tile);
     }
@@ -1169,6 +1198,8 @@ unsigned char roomrom_ow_room_render_is_stable(void)
  *   mark:  turns capture off and asserts stable. */
 void roomrom_ow_room_render_begin_full_fill(void)
 {
+    if(game_profile_is_remix() && F_ram_0010==0u)
+        water_upload_phase(s_water_phase,3u,0u);
     s_raw_tiles_stable = 0u;
     s_raw_tile_capture_active = 1u;
     /* The layout cache stays: its key holds the room's live world flags
@@ -1239,7 +1270,7 @@ void roomrom_ow_room_render_publish_play_area_tiles(void)
      * 4.2k instructions in the room-entry tick (two frames). */
     _Static_assert(NES_TILE_COL_STRIDE == ROOMROM_OW_RAW_TILE_ROWS,
                    "PlayAreaTiles column stride");
-    sgdk_memcpy(&nes_ram[NES_PLAY_AREA_BASE], s_raw_tiles,
+    sgdk_memcpy(&nes_ram[NES_PLAY_AREA_BASE], s_raw_tiles, /* native_ram bulk:src/game/world/render/ow_render.c:1242 */
                 (unsigned short)sizeof s_raw_tiles);
 }
 

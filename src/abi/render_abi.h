@@ -29,6 +29,8 @@ void render_set_plane_a_word(unsigned short col, unsigned short row,
  * on; render_plane_defer_flush writes them (NES NMI timing). */
 void render_plane_defer(unsigned char on);
 void render_plane_defer_flush(void);
+/* T-393: no deferred plane/window/SAT/startup work is waiting. */
+unsigned char render_present_idle(void);
 void render_set_plane_b_word(unsigned short col, unsigned short row,
                              unsigned short word);
 
@@ -43,7 +45,13 @@ void render_load_palette(unsigned short idx, const unsigned short *src);
 void render_chr_upload(unsigned short vram_addr,
                        const unsigned char *src,
                        unsigned short byte_count);
-/* Queue a VRAM word run for the next VBlank DMA; src (even, RAM) must
+/* Copy packed tile bytes into SGDK-owned DMA storage for the next VBlank.
+ * Even destination/count required; source may be reused immediately. Returns
+ * zero on allocation/queue failure so the caller can retain its immediate path. */
+unsigned char render_chr_queue_copy(unsigned short vram_addr,
+                                     const unsigned char *src,
+                                     unsigned short byte_count);
+/* Queue a VRAM word run for the next VBlank DMA; src (even, RAM or ROM) must
  * stay unchanged until then. Returns 0 when the queue is full. */
 unsigned char render_vram_queue_words(unsigned short vram_addr,
                                       const unsigned short *src,
@@ -113,6 +121,15 @@ void render_pause_scene_deferred(unsigned short menu_col,
 /* Publish the pause SAT cache and both scroll words at one VBlank boundary. */
 void render_pause_frame_deferred(unsigned short sat_base, short vertical,
                                  unsigned short sprite_count);
+/* T-257 pause map: Plane A/B horizontal scroll at the next VBlank. */
+void render_pause_hscroll_deferred(short horizontal);
+/* T-257: copy the paused HUD/room strip again (same columns/rows as the
+ * last render_pause_scene_deferred) at the next VBlank. */
+void render_pause_scene_recopy(void);
+/* T-257: Plane A menu column, and column/row the paused room strip is
+ * copied from (last render_pause_scene_deferred). */
+void render_pause_scene_cols(unsigned short *menu_col, unsigned short *room_col,
+                             unsigned short *room_row);
 
 /* Phase 12.2 SGDK-1 cleanup: VRAM word read. Used by src/game/dungeon/
  * uw_render for plane-readback during scroll diffs. Wraps the

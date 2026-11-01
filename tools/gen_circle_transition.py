@@ -7,6 +7,8 @@ No source-game art; standard library only. Run from any directory.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# PAL3[4]: reserved black; see tools/gen_startup_triangle.py.
+MASK_INDEX = 4
 
 
 def generate():
@@ -14,13 +16,13 @@ def generate():
     counts = []
     for frame in range(44):
         radius = frame * 8
-        patterns = [(0xffffffff,) * 8]
+        patterns = [(0x44444444,) * 8]
         indices = {patterns[0]: 0}
         cells = []
         for ty in range(64):
             for tx in range(64):
                 pixels = [[0 if (2*(tx*8+x)-511)**2 + (2*(ty*8+y)-511)**2 <= (radius*2)**2
-                           and radius else 15 for x in range(8)] for y in range(8)]
+                           and radius else MASK_INDEX for x in range(8)] for y in range(8)]
                 variants = []
                 for flip in range(4):
                     rows = pixels[::-1] if flip & 2 else pixels

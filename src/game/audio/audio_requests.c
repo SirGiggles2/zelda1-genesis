@@ -1,6 +1,7 @@
 #include "audio_requests.h"
 #include "platform_abi.h"
 #include "../../abi/audio_abi.h"
+#include "../../state/game_profile.h"
 
 /* T-127: NES sound requests -> Genesis PCM, the only place gameplay sound
  * is started.
@@ -19,9 +20,12 @@
  * sword/arrow/flame/bomb/sea 72..76 (tools/audio/synth_noise_sfx.py),
  * Tune0 bits 0..6 = 77..83 and Tune1 bits 0..7 = 84..91
  * (tools/audio/synth_square_sfx.py). NES has one hardware channel per
- * source; XGM gives SFX three (CH1 plays the music's drum samples):
- * noise effects CH3, Tune0 CH4, Tune1 CH2 shared with the DMC samples
- * (latest wins). A monster kill requests Tune0 $02 and Tune1 $20 in the
+ * source. XGM has four PCM voices; Original reserves CH1 for music drums:
+ * noise effects CH3, Tune0 CH4, Tune1 CH2. Original retains its DMC/CH2
+ * sharing. Redux gives DMC CH1 so a door's independent DMC cannot truncate
+ * the push-block secret tune on CH2. DMC priority8 briefly preempts music
+ * percussion (XGM priorities0..3); later music commands resume normally.
+ * A monster kill requests Tune0 $02 and Tune1 $20 in the
  * same frame; both are heard, as on NES. */
 #define NES_SAMPLE_REQUEST 0x0601u
 #define NES_TUNE1_REQUEST  0x0602u
@@ -39,6 +43,7 @@ static const unsigned char k_effect_frames[6] = { 0x0Au, 0x05u, 0x20u, 0x38u, 0x
 /* Tune lengths in frames (sfx_pcm_tunes.c sfx_pcm_tune_frames). */
 extern const unsigned short sfx_pcm_tune_frames[];
 
+static unsigned char s_sample_id, s_sample_channel;
 static unsigned char s_effect, s_effect_frames;
 static unsigned char s_tune0, s_tune1;          /* playing request bit, 0 = none */
 static unsigned short s_tune0_frames, s_tune1_frames;
@@ -67,11 +72,21 @@ void audio_requests_silence_tunes(void)
 
 static void drive_sample(void)
 {
-    unsigned char req = nes_ram[NES_SAMPLE_REQUEST];
+    unsigned char req = F_ram_0601_N;
     if (req == 0u) return;
-    nes_ram[NES_SAMPLE_REQUEST] = 0u;
+    F_ram_0601_N = 0u;
     req &= 0x7Fu;
-    if (req) audio_pcm_play((unsigned char)(64u + lowest_bit(req)), 8u, CH_SAMPLE);
+    if (req) {
+        /* NES source: DriveSample and DriveTune1 are independent voices.
+         * Drained C: this consumer; Coverage: PARTIAL(Redux PCM routing).
+         * Stance: EXTEND, retaining Original and same-source replacement. */
+        unsigned char channel=game_profile_is_remix() ? 1u : CH_SAMPLE;
+        unsigned char id=(unsigned char)(64u + lowest_bit(req));
+        if(s_sample_id && s_sample_channel!=channel)
+            audio_pcm_stop(s_sample_id,s_sample_channel);
+        audio_pcm_play(id,8u,channel);
+        s_sample_id=id;s_sample_channel=channel;
+    }
 }
 
 static void start_effect(unsigned char i)
@@ -83,9 +98,9 @@ static void start_effect(unsigned char i)
 
 static void drive_effect(void)
 {
-    unsigned char req = nes_ram[NES_EFFECT_REQUEST];
+    unsigned char req = F_ram_0603_N;
     unsigned char i;
-    nes_ram[NES_EFFECT_REQUEST] = 0u;
+    F_ram_0603_N = 0u;
     if (req & 0x80u) { s_effect = 0u; return; }
     for (i = 0u; i < 5u; ++i) {
         unsigned char bit = (unsigned char)(1u << i);
@@ -104,14 +119,20 @@ static void drive_effect(void)
 
 static void drive_tunes(void)
 {
-    unsigned char r0 = nes_ram[NES_TUNE0_REQUEST];
-    unsigned char r1 = nes_ram[NES_TUNE1_REQUEST];
-    nes_ram[NES_TUNE0_REQUEST] = 0u;
-    nes_ram[NES_TUNE1_REQUEST] = 0u;
+    unsigned char r0 = F_ram_0604_N;
+    unsigned char r1 = F_ram_0602_N2;
+    F_ram_0604_N = 0u;
+    F_ram_0602_N2 = 0u;
 
     /* Tune1 (square 1). */
     if (r1 != 0u) {
-        unsigned char b = lowest_bit(r1);          /* $80 -> bit 7 (Link dying) */
+        /* NES @SilenceThenPlay forces $80 even when lower bits are set. */
+        unsigned char b = (r1 & 0x80u) ? 7u : lowest_bit(r1);
+        /* NES source: Z_00.asm:DriveTune1 @SilenceThenPlay/SilenceSong.
+         * Drained C: existing drive_tunes; Coverage: FULL; Stance: EXTEND.
+         * Silence the song before starting the death PCM. This request
+         * belongs to this NMI consumer, never the legacy VBlank poll. */
+        if (r1 & 0x80u) audio_music_play(0u);
         s_tune1 = (unsigned char)(1u << b);
         s_tune1_frames = sfx_pcm_tune_frames[7u + b];
         audio_pcm_play((unsigned char)(84u + b), 8u, CH_TUNE1);

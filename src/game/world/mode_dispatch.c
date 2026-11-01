@@ -22,7 +22,7 @@
 #include "platform_abi.h"
 
 /* NES Variables.inc GameMode := $12. */
-#define MODE_DISPATCH_GAME_MODE RAM(0x0012u)
+#define MODE_DISPATCH_GAME_MODE F_ram_0012_R
 
 /* Forward decls for not-yet-drained mode bodies. Each stub returns
  * without state change so caller's loop continues. Bodies port per

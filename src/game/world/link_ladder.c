@@ -5,6 +5,7 @@
 #include "../core/core_dispatch.h"          /* core_destroy_monster, core_abs,
                                              * core_get_opposite_dir */
 #include "../../state/nes_ram_sync.h"        /* nes_ram_sync_link_face */
+#include "../../state/player_state.h"
 
 /* See link_ladder.h for the NES source map (T-056). */
 #define TMP_00              0x0000u
@@ -45,36 +46,46 @@ static const unsigned char k_ladder_rooms_ow[6] = {
  * tick that skips the object phase cannot leak the draw into the next. */
 static unsigned char s_draw_pending;
 static unsigned char s_draw_frame;
+static unsigned char s_ladder_player;
 #define FRAME_COUNTER       0x0015u
+
+/* NES source: CheckLadder -> LadderSlot and deferred DrawLadder.
+ * Drained C: existing end-move/check/draw implementation below.
+ * Coverage: PARTIAL independent party ladders; source rules unchanged.
+ * Stance: EXTEND caller/owner selection and derived draw requests. */
+void link_ladder_set_player(unsigned char player)
+{
+    s_ladder_player = player < PLAYER_MAX_COUNT ? player : 0u;
+}
 
 void link_ladder_end_move(void)
 {
     unsigned char gm, tile, x, in, y;
 
-    if (nes_ram[WHIRLWIND_TELEPORT] != 0u) return;
+    if (F_ram_0522_N != 0u) return;
     /* Modes 4 and 6 and below 5 go to @CheckWarps; the ladder only
      * applies at @CheckLadderRoom in mode 5. Grid truncation
      * (@TruncGridOffset) is done by the Genesis mover before this. */
-    gm = nes_ram[GAME_MODE];
+    gm = F_ram_0012_N3;
     if (gm != 0x05u) return;
-    if (nes_ram[OBJ_GRID_OFFSET] != 0u) return;
-    if (nes_ram[CUR_LEVEL] == 0u) {
+    if (F_ram_0394_N != 0u) return;
+    if (F_ram_0010_N3 == 0u) {
         signed char i;
         for (i = 5; i >= 0; --i)
-            if (nes_ram[ROOM_ID] == k_ladder_rooms_ow[i]) break;
+            if (F_ram_00EB_N == k_ladder_rooms_ow[i]) break;
         if (i < 0) return;
     }
-    if (nes_ram[DOORWAY_DIR] != 0u) return;
-    if (nes_ram[INV_LADDER] == 0u) return;
-    if ((nes_ram[OBJ_STATE] & 0xC0u) == 0x40u) return;
-    if (nes_ram[LADDER_SLOT] != 0u) return;
+    if (F_ram_0053_N != 0u) return;
+    if (F_ram_0663_N == 0u) return;
+    if ((F_ram_00AC_N & 0xC0u) == 0x40u) return;
+    if (F_ram_0064_N != 0u) return;
 
     /* ObjDir is Link's facing at this point of the NES frame; the Genesis
      * mirrors it into $98 in the object phase, so take it now. */
     nes_ram_sync_link_face();
-    nes_ram[TMP_0F] = nes_ram[OBJ_DIR];
+    F_ram_000F_N = F_ram_0098_N5;
     tile = collision_get_colliding_tile_moving(0u);
-    if (nes_ram[CUR_LEVEL] != 0u) {
+    if (F_ram_0010_N3 != 0u) {
         if (tile != 0xF4u) return;
     } else {
         if (tile < 0x8Du || tile >= 0x99u) return;
@@ -82,54 +93,54 @@ void link_ladder_end_move(void)
 
     /* @SetUpLadder: FindEmptyMonsterSlot ($B..1, ObjType 0). */
     for (x = 0x0Bu; x != 0u; --x)
-        if (nes_ram[OBJ_TYPE + x] == 0u) break;
+        if (F_ram_034F_X(x) == 0u) break;
     if (x == 0u) return;
-    nes_ram[EMPTY_MONSTER_SLOT] = x;
-    in = nes_ram[OBJ_INPUT_DIR];
+    F_ram_0059_N = x;
+    in = F_ram_03F8_N;
     if (in == 0u) return;
-    if (in != nes_ram[OBJ_DIR]) return;
+    if (in != F_ram_0098_N5) return;
 
-    nes_ram[LADDER_SLOT] = x;
-    nes_ram[OBJ_DIR + x] = in;
+    F_ram_0064_N = x;
+    F_ram_0098_X2(x) = in;
     y = (unsigned char)(core_get_opposite_dir(in) >> 8);   /* in != 0: 0..3 */
-    nes_ram[OBJ_X + x] = (unsigned char)(nes_ram[OBJ_X] + k_ladder_dx[y & 3u]);
-    nes_ram[OBJ_Y + x] = (unsigned char)(nes_ram[OBJ_Y] + k_ladder_dy[y & 3u]);
-    nes_ram[OBJ_TYPE + x] = LADDER_OBJ_TYPE;
-    nes_ram[OBJ_SHOVE_DIR + x] = 0u;           /* ResetShoveInfo */
-    nes_ram[OBJ_SHOVE_DIST + x] = 0u;
-    nes_ram[OBJ_INVINCIBILITY + x] = 0u;
-    nes_ram[OBJ_STATE + x] = 1u;
+    F_ram_0070_X(x) = (unsigned char)(F_ram_0070_N + k_ladder_dx[y & 3u]);
+    F_ram_0084_X(x) = (unsigned char)(F_ram_0084_N + k_ladder_dy[y & 3u]);
+    F_ram_034F_X(x) = LADDER_OBJ_TYPE;
+    F_ram_00C0_X(x) = 0u;           /* ResetShoveInfo */
+    F_ram_00D3_X(x) = 0u;
+    F_ram_04F0_X(x) = 0u;
+    F_ram_00AC_X(x) = 1u;
 }
 
 unsigned char link_ladder_check(void)
 {
-    unsigned char x = nes_ram[LADDER_SLOT];
+    unsigned char x = F_ram_0064_N;
     unsigned char a, d;
 
-    s_draw_pending = 0u;
+    s_draw_pending &= (unsigned char)~(1u << s_ladder_player);
     if (x == 0u) return 0u;
-    if (nes_ram[OBJ_STATE + x] == 0u) goto stash;
+    if (F_ram_00AC_X(x) == 0u) goto stash;
 
-    if (nes_ram[OBJ_DIR + x] & 0x0Cu) {
-        if (nes_ram[OBJ_X] != nes_ram[OBJ_X + x]) goto stash;
-        a = (unsigned char)((unsigned char)(nes_ram[OBJ_Y] + 3u) - nes_ram[OBJ_Y + x]);
+    if (F_ram_0098_X2(x) & 0x0Cu) {
+        if (F_ram_0070_N != F_ram_0070_X(x)) goto stash;
+        a = (unsigned char)((unsigned char)(F_ram_0084_N + 3u) - F_ram_0084_X(x));
     } else {
-        if ((unsigned char)(nes_ram[OBJ_Y] + 3u) != nes_ram[OBJ_Y + x]) goto stash;
-        a = (unsigned char)(nes_ram[OBJ_X] - nes_ram[OBJ_X + x]);
+        if ((unsigned char)(F_ram_0084_N + 3u) != F_ram_0084_X(x)) goto stash;
+        a = (unsigned char)(F_ram_0070_N - F_ram_0070_X(x));
     }
     /* @CheckDistanceToLadder: [00] = |distance|. */
     d = core_abs(a);
-    nes_ram[TMP_00] = d;
+    F_ram_0000_N = d;
     if (d < 0x10u) {
-        nes_ram[OBJ_STATE + x] = 2u;            /* @SetState2 */
+        F_ram_00AC_X(x) = 2u;            /* @SetState2 */
         goto handle_input;
     }
     if (d != 0x10u) goto stash;
-    if (nes_ram[OBJ_DIR] != nes_ram[OBJ_DIR + x]) goto stash;
-    if (nes_ram[OBJ_STATE + x] == 1u) goto handle_input;
+    if (F_ram_0098_N5 != F_ram_0098_X2(x)) goto stash;
+    if (F_ram_00AC_X(x) == 1u) goto handle_input;
 
 stash:
-    nes_ram[LADDER_SLOT] = 0u;
+    F_ram_0064_N = 0u;
     core_destroy_monster(x);
     /* CheckLadder returns with NES X still selecting the destroyed ladder.
      * Walker_Move falls through to MoveObject with that slot, not Link. */
@@ -140,33 +151,33 @@ handle_input:
      * Link there and loops: ObjDir,X then reads Link's direction). */
     for (;;) {
         unsigned char opp;
-        a = nes_ram[OBJ_INPUT_DIR];
+        a = F_ram_03F8_N;
         if (a == 0u) break;                     /* draw, [0F] = 0 */
-        a = nes_ram[OBJ_DIR];
+        a = F_ram_0098_N5;
         /* A. Off the ladder centre, facing its way: keep Link's dir. */
-        if (nes_ram[TMP_00] != 0u && a == nes_ram[OBJ_DIR + x]) break;
+        if (F_ram_0000_N != 0u && a == F_ram_0098_X2(x)) break;
         /* B. Moving the ladder's way. */
-        a = nes_ram[OBJ_DIR + x];
-        if (a == nes_ram[TMP_0F]) break;
+        a = F_ram_0098_X2(x);
+        if (a == F_ram_000F_N) break;
         /* C. Facing back where the ladder came from. */
         opp = (unsigned char)core_get_opposite_dir(a);
         a = opp;
-        if (a == nes_ram[OBJ_DIR]) break;
+        if (a == F_ram_0098_N5) break;
         /* D/E. Ladder up and input up: test the tile 8 px higher. */
-        if (opp != 0x04u || nes_ram[OBJ_INPUT_DIR] != 0x08u) {
+        if (opp != 0x04u || F_ram_03F8_N != 0x08u) {
             a = 0u;
             break;
         }
-        nes_ram[TMP_0F] = 0x08u;                /* SetMovingDirAndSwitchToPlayerSlot */
+        F_ram_000F_N = 0x08u;                /* SetMovingDirAndSwitchToPlayerSlot */
         x = 0u;
         {
-            const unsigned char saved_y = nes_ram[OBJ_Y];
-            nes_ram[OBJ_Y] = (unsigned char)(saved_y - 8u);
+            const unsigned char saved_y = F_ram_0084_N;
+            F_ram_0084_N = (unsigned char)(saved_y - 8u);
             (void)collision_get_colliding_tile_moving(0u);
-            nes_ram[OBJ_Y] = saved_y;
+            F_ram_0084_N = saved_y;
         }
-        a = nes_ram[TMP_0F];
-        if (nes_ram[OBJ_COLLIDED_TILE] >= nes_ram[FIRST_UNWALKABLE]) {
+        a = F_ram_000F_N;
+        if (F_ram_049E_N >= F_ram_034A_N) {
             a = 0u;
             break;
         }
@@ -175,26 +186,41 @@ handle_input:
 
     /* @DrawLadder (deferred, link_ladder_draw), then
      * SetMovingDirAndSwitchToPlayerSlot. */
-    s_draw_pending = 1u;
-    s_draw_frame = nes_ram[FRAME_COUNTER];
-    nes_ram[TMP_0F] = a;
+    s_draw_pending |= (unsigned char)(1u << s_ladder_player);
+    s_draw_frame = F_ram_0015_N4;
+    F_ram_000F_N = a;
     return 0u;
+}
+
+static void draw_ladder_slot(unsigned char x)
+{
+    unsigned char saved_cur;
+    if (x == 0u) return;
+    saved_cur = F_ram_0340_N;
+    F_ram_0340_N = x;                 /* Genesis cache owner */
+    /* Anim_FetchObjPosForSpriteDescriptor. */
+    F_ram_0000_N = F_ram_0070_X(x);
+    F_ram_0001_N = F_ram_0084_X(x);
+    F_ram_000F_N = 0u;
+    draw_static_item_sprites(0u, x, LADDER_ITEM_SLOT);
+    F_ram_0340_N = saved_cur;
 }
 
 void link_ladder_draw(void)
 {
-    unsigned char x, saved_cur;
-    if (!s_draw_pending) return;
+    const unsigned char pending = s_draw_pending;
+    unsigned char player, i, saved_scratch[16];
+    if (!pending) return;
     s_draw_pending = 0u;
-    if (s_draw_frame != nes_ram[FRAME_COUNTER]) return;
-    x = nes_ram[LADDER_SLOT];
-    if (x == 0u) return;
-    saved_cur = nes_ram[CUR_OBJ_INDEX];
-    nes_ram[CUR_OBJ_INDEX] = x;                 /* Genesis cache owner */
-    /* Anim_FetchObjPosForSpriteDescriptor. */
-    nes_ram[TMP_00] = nes_ram[OBJ_X + x];
-    nes_ram[TMP_01] = nes_ram[OBJ_Y + x];
-    nes_ram[TMP_0F] = 0u;
-    draw_static_item_sprites(0u, x, LADDER_ITEM_SLOT);
-    nes_ram[CUR_OBJ_INDEX] = saved_cur;
+    if (s_draw_frame != F_ram_0015_N4) return;
+    if (pending & 1u) draw_ladder_slot(F_ram_0064_N);
+    if (g_player_count <= 1u || (pending & 0x0Eu) == 0u) return;
+    /* Additional presentation cannot change the source P1 scratch result. */
+    for (i = 0u; i < 16u; ++i) saved_scratch[i] = nes_ram[i];
+    for (player = 1u; player < g_player_count; ++player) {
+        const unsigned char slot = G_PLAYERS[player].ladder_slot;
+        if ((pending & (1u << player)) && slot != 0u &&
+            F_ram_034F_X(slot) == LADDER_OBJ_TYPE) draw_ladder_slot(slot);
+    }
+    for (i = 0u; i < 16u; ++i) nes_ram[i] = saved_scratch[i];
 }

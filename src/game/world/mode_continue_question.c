@@ -33,18 +33,18 @@
                                         room_clear_room_history */
 
 /* NES Variables.inc. */
-#define M8_IS_UPDATING_MODE   RAM(0x0011u)
-#define M8_GAME_MODE          RAM(0x0012u)
-#define M8_GAME_SUBMODE       RAM(0x0013u)
-#define M8_TILE_BUF_SELECTOR  RAM(0x0014u)
-#define M8_OBJ_TIMER_1        RAM(0x0029u)   /* ObjTimer+1 */
-#define M8_UNDERGROUND_EXIT   RAM(0x005Au)
-#define M8_OBJ_STATE          RAM(0x00ACu)   /* ObjState (Link) */
-#define M8_BUTTONS_PRESSED    RAM(0x00F8u)
-#define M8_TUNE0_REQUEST      RAM(0x0604u)
-#define M8_INV_CLOCK          RAM(0x066Cu)
-#define M8_HEART_VALUES       RAM(0x066Fu)
-#define M8_HEART_PARTIAL      RAM(0x0670u)
+#define M8_IS_UPDATING_MODE   F_ram_0011_R
+#define M8_GAME_MODE          F_ram_0012_R
+#define M8_GAME_SUBMODE       F_ram_0013_R
+#define M8_TILE_BUF_SELECTOR  F_ram_0014_R
+#define M8_OBJ_TIMER_1        F_ram_0029_R   /* ObjTimer+1 */
+#define M8_UNDERGROUND_EXIT   F_ram_005A_R
+#define M8_OBJ_STATE          F_ram_00AC_R   /* ObjState (Link) */
+#define M8_BUTTONS_PRESSED    F_ram_00F8_R
+#define M8_TUNE0_REQUEST      F_ram_0604_R
+#define M8_INV_CLOCK          F_ram_066C_R
+#define M8_HEART_VALUES       F_ram_066F_R
+#define M8_HEART_PARTIAL      F_ram_0670_R
 #define M8_SPRITES            0x0200u        /* Sprites (OAM shadow) */
 #define M8_DYN_TILE_BUF       0x0302u        /* DynTileBuf */
 
@@ -134,10 +134,10 @@ static void init_mode8(void)
 
 static void draw_cursor(void)
 {
-    RAM(M8_SPRITES + 1u) = k_base_sprite_values[0];
-    RAM(M8_SPRITES + 2u) = k_base_sprite_values[1];
-    RAM(M8_SPRITES + 3u) = game_profile_is_remix() ? core_redux_caution_params[0] : k_base_sprite_values[2];
-    RAM(M8_SPRITES + 0u) = game_profile_is_remix() ? core_redux_caution_params[1u+M8_GAME_SUBMODE] : k_sprite_ys[M8_GAME_SUBMODE];
+    F_ram_0201_R = k_base_sprite_values[0];
+    F_ram_0202_R = k_base_sprite_values[1];
+    F_ram_0203_R = game_profile_is_remix() ? core_redux_caution_params[0] : k_base_sprite_values[2];
+    F_ram_0200_R = game_profile_is_remix() ? core_redux_caution_params[1u+M8_GAME_SUBMODE] : k_sprite_ys[M8_GAME_SUBMODE];
     roomrom_mode8_cursor();
 }
 
@@ -164,6 +164,14 @@ static void handle_activated(void)
     (void)core_silence_all_sound();              /* shared RAM/native reset */
 }
 
+/* T-256: the Remix pause SAVE AND QUIT takes the same exit as choosing
+ * Save here (sel 1): mode $0D saves, then the file menus. */
+void mode8_continue_question_commit(unsigned char sel)
+{
+    M8_GAME_SUBMODE = (unsigned char)(sel & 0x03u);
+    handle_activated();
+}
+
 static void animate_selection(void)
 {
     unsigned char i, sel, attr;
@@ -171,11 +179,11 @@ static void animate_selection(void)
         handle_activated();
         return;
     }
-    for (i = 0u; i < 5u; ++i) RAM(M8_DYN_TILE_BUF + i) = k_flash_record[i];
+    for (i = 0u; i < 5u; ++i) F_ram_0302_R4(i) = k_flash_record[i];
     sel = (unsigned char)(M8_GAME_SUBMODE & 0x03u);
-    RAM(M8_DYN_TILE_BUF + 1u) = game_profile_is_remix() ? core_redux_caution_params[4u+sel] : k_flash_attrs_lo[sel];
+    F_M8_DYN_TILE_BUF_0303_R = game_profile_is_remix() ? core_redux_caution_params[4u+sel] : k_flash_attrs_lo[sel];
     attr = (M8_OBJ_TIMER_1 & 0x04u) ? (game_profile_is_remix() ? core_redux_caution_params[7u+sel] : 0x55u) : 0x00u;
-    RAM(M8_DYN_TILE_BUF + 3u) = attr;
+    F_M8_DYN_TILE_BUF_0305_R = attr;
     /* The NES transfers the record at the next NMI: recolour then. */
     render_plane_defer(1u);
     draw_selection(sel, attr ? 1u : 0u);

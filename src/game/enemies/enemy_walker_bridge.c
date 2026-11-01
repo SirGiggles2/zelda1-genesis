@@ -112,19 +112,19 @@ __attribute__((always_inline)) void c_walker_move(unsigned int slot)
      * ObjShoveDistance frames. Wired 2026-05-18 — c_obj_shove drained
      * at c_shims.asm:4447 + linked. Without this, knockback frames
      * collapsed to no-op and walkers kept moving through hit-react. */
-    if (OBJ(NES_OBJ_SHOVE_DIR, slot) != 0u) {
+    if (F_ram_00C0_O2(slot) != 0u) {
         c_obj_shove(slot);
         return;
     }
 
     /* Step 2 — CheckStunned (non-Link path). */
-    if ((RAM(NES_INV_CLOCK) | OBJ(NES_OBJ_STUN_TIMER, slot)) != 0u) {
+    if ((F_ram_066C_R2 | F_NES_OBJ_STUN_TIMER_O(slot)) != 0u) {
         return;
     }
 
     /* Step 3 — FilterInput. ObjInputDir(slot) was seeded by
      * enrt_update_rope from ENEMY_DIR(slot) before the call. */
-    unsigned char input = (unsigned char)OBJ(NES_OBJ_INPUT_DIR, slot);
+    unsigned char input = (unsigned char)F_ram_03F8_O(slot);
     unsigned char dir;
     if (input == 0u) {
         dir = 0u;
@@ -145,11 +145,11 @@ __attribute__((always_inline)) void c_walker_move(unsigned int slot)
     }
 
     /* Step 4 — SetMovingDir. NES masks low nibble into $0F. */
-    RAM(NES_OBJ_DIR) = (unsigned char)(dir & 0x0Fu);
+    F_ram_000F_R2 = (unsigned char)(dir & 0x0Fu);
 
     /* NES sets $0E = 0 (doorway scratch). Walker_CheckTileCollision
      * branch uses this; safe to clear unconditionally. */
-    RAM(NES_SHOT_COLLISION_FLAG) = 0u;
+    F_ram_000E_R = 0u;
 
     /* Step 5 — CheckBoundary. object_bound_by_room reads NES_OBJ_DIR,
      * runs both H/V bound tests, and returns the post-test DIR (0 if
@@ -241,11 +241,11 @@ unsigned char z01_abs(unsigned int val)
  * (NES uses ObjY = (Y & $F8) | 5 for top-left alignment). */
 static void shove_ensure_object_aligned(unsigned int slot)
 {
-    if (OBJ(NES_OBJ_GRID_OFFSET, slot) != 0u)
+    if (F_ram_0394_O(slot) != 0u)
         return;
-    OBJ(NES_OBJ_X, slot) = (unsigned char)(OBJ(NES_OBJ_X, slot) & 0xF8u);
-    OBJ(NES_OBJ_Y, slot) =
-        (unsigned char)((OBJ(NES_OBJ_Y, slot) & 0xF8u) | 0x05u);
+    F_ram_0070_O2(slot) = (unsigned char)(F_ram_0070_O2(slot) & 0xF8u);
+    F_ram_0084_O2(slot) =
+        (unsigned char)((F_ram_0084_O2(slot) & 0xF8u) | 0x05u);
 }
 
 /* Helper: NES CheckPersonBlocking (Z_01.asm:3108). Reads Link's Y;
@@ -255,9 +255,9 @@ static void shove_ensure_object_aligned(unsigned int slot)
 static void shove_check_person_blocking(void)
 {
     /* NES uses absolute ObjY (slot 0 = Link). */
-    if (OBJ(NES_OBJ_Y, 0u) >= 0x8Eu)
+    if (F_ram_0084_O2(0u) >= 0x8Eu)
         return;                           /* Link too low; not blocking */
-    if ((RAM(NES_LINK_MOVING_DIR) & 0x08u) == 0u)
+    if ((F_ram_000F_R3 & 0x08u) == 0u)
         return;                           /* not moving up */
     (void)core_reset_moving_dir();        /* clears $0F */
 }
@@ -280,13 +280,13 @@ void c_obj_shove(unsigned int slot)
      * $02 = +1/-1 delta for the moved axis.
      */
 
-    unsigned char shove_dir = (unsigned char)OBJ(NES_OBJ_SHOVE_DIR, slot);
+    unsigned char shove_dir = (unsigned char)F_ram_00C0_O2(slot);
 
     /* ASL on shove_dir: bit-7 was the "init" flag. */
     if ((shove_dir & 0x80u) != 0u) {
         /* @InitPhase — clear high bit, then check perpendicular. */
         unsigned char dir_low = (unsigned char)(shove_dir & 0x7Fu);
-        OBJ(NES_OBJ_SHOVE_DIR, slot) = dir_low;
+        F_ram_00C0_O2(slot) = dir_low;
 
         unsigned char obj_dir = (unsigned char)ENEMY_DIR(slot);
         if (obj_dir < 0x03u) {
@@ -300,57 +300,57 @@ void c_obj_shove(unsigned int slot)
         }
 
         /* @CheckPerpendicularShove */
-        if (OBJ(NES_OBJ_GRID_OFFSET, slot) == 0u)
+        if (F_ram_0394_O(slot) == 0u)
             return;                      /* aligned -> allow it */
         if (slot != 0u) {
             /* not Link -> ResetShoveInfo */
-            OBJ(NES_OBJ_SHOVE_DIR, slot)  = 0u;
-            OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) = 0u;
+            F_ram_00C0_O2(slot)  = 0u;
+            F_ram_00D3_O2(slot) = 0u;
             return;
         }
         /* Link: bounce shove backward (opposite of facing). NES uses
          * absolute addresses ObjDir + ObjShoveDir (slot 0). */
         {
             unsigned int packed = core_get_opposite_dir((unsigned int)ENEMY_DIR(0u));
-            OBJ(NES_OBJ_SHOVE_DIR_BASE, 0u) = (unsigned char)(packed & 0xFFu);
+            F_ram_00C0_O3(0u) = (unsigned char)(packed & 0xFFu);
         }
         return;
     }
 
     /* @MoveIfNotDone */
-    if (OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) == 0u) {
+    if (F_ram_00D3_O2(slot) == 0u) {
         /* ResetShoveInfo (no distance left). */
-        OBJ(NES_OBJ_SHOVE_DIR, slot)       = 0u;
-        OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) = 0u;
+        F_ram_00C0_O2(slot)       = 0u;
+        F_ram_00D3_O2(slot) = 0u;
         return;
     }
 
     /* ShoveMoveMin: 4-pixel move loop. [03] is the NES pixel counter and
      * [02] the +1/-1 step; both stay in NES RAM as on the NES (T-171). */
-    RAM(0x0003u) = 4u;
+    F_ram_0003_R = 4u;
     do {
         /* @LoopShovePixel */
-        unsigned char grid_off = (unsigned char)OBJ(NES_OBJ_GRID_OFFSET, slot);
+        unsigned char grid_off = (unsigned char)F_ram_0394_O(slot);
         if (grid_off == 0u) {
             shove_ensure_object_aligned(slot);
-            unsigned char dir = (unsigned char)(OBJ(NES_OBJ_SHOVE_DIR, slot) & 0x0Fu);
-            RAM(NES_LINK_MOVING_DIR) = dir;
+            unsigned char dir = (unsigned char)(F_ram_00C0_O2(slot) & 0x0Fu);
+            F_ram_000F_R3 = dir;
             unsigned char tile = collision_get_colliding_tile_moving(slot);
             if (collision_moving_tile_is_obstacle(tile)) {
                 /* ObjectFirstUnwalkableTile -> blocked. */
-                OBJ(NES_OBJ_SHOVE_DIR, slot)       = 0u;
-                OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) = 0u;
+                F_ram_00C0_O2(slot)       = 0u;
+                F_ram_00D3_O2(slot) = 0u;
                 return;
             }
         }
 
         /* @CheckBoundary */
         {
-            unsigned char dir = (unsigned char)(OBJ(NES_OBJ_SHOVE_DIR, slot) & 0x0Fu);
+            unsigned char dir = (unsigned char)(F_ram_00C0_O2(slot) & 0x0Fu);
             unsigned char post = object_bound_by_room_with_dir(dir, slot);
             if (post == 0u) {
-                OBJ(NES_OBJ_SHOVE_DIR, slot)       = 0u;
-                OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) = 0u;
+                F_ram_00C0_O2(slot)       = 0u;
+                F_ram_00D3_O2(slot) = 0u;
                 return;
             }
         }
@@ -363,9 +363,9 @@ void c_obj_shove(unsigned int slot)
                             ((t1 >= 0x4Bu) && (t1 < 0x53u));
             if (is_person) {
                 shove_check_person_blocking();
-                if (RAM(NES_LINK_MOVING_DIR) == 0u) {
-                    OBJ(NES_OBJ_SHOVE_DIR, slot)       = 0u;
-                    OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) = 0u;
+                if (F_ram_000F_R3 == 0u) {
+                    F_ram_00C0_O2(slot)       = 0u;
+                    F_ram_00D3_O2(slot) = 0u;
                     return;
                 }
             }
@@ -375,44 +375,44 @@ void c_obj_shove(unsigned int slot)
          * else -1. NES uses (ShoveDir & $05) as the "positive" mask. */
         unsigned char delta;
         {
-            unsigned char dir = (unsigned char)OBJ(NES_OBJ_SHOVE_DIR, slot);
+            unsigned char dir = (unsigned char)F_ram_00C0_O2(slot);
             delta = ((dir & 0x05u) != 0u) ? 0x01u : 0xFFu;
         }
-        RAM(0x0002u) = delta;
+        F_ram_0002_R = delta;
 
         /* Decrement remaining distance. */
-        OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) =
-            (unsigned char)(OBJ(NES_OBJ_SHOVE_DIST_BASE, slot) - 1u);
+        F_ram_00D3_O2(slot) =
+            (unsigned char)(F_ram_00D3_O2(slot) - 1u);
 
         /* Advance grid offset by delta; wrap to 0 on multiple of $10
          * (or 8 for Link). */
         {
             unsigned char new_off =
-                (unsigned char)(OBJ(NES_OBJ_GRID_OFFSET, slot) + delta);
+                (unsigned char)(F_ram_0394_O(slot) + delta);
             unsigned char masked  = (unsigned char)(new_off & 0x0Fu);
             if (masked == 0u) {
-                OBJ(NES_OBJ_GRID_OFFSET, slot) = 0u;
+                F_ram_0394_O(slot) = 0u;
             } else if (slot == 0u && (masked & 0x07u) == 0u) {
-                OBJ(NES_OBJ_GRID_OFFSET, slot) = 0u;
+                F_ram_0394_O(slot) = 0u;
             } else {
-                OBJ(NES_OBJ_GRID_OFFSET, slot) = new_off;
+                F_ram_0394_O(slot) = new_off;
             }
         }
 
         /* @ApplySpeed: horizontal bits 0-1 of ShoveDir set -> bump X,
          * else bump Y. */
         {
-            unsigned char dir = (unsigned char)OBJ(NES_OBJ_SHOVE_DIR, slot);
+            unsigned char dir = (unsigned char)F_ram_00C0_O2(slot);
             if ((dir & 0x03u) != 0u) {
-                OBJ(NES_OBJ_X, slot) =
-                    (unsigned char)(OBJ(NES_OBJ_X, slot) + delta);
+                F_ram_0070_O2(slot) =
+                    (unsigned char)(F_ram_0070_O2(slot) + delta);
             } else {
-                OBJ(NES_OBJ_Y, slot) =
-                    (unsigned char)(OBJ(NES_OBJ_Y, slot) + delta);
+                F_ram_0084_O2(slot) =
+                    (unsigned char)(F_ram_0084_O2(slot) + delta);
             }
         }
-        RAM(0x0003u) = (unsigned char)(RAM(0x0003u) - 1u);
-    } while (RAM(0x0003u) != 0u);
+        F_ram_0003_R = (unsigned char)(F_ram_0003_R - 1u);
+    } while (F_ram_0003_R != 0u);
 }
 
 /* -------- Step 18: native c_walker_check_tile_collision -------- */
@@ -431,8 +431,8 @@ static unsigned char walker_get_next_alt_dir(unsigned int slot)
         0x08u, 0x04u, 0x02u, 0x01u
     };
 
-    unsigned char step = (unsigned char)RAM(NES_SHOT_COLLISION_FLAG); /* $0E */
-    RAM(NES_SHOT_COLLISION_FLAG) = (unsigned char)(step + 1u);
+    unsigned char step = (unsigned char)F_ram_000E_R; /* $0E */
+    F_ram_000E_R = (unsigned char)(step + 1u);
 
     switch (step & 0x03u) {
     case 0u: {
@@ -441,7 +441,7 @@ static unsigned char walker_get_next_alt_dir(unsigned int slot)
          * If ObjDir & $0C (V-facing) -> Y += 2 -> table picks H dir.
          * Else -> table picks V dir. Result is always perpendicular
          * to current facing axis. NES Random table base = $0018. */
-        unsigned char r = (unsigned char)RAM(0x0018u + slot);
+        unsigned char r = (unsigned char)F_ram_0018_R4(slot);
         unsigned char y = ((r & 0x80u) != 0u) ? 0u : 1u;
         if ((ENEMY_DIR(slot) & 0x0Cu) != 0u) {
             y = (unsigned char)(y + 2u);
@@ -455,7 +455,7 @@ static unsigned char walker_get_next_alt_dir(unsigned int slot)
          * $0A = bits {DOWN, RIGHT}; $05 = bits {UP, LEFT}. So shifting
          * right when on the "increasing" axis flips to the matching
          * decreasing direction (and vice versa). */
-        unsigned char dir = (unsigned char)RAM(NES_LINK_MOVING_DIR);
+        unsigned char dir = (unsigned char)F_ram_000F_R3;
         if ((dir & 0x0Au) != 0u) {
             return (unsigned char)(dir >> 1);
         }
@@ -468,12 +468,12 @@ static unsigned char walker_get_next_alt_dir(unsigned int slot)
             core_get_opposite_dir((unsigned int)ENEMY_DIR(slot));
         unsigned char opp = (unsigned char)(packed & 0xFFu);
         ENEMY_DIR(slot)          = opp;
-        RAM(NES_LINK_MOVING_DIR) = opp;
+        F_ram_000F_R3 = opp;
         return opp;
     }
     default: {
         /* EndLoop (Z_07.asm:3077). $0E = 0; return 0. */
-        RAM(NES_SHOT_COLLISION_FLAG) = 0u;
+        F_ram_000E_R = 0u;
         return 0u;
     }
     }
@@ -485,13 +485,13 @@ static unsigned char walker_get_next_alt_dir(unsigned int slot)
  * [0F] = candidate, as on the NES. Used by UpdateRope's turn timer. */
 void c_face_unblocked_dir(unsigned int slot)
 {
-    if (OBJ(NES_OBJ_GRID_OFFSET, slot) != 0u) return;
-    RAM(NES_SHOT_COLLISION_FLAG) = 0u;
+    if (F_ram_0394_O(slot) != 0u) return;
+    F_ram_000E_R = 0u;
     for (;;) {
         unsigned char alt = walker_get_next_alt_dir(slot);
-        RAM(NES_LINK_MOVING_DIR) = alt;
+        F_ram_000F_R3 = alt;
         if (alt == 0u) return;
-        if (collision_get_colliding_tile_moving(slot) >= (unsigned char)RAM(0x034Au))
+        if (collision_get_colliding_tile_moving(slot) >= (unsigned char)F_ram_034A_R2)
             continue;
         alt = object_bound_by_room_with_dir(alt, slot);
         if (alt == 0u) continue;
@@ -526,20 +526,20 @@ void c_walker_check_tile_collision(unsigned int slot)
      * the NES (T-171; the earlier `== 0 -> return` skip predated that). */
 
     /* @CheckGridOffset (X != 0 path): grid offset != 0 -> return. */
-    if (OBJ(NES_OBJ_GRID_OFFSET, slot) != 0u) return;
+    if (F_ram_0394_O(slot) != 0u) return;
 
     /* Reset alt-dir step ($0E = 0). */
-    RAM(NES_SHOT_COLLISION_FLAG) = 0u;
+    F_ram_000E_R = 0u;
 
     /* If $0F (moving dir) == 0, set from input dir + drop into
      * the TryNextDir loop. Else fall through to CheckTiles. */
-    unsigned char moving_dir = (unsigned char)RAM(NES_LINK_MOVING_DIR);
+    unsigned char moving_dir = (unsigned char)F_ram_000F_R3;
     if (moving_dir == 0u) {
-        moving_dir = (unsigned char)OBJ(NES_OBJ_INPUT_DIR, slot);
-        RAM(NES_LINK_MOVING_DIR) = moving_dir;
+        moving_dir = (unsigned char)F_ram_03F8_O(slot);
+        F_ram_000F_R3 = moving_dir;
         unsigned char alt = walker_get_next_alt_dir(slot);
-        RAM(NES_LINK_MOVING_DIR) = alt;
-        if (RAM(NES_SHOT_COLLISION_FLAG) == 0u) return;
+        F_ram_000F_R3 = alt;
+        if (F_ram_000E_R == 0u) return;
         /* fall through into CheckTiles loop */
     }
 
@@ -550,7 +550,7 @@ void c_walker_check_tile_collision(unsigned int slot)
             /* GoWalkableDir non-Link path -> CheckBoundary (Z_07.asm:3005).
              * BoundByRoom returns post-test dir; non-zero -> store as
              * facing dir and return. Zero -> TryNextDir loop. */
-            unsigned char dir = (unsigned char)RAM(NES_LINK_MOVING_DIR);
+            unsigned char dir = (unsigned char)F_ram_000F_R3;
             unsigned char post = object_bound_by_room_with_dir(dir, slot);
             if (post != 0u) {
                 ENEMY_DIR(slot) = post;
@@ -559,8 +559,8 @@ void c_walker_check_tile_collision(unsigned int slot)
         }
         /* Unwalkable OR boundary failed -> next alt dir. */
         unsigned char alt = walker_get_next_alt_dir(slot);
-        RAM(NES_LINK_MOVING_DIR) = alt;
-        if (RAM(NES_SHOT_COLLISION_FLAG) == 0u) return;
+        F_ram_000F_R3 = alt;
+        if (F_ram_000E_R == 0u) return;
     }
     /* guard exit: NES loop bounded by $0E reaching 4. The 8-iter
      * cap above is a belt-and-braces native guard — should never
@@ -596,7 +596,7 @@ unsigned int c_shoot_if_wanted(unsigned int shot_type, unsigned int slot)
      *     until then it'll spawn but stand still — visible regression
      *     surface for the next step. */
 
-    RAM(0x0000u) = (unsigned char)shot_type;   /* _ShootIfWanted: STA $00 */
+    F_ram_0000_R = (unsigned char)shot_type;   /* _ShootIfWanted: STA $00 */
     if (ENEMY_PUSH_TIMER(slot) == 0u) return 0u;
 
     unsigned int empty = 0u;
@@ -621,7 +621,7 @@ unsigned int c_shoot_if_wanted(unsigned int shot_type, unsigned int slot)
      * the trampoline match to NES sequence is auditable. */
     ENEMY_TYPE(empty)              = (unsigned char)shot_type;
     ENEMY_OBJ_SHOVE_DIR(empty)     = 0u;
-    OBJ(0x00D3u, empty)            = 0u;  /* ObjShoveDistance */
+    F_ram_00D3_O(empty)            = 0u;  /* ObjShoveDistance */
     ENEMY_MOVE_TIMER(empty)        = 0u;  /* ObjTimer ($0028) */
     ENEMY_STATE_TIMER(empty)       = 0u;  /* ObjState ($00AC) */
     ENEMY_HIT_REACTION(empty)      = 0u;  /* ObjInvincibilityTimer ($04F0) */
@@ -647,6 +647,11 @@ unsigned int c_shoot_if_wanted(unsigned int shot_type, unsigned int slot)
 
 void enrt_update_octorock(unsigned int slot)
 {
+    /* T392: UpdateMode5Play dispatches monsters only in slots1..11.
+     * Keep shared walker helpers out of their slot0 native-player paths.
+     * This bounds the measured Octorok path and protects Link from invalid
+     * dispatch; valid monster arithmetic/order remain unchanged. */
+    if(slot==0u || slot>ENEMY_LOOP_SLOT_LAST)return;
     /* NES UpdateOctorock (Z_04.asm:2966). Phase 7 Task 7.2 step 6.
      * Native composition over drained primitives. Stance: EXTEND.
      *
@@ -783,18 +788,18 @@ void enrt_update_octorock(unsigned int slot)
  */
 
 /* NES Item_ObjMonsterType ($0412) aliases ENEMY_PUSH_TIMER. */
-#define META_ITEM_MONSTER_TYPE(slot)   OBJ(0x0412, (slot))
-#define META_OBJ_ATTR(slot)            OBJ(0x04BF, (slot))
-#define META_WORLD_KILL_CYCLE          RAM(0x052A)
+#define META_ITEM_MONSTER_TYPE(slot)   F_ram_0412_O((slot))
+#define META_OBJ_ATTR(slot)            F_ram_04BF_O((slot))
+#define META_WORLD_KILL_CYCLE          F_META_WORLD_KILL_CYCLE_R
 /* NES Item_ObjItemLifetime ($03A8): per-slot countdown for dropped item. */
-#define META_ITEM_LIFETIME(slot)       OBJ(0x03A8, (slot))
+#define META_ITEM_LIFETIME(slot)       F_ram_03A8_O3((slot))
 /* NES Item_ObjItemId aliases OBJ_STATE ($00AC). */
-#define META_ITEM_ID(slot)             OBJ(0x00AC, (slot))
+#define META_ITEM_ID(slot)             F_ram_00AC_O2((slot))
 /* NES help-drop runaway counters at ZP $50/$51. */
-#define META_HELP_DROP_COUNT           RAM(0x0050)
-#define META_HELP_DROP_VALUE           RAM(0x0051)
+#define META_HELP_DROP_COUNT           F_ram_0050_R
+#define META_HELP_DROP_VALUE           F_ram_0051_R
 /* NES WorldKillCount at $0627 — fairy-on-$10-kills gate. */
-#define META_WORLD_KILL_COUNT          RAM(0x0627)
+#define META_WORLD_KILL_COUNT          F_ram_0627_R
 
 /* NES drop tables (reference/aldonunez/Z_04.asm:11042-11101).
  * Extracted to src/data/drop_tables.inc; mirrored here as C const arrays
@@ -1163,7 +1168,7 @@ void enrt_update_armos(unsigned int slot)
 {
     enrt_update_goriya(slot);
 
-    if ((unsigned char)OBJ(NES_OBJ_SHOVE_DIR, slot) != 0u) {
+    if ((unsigned char)F_ram_00C0_O2(slot) != 0u) {
         armos_draw_and_check_collisions(slot);
         return;
     }
@@ -1255,7 +1260,7 @@ void enrt_init_armos_or_flying_ghini(unsigned int slot)
         unsigned char chosen_tile = 0x70u;        /* default: stairs. */
         unsigned char matched = 0u;
 
-        const unsigned char room_id = (unsigned char)RAM(NES_CUR_ROOM_ID);
+        const unsigned char room_id = (unsigned char)F_ram_00EB_R2;
         const unsigned char obj_x = (unsigned char)ENEMY_X(slot);
         const unsigned char obj_y = (unsigned char)ENEMY_Y(slot);
         const unsigned char *secret_xs = game_profile_is_remix()
@@ -1272,7 +1277,7 @@ void enrt_init_armos_or_flying_ghini(unsigned int slot)
                     ENEMY_Y(19u)            = 0x80u;
                     ENEMY_X(19u)            = obj_x;
                     ENEMY_STATE_TIMER(19u)  = 0u;       /* ObjState[19] = 0. */
-                    OBJ(NES_OBJ_FLAG_BASE, 19u) = 0x14u;/* RoomItemId = PowerBracelet. */
+                    F_ram_0098_O2(19u) = 0x14u;/* RoomItemId = PowerBracelet. */
                     if (progress_get_room_flag_uw_item_state() == 0u) {
                         enemy_play_secret_found_tune();
                     }
@@ -1293,11 +1298,11 @@ void enrt_init_armos_or_flying_ghini(unsigned int slot)
         }
 
         /* INC ReturnToBank4 — flag for ChangeTileObjTiles. */
-        RAM(0x00F7u) = (uint8_t)(RAM(0x00F7u) + 1u);
+        F_ram_00F7_R = (uint8_t)(F_ram_00F7_R + 1u);
         dyn_tile_change_tile_obj_tiles(chosen_tile, slot);
 
         /* ObjGridOffset = 3 (square-grid alignment compensation). */
-        OBJ(NES_OBJ_GRID_OFFSET, slot) = 0x03u;
+        F_ram_0394_O(slot) = 0x03u;
 
         /* Q-speed: $20 if RNG_A < $80 else $60. */
         /* NES LDY Random+1,X (T-147: read Random+0,X). */
@@ -1382,24 +1387,24 @@ void enrt_update_zelda(unsigned int slot)
         if (x < 0x70u || x >= 0x81u ||
             (unsigned char)ENEMY_PLAYER_OBJ_Y != 0x95u) return;
         ENEMY_STATE_TIMER(slot) = 1u;
-        RAM(NES_OBJ_STATE_BASE) = 0x40u;
+        F_ram_00AC_R2 = 0x40u;
         roomrom_main_set_link_story_pose(0x88u, 0x88u,
                                          ROOMROM_MAIN_LINK_FACE_LEFT);
-        RAM(0x0600u) = 0x06u; /* Zelda fanfare request. */
+        F_ram_0600_R = 0x06u; /* Zelda fanfare request. */
         ENEMY_MOVE_TIMER(slot) = 0x80u;
         return;
     }
     /* Link_EndMoveAndDraw_Bank4: animation counter 6 (no animation), then
      * Link_EndMoveAndAnimate through the Link owner (T-171). */
-    RAM(0x03D0u) = 0x06u;
+    F_ram_03D0_R = 0x06u;
     roomrom_main_link_end_move_from_object();
     if ((unsigned char)ENEMY_MOVE_TIMER(slot) != 0u) return;
-    RAM(0x0011u) = 0u; /* IsUpdatingMode */
-    RAM(NES_SUB_MODE) = 0u;
-    RAM(NES_OBJ_STATE_BASE) = 0u;
-    RAM(NES_GAME_MODE) = 0x13u;
+    F_ram_0011_R = 0u; /* IsUpdatingMode */
+    F_ram_0013_R2 = 0u;
+    F_ram_00AC_R2 = 0u;
+    F_ram_0012_R2 = 0x13u;
     ENEMY_X(12u) = 0x20u;
     ENEMY_X(13u) = 0x01u;
-    RAM(0x000Au) = 0x24u; /* FillTileMap blank tile selector. */
+    F_ZP_TMPA_R = 0x24u; /* FillTileMap blank tile selector. */
     world_fill_tile_map();  /* JMP FillTileMap (T-171) */
 }

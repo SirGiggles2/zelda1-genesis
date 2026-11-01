@@ -21,18 +21,18 @@
  *   LDA #$00 / STA RollingSpriteIndex / RTS */
 static inline void sprite_reset_cur_sprite_index_inline(void)
 {
-    RAM(ROLLING_SPRITE_INDEX_ADDR) = 0u;
+    F_ram_0341_R2 = 0u;
 }
 
 void sprite_cycle_cur_sprite_index(void)
 {
     /* drain: idx = RAM($0341) + 1; if idx == $28 reset; else store. */
     const unsigned char idx =
-        (unsigned char)(RAM(ROLLING_SPRITE_INDEX_ADDR) + 1u);
+        (unsigned char)(F_ram_0341_R2 + 1u);
     if (idx == ROLLING_SPRITE_INDEX_WRAP) {
         sprite_reset_cur_sprite_index_inline();
     } else {
-        RAM(ROLLING_SPRITE_INDEX_ADDR) = idx;
+        F_ram_0341_R2 = idx;
     }
 }
 
@@ -42,11 +42,11 @@ void sprite_cycle_cur_sprite_index(void)
  * Stance: EXTEND two consecutive cycles into one committed cursor. */
 void sprite_cycle_cur_sprite_index_twice(void)
 {
-    unsigned char idx = (unsigned char)(RAM(ROLLING_SPRITE_INDEX_ADDR) + 2u);
+    unsigned char idx = (unsigned char)(F_ram_0341_R2 + 2u);
     if (idx == ROLLING_SPRITE_INDEX_WRAP ||
         idx == ROLLING_SPRITE_INDEX_WRAP + 1u)
         idx = (unsigned char)(idx - ROLLING_SPRITE_INDEX_WRAP);
-    RAM(ROLLING_SPRITE_INDEX_ADDR) = idx;
+    F_ram_0341_R2 = idx;
 }
 
 unsigned char sprite_cycle_sprite_index_in_a(unsigned char idx)
@@ -58,7 +58,7 @@ unsigned char sprite_cycle_sprite_index_in_a(unsigned char idx)
         sprite_reset_cur_sprite_index_inline();
         return 0u;
     }
-    RAM(ROLLING_SPRITE_INDEX_ADDR) = idx;
+    F_ram_0341_R2 = idx;
     return idx;
 }
 
@@ -72,7 +72,7 @@ void sprite_hide_object_sprites(void)
         ROOM_OAM_BYTE(d2) = 0xF8u;
         d2 = (unsigned char)(d2 + 4u);
     } while (d2 != 0u);  /* wraps to 0 after 256 → exit */
-    RAM(0x0342) = sprite_cycle_sprite_index_in_a((unsigned char)RAM(0x0342));
+    F_ram_0342_R = sprite_cycle_sprite_index_in_a((unsigned char)F_ram_0342_R);
 }
 
 /* --- Animation cluster (NES Z_07.asm Plan-C drained subset) ------------

@@ -23,13 +23,13 @@ static const unsigned char k_dir_masks[4] = { 0x01u, 0x02u, 0x04u, 0x08u };
 unsigned char uw_map_rotation(unsigned char level)
 {
     if (level < 1u || level > 9u) return 0u;
-    return (unsigned char)(nes_ram[LI_ROTATION] & 0x0Fu);
+    return (unsigned char)(F_LI_ROTATION_N & 0x0Fu);
 }
 
 unsigned char uw_map_triforce_room(unsigned char level)
 {
     if (level < 1u || level > 9u) return 0u;
-    return nes_ram[LI_TRIFORCE];
+    return F_ram_6BAE_N;
 }
 
 /* NES FindDoorAttrByDoorBit (Z_05.asm:4520) collapsed to the 4 cardinal
@@ -40,8 +40,8 @@ unsigned char uw_map_triforce_room(unsigned char level)
  *   right $01 -> AttrsB bits 2-4 */
 static unsigned char uw_door_attr(unsigned char room, unsigned char dirbit)
 {
-    const unsigned char a = nes_ram[LBA_A_BASE + room];
-    const unsigned char b = nes_ram[LBA_B_BASE + room];
+    const unsigned char a = F_ram_687E_X3(room);
+    const unsigned char b = F_ram_68FE_X2(room);
     switch (dirbit) {
         case 0x08u: return (unsigned char)((a >> 5) & 7u);
         case 0x04u: return (unsigned char)((a >> 2) & 7u);
@@ -56,10 +56,15 @@ static unsigned char uw_door_attr(unsigned char room, unsigned char dirbit)
 static unsigned char uw_room_flags(unsigned char room)
 {
     const unsigned short ptr =
-        (unsigned short)nes_ram[NES_SRAM_BASE + NES_SRAM_ROOM_FLAGS_PTR_LO]
+        (unsigned short)F_ram_6BAF_N
       | (unsigned short)((unsigned short)
-            nes_ram[NES_SRAM_BASE + NES_SRAM_ROOM_FLAGS_PTR_HI] << 8);
-    return nes_ram[ptr + room];
+            F_ram_6BB0_N << 8);
+    return nes_ram[ptr + room]; /* native_ram bulk:dyn_ptr_table */
+}
+
+unsigned char uw_map_room_visited(unsigned char room)
+{
+    return (unsigned char)((uw_room_flags(room) & 0x20u) != 0u);
 }
 
 /* NES Submenu_WriteScanningMapRoomMark + CalcOpenDoorwayMask for one room. */
@@ -121,7 +126,7 @@ void uw_map_build(unsigned char level, unsigned char out[8][16])
     {
         for (row = 0u; row < 8u; ++row)
             for (col = 0u; col < 16u; ++col)
-                if ((nes_ram[LI_MASK + col] & MAP_ROW_MASK(row)) == 0u)
+                if ((F_LI_MASK_X(col) & MAP_ROW_MASK(row)) == 0u)
                     out[row][col] = 0xF5u;
     }
 }

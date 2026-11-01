@@ -1,11 +1,10 @@
-"""Build the local Redux music bank from authenticated studio extractions.
+"""Build the local Redux music bank from the user's ROM and saved Studio mix.
 
-Missing extractions are reproduced from the user's supported Redux ROM.
 ROM-derived VGMs and C arrays stay in build/ and are never distributed.
 """
+import argparse
 import hashlib
-import importlib.util
-import json
+import os
 import struct
 import sys
 from pathlib import Path
@@ -19,39 +18,33 @@ IDS = ('overworld', 'dungeon_zelda', 'dungeon_new_light',
        'ganon', 'triforce', 'zelda', 'item', 'ending', 'title')
 
 
-def generate():
-    folder = ROOT / 'VGMS/Redux'
-    manifest = folder / 'extraction.json'
-    if not manifest.is_file():
-        from extract_soundtrack import extract_soundtrack
-        from build import SUPPORTED_REDUX_ROMS
-        candidates = [ROOT / 'build/redux/Zelda Redux.nes', *ROOT.glob('*.nes'),
-                      *ROOT.glob('roms/*.nes')]
+def generate(rom: Path | None = None, out: Path | None = None):
+    from studio_music import generate_vgms
+    from build import SUPPORTED_REDUX_ROMS
+    candidates = ([rom] if rom else []) + ([Path(os.environ['ZELDA_REDUX_ROM'])]
+                  if os.environ.get('ZELDA_REDUX_ROM') else []) + [
+                  ROOT / 'build/redux/Zelda Redux.nes', *ROOT.glob('*.nes'), *ROOT.glob('roms/*.nes')]
+    if rom is None:
         rom = next((p for p in candidates if p.is_file() and
                     hashlib.sha256(p.read_bytes()).hexdigest() in SUPPORTED_REDUX_ROMS), None)
-        if not rom:
-            raise ValueError('Redux music needs the supported Redux ROM or VGMS/Redux/extraction.json')
-        extract_soundtrack(rom, folder)
-    report = json.loads(manifest.read_text())
-    from build import SUPPORTED_REDUX_ROMS
-    if report['rom_sha256'] not in SUPPORTED_REDUX_ROMS:
-        raise ValueError('Redux music extraction has an unsupported source ROM')
-    rows = {s['id']: s for s in report['songs']}
-    out = ROOT / 'build/redux_music'
+    if rom is None or hashlib.sha256(rom.read_bytes()).hexdigest() not in SUPPORTED_REDUX_ROMS:
+        raise ValueError('Redux Studio music needs the supported Redux ROM; set ZELDA_REDUX_ROM')
+    out = out or ROOT / 'build/redux_music'
     out.mkdir(parents=True, exist_ok=True)
-    spec = importlib.util.spec_from_file_location('local_music', ROOT / 'tools/converter/local_music.py')
-    compiler = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(compiler)
-    sources = [folder / rows[s]['file'] for s in IDS]
-    for sid, path in zip(IDS, sources):
-        if hashlib.sha256(path.read_bytes()).hexdigest() != rows[sid]['vgm_sha256']:
-            raise ValueError(f'Redux music extraction changed: {path.name}')
+    import local_music as compiler
     table = out / 'redux_music.c'
-    fingerprint = hashlib.sha256(Path(__file__).read_bytes() + manifest.read_bytes() +
-                                (ROOT / 'tools/converter/local_music.py').read_bytes()).hexdigest()
+    dependencies = [Path(__file__), ROOT / 'data/music/builder_mix.json',
+                    ROOT / 'tools/music_studio/web/render.js',
+                    *(ROOT / 'tools/converter' / name for name in
+                      ('studio_music.py', 'studio_render.js', 'nes_music.py', 'local_music.py'))]
+    fingerprint = hashlib.sha256(rom.read_bytes() + b''.join(p.read_bytes() for p in dependencies)).hexdigest()
     stamp = out / 'fingerprint.txt'
     if table.is_file() and (out / 'redux_music.h').is_file() and stamp.exists() and stamp.read_text() == fingerprint:
         return
+    folder = out / 'vgm'
+    report = generate_vgms(rom, folder, profile='redux')
+    rows = report['songs']
+    sources = [folder / rows[s]['file'] for s in IDS]
     picked = {}
     for i, (sid, p) in enumerate(zip(IDS, sources)):
         data = bytearray(p.read_bytes())
@@ -77,4 +70,8 @@ def generate():
 
 
 if __name__ == '__main__':
-    generate()
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--rom', type=Path)
+    parser.add_argument('--out', type=Path)
+    args = parser.parse_args()
+    generate(args.rom, args.out)

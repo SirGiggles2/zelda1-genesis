@@ -31,29 +31,29 @@ static unsigned char s_singles[SINGLE_COUNT];
 static void backup(void)
 {
     unsigned short i;
-    for (i = 0u; i < NES_SAVE_BLOCK_BYTES; ++i) s_block[i] = nes_ram[NES_SAVE_BLOCK_BASE + i];
-    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) s_items[i] = RAM(NES_PROFILE_ITEMS + i);
-    for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i) s_flags[i] = RAM(NES_PROFILE_WORLD_FLAGS + i);
-    for (i = 0u; i < SLOTINFO_BYTES; ++i) s_slotinfo[i] = RAM(SLOTINFO_FIRST + i);
-    for (i = 0u; i < SINGLE_COUNT; ++i) s_singles[i] = RAM(k_single_cells[i]);
+    for (i = 0u; i < NES_SAVE_BLOCK_BYTES; ++i) s_block[i] = F_ram_6000_X(i);
+    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) s_items[i] = F_ram_0657_R6(i);
+    for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i) s_flags[i] = F_ram_067F_R2(i);
+    for (i = 0u; i < SLOTINFO_BYTES; ++i) s_slotinfo[i] = F_ram_062D_R4(i);
+    for (i = 0u; i < SINGLE_COUNT; ++i) s_singles[i] = RAM(k_single_cells[i]); /* native_ram bulk:dyn_addr */
 }
 
 static void restore(void)
 {
     unsigned short i;
-    for (i = 0u; i < NES_SAVE_BLOCK_BYTES; ++i) nes_ram[NES_SAVE_BLOCK_BASE + i] = s_block[i];
-    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) RAM(NES_PROFILE_ITEMS + i) = s_items[i];
-    for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i) RAM(NES_PROFILE_WORLD_FLAGS + i) = s_flags[i];
-    for (i = 0u; i < SLOTINFO_BYTES; ++i) RAM(SLOTINFO_FIRST + i) = s_slotinfo[i];
-    for (i = 0u; i < SINGLE_COUNT; ++i) RAM(k_single_cells[i]) = s_singles[i];
+    for (i = 0u; i < NES_SAVE_BLOCK_BYTES; ++i) F_ram_6000_X(i) = s_block[i];
+    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) F_ram_0657_R6(i) = s_items[i];
+    for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i) F_ram_067F_R2(i) = s_flags[i];
+    for (i = 0u; i < SLOTINFO_BYTES; ++i) F_ram_062D_R4(i) = s_slotinfo[i];
+    for (i = 0u; i < SINGLE_COUNT; ++i) RAM(k_single_cells[i]) = s_singles[i]; /* native_ram bulk:dyn_addr */
 }
 
 static void seed_profile(unsigned char first)
 {
     unsigned short i;
-    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) RAM(NES_PROFILE_ITEMS + i) = (unsigned char)(first + i);
+    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) F_ram_0657_R6(i) = (unsigned char)(first + i);
     for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i)
-        RAM(NES_PROFILE_WORLD_FLAGS + i) = (unsigned char)(first ^ i);
+        F_ram_067F_R2(i) = (unsigned char)(first ^ i);
 }
 
 /* 0: a formatted file validates, is blank and inactive. */
@@ -61,9 +61,9 @@ static unsigned char test_format_valid(void)
 {
     save_file_a_format(2u);
     return (save_file_a_valid(2u) &&
-            nes_ram[NES_FILEA_NAME(2u)] == 0x24u &&
-            nes_ram[NES_FILEA_ACTIVE(2u)] == 0u &&
-            RAM(NES_SLOTINFO_ACTIVE + 2u) == 0u) ? 1u : 0u;
+            F_NES_FILEA_NAME_6012_N == 0x24u &&
+            F_NES_FILEA_ACTIVE_6514_N == 0u &&
+            F_NES_SLOTINFO_ACTIVE_0635_R == 0u) ? 1u : 0u;
 }
 
 /* 1: known vector — blank file sums to 8 x $24 = $0120, stored [hi, lo]. */
@@ -71,8 +71,8 @@ static unsigned char test_checksum_vector(void)
 {
     save_file_a_format(0u);
     return (save_file_a_checksum(0u) == 0x0120u &&
-            nes_ram[NES_FILEA_CHECKSUM(0u)] == 0x01u &&
-            nes_ram[NES_FILEA_CHECKSUM(0u) + 1u] == 0x20u) ? 1u : 0u;
+            F_NES_FILEA_CHECKSUM_6524_N == 0x01u &&
+            F_NES_FILEA_CHECKSUM_6525_N == 0x20u) ? 1u : 0u;
 }
 
 /* 2: save then load restores items (pre-refill) and world flags. */
@@ -90,25 +90,25 @@ static unsigned char test_save_load_round_trip(void)
 {
     unsigned short i;
     seed_profile(0x10u);
-    RAM(NES_SLOTINFO_QUEST + 1u) = 1u;
-    RAM(NES_SLOTINFO_DEATHS + 1u) = 5u;
+    F_NES_SLOTINFO_QUEST_R = 1u;
+    F_NES_SLOTINFO_DEATHS_R = 5u;
     if (!save_file_a_save(1u)) return fail_at(1u, 0u, 0u);
     if (!save_file_a_valid(1u)) return fail_at(2u, 0u, 0u);
-    if (nes_ram[NES_FILEA_ACTIVE(1u)] != 1u) return fail_at(3u, 0u, nes_ram[NES_FILEA_ACTIVE(1u)]);
-    if (nes_ram[NES_FILEA_QUEST(1u)] != 1u) return fail_at(4u, 0u, nes_ram[NES_FILEA_QUEST(1u)]);
-    if (nes_ram[NES_FILEA_DEATHS(1u)] != 5u) return fail_at(5u, 0u, nes_ram[NES_FILEA_DEATHS(1u)]);
+    if (F_NES_FILEA_ACTIVE_6513_N != 1u) return fail_at(3u, 0u, F_NES_FILEA_ACTIVE_6513_N);
+    if (F_NES_FILEA_QUEST_N != 1u) return fail_at(4u, 0u, F_NES_FILEA_QUEST_N);
+    if (F_NES_FILEA_DEATHS_N != 5u) return fail_at(5u, 0u, F_NES_FILEA_DEATHS_N);
     seed_profile(0xA0u);
     save_file_a_load(1u);
     for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) {
         /* Items+$15 = InvClock $066C: @ChoseSlot clears it after the copy. */
         unsigned char want = (i == 0x15u) ? 0u : (unsigned char)(0x10u + i);
-        if (RAM(NES_PROFILE_ITEMS + i) != want)
-            return fail_at(6u, i, RAM(NES_PROFILE_ITEMS + i));
+        if (F_ram_0657_R6(i) != want)
+            return fail_at(6u, i, F_ram_0657_R6(i));
     }
     for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i)
-        if (RAM(NES_PROFILE_WORLD_FLAGS + i) != (unsigned char)(0x10u ^ i))
-            return fail_at(7u, i, RAM(NES_PROFILE_WORLD_FLAGS + i));
-    if (RAM(NES_CUR_SAVE_SLOT) != 1u) return fail_at(8u, 0u, RAM(NES_CUR_SAVE_SLOT));
+        if (F_ram_067F_R2(i) != (unsigned char)(0x10u ^ i))
+            return fail_at(7u, i, F_ram_067F_R2(i));
+    if (F_ram_0016_R3 != 1u) return fail_at(8u, 0u, F_ram_0016_R3);
     return 1u;
 }
 
@@ -117,11 +117,11 @@ static unsigned char test_corrupt_rejected(void)
 {
     seed_profile(0x33u);
     if (!save_file_a_save(1u)) return 0u;
-    nes_ram[NES_FILEA_FLAGS(1u) + 0x40u] ^= 0x01u;
+    F_NES_FILEA_FLAGS_N ^= 0x01u;
     if (save_file_a_valid(1u)) return 0u;
     save_files_boot_validate();
-    return (save_file_a_valid(1u) && nes_ram[NES_FILEA_ACTIVE(1u)] == 0u &&
-            RAM(NES_SLOTINFO_ACTIVE + 1u) == 0u) ? 1u : 0u;
+    return (save_file_a_valid(1u) && F_NES_FILEA_ACTIVE_6513_N == 0u &&
+            F_NES_SLOTINFO_ACTIVE_0634_R == 0u) ? 1u : 0u;
 }
 
 /* 4: saving slot 0 leaves slot 2's file A bytes unchanged. */
@@ -131,11 +131,11 @@ static unsigned char test_cross_slot_isolation(void)
     unsigned char before[SAVE_ITEMS_BYTES];
     seed_profile(0x44u);
     (void)save_file_a_save(2u);
-    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) before[i] = nes_ram[NES_FILEA_ITEMS(2u) + i];
+    for (i = 0u; i < SAVE_ITEMS_BYTES; ++i) before[i] = F_NES_FILEA_ITEMS_X(i);
     seed_profile(0x55u);
     (void)save_file_a_save(0u);
     for (i = 0u; i < SAVE_ITEMS_BYTES; ++i)
-        if (nes_ram[NES_FILEA_ITEMS(2u) + i] != before[i]) return 0u;
+        if (F_NES_FILEA_ITEMS_X(i) != before[i]) return 0u;
     return save_file_a_valid(2u);
 }
 

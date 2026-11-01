@@ -145,49 +145,64 @@ void options_music_set(unsigned char slot, unsigned char track)
 /* NES source: Zelda1-Redux/src/code/music/dungeon_music.asm:.songs.
  * Drained C: options_runtime.c existing per-file serialized state owner.
  * Coverage: PARTIAL(user per-dungeon preferences); Stance: EXTEND.
- * Nine two-bit selectors occupy reserved[10..12], with no BSS growth. */
+ * Nine three-bit songs: low pairs in reserved[10..12], high bits in
+ * reserved[14..15] (off 27..28), with no BSS growth. */
+static unsigned char dungeon_music_raw(unsigned char index)
+{
+    unsigned char lo=(unsigned char)((g_options.reserved[10u+(index>>2)] >> ((index&3u)*2u))&3u);
+    unsigned char hi=(unsigned char)((g_options.reserved[14u+(index>>3)] >> (index&7u))&1u);
+    return (unsigned char)(lo | (hi<<2));
+}
+/* Source .songs repeats Zelda/New Light/Perils/Triforce Power twice. */
+static unsigned char dungeon_music_redux(unsigned char level)
+{
+    return level==9u ? OPTIONS_DUNGEON_MUSIC_LEVEL_NINE :
+        (unsigned char)(OPTIONS_DUNGEON_MUSIC_ZELDA+((level-1u)&3u));
+}
 unsigned char options_dungeon_music_get(unsigned char level)
 {
-    unsigned char index, choice;
+    unsigned char choice;
     if (level<1u || level>9u) return 0u;
-    index=(unsigned char)(level-1u);
-    choice=(unsigned char)((g_options.reserved[10u+(index>>2)] >> ((index&3u)*2u))&3u);
+    choice=dungeon_music_raw((unsigned char)(level-1u));
     if (choice) return choice;
-    return level==9u ? OPTIONS_DUNGEON_MUSIC_REDUX :
+    return level==9u ? OPTIONS_DUNGEON_MUSIC_LEVEL_NINE :
         (g_options.uw_music==OPTIONS_UWMUSIC_CYBERDEOUS ?
          OPTIONS_DUNGEON_MUSIC_CYBERDEOUS : OPTIONS_DUNGEON_MUSIC_INGLEBARD);
 }
 void options_dungeon_music_set(unsigned char level, unsigned char choice)
 {
     unsigned char index, shift, *cell;
-    if (level<1u || level>9u || choice>3u) return;
+    if (level<1u || level>9u || choice>OPTIONS_DUNGEON_MUSIC_SONGS) return;
     index=(unsigned char)(level-1u); shift=(unsigned char)((index&3u)*2u);
     cell=&g_options.reserved[10u+(index>>2)];
-    *cell=(unsigned char)((*cell & ~(3u<<shift)) | (choice<<shift));
+    *cell=(unsigned char)((*cell & ~(3u<<shift)) | ((choice&3u)<<shift));
+    cell=&g_options.reserved[14u+(index>>3)]; shift=(unsigned char)(index&7u);
+    *cell=(unsigned char)((*cell & ~(1u<<shift)) | (((choice>>2)&1u)<<shift));
     recheck_after_write();
 }
 unsigned char options_dungeon_music_preset(void)
 {
-    unsigned char level, choice=options_dungeon_music_get(1u);
-    for (level=2u; level<=9u; ++level)
-        if (options_dungeon_music_get(level)!=choice) return 0u;
-    return choice;
+    unsigned char level, same=1u, redux=1u, choice=options_dungeon_music_get(1u);
+    for (level=1u; level<=9u; ++level) {
+        unsigned char c=options_dungeon_music_get(level);
+        if (c!=choice) same=0u;
+        if (c!=dungeon_music_redux(level)) redux=0u;
+    }
+    return same ? choice : redux ? OPTIONS_DUNGEON_MUSIC_REDUX : 0u;
 }
 void options_dungeon_music_set_all(unsigned char choice)
 {
     unsigned char level;
-    if (choice<1u || choice>3u) return;
-    for (level=1u; level<=9u; ++level) options_dungeon_music_set(level,choice);
+    if (choice<1u || choice>OPTIONS_DUNGEON_MUSIC_REDUX) return;
+    for (level=1u; level<=9u; ++level)
+        options_dungeon_music_set(level,choice==OPTIONS_DUNGEON_MUSIC_REDUX ?
+                                  dungeon_music_redux(level) : choice);
 }
 unsigned char options_dungeon_music_track(unsigned char level)
 {
-    unsigned char choice=options_dungeon_music_get(level);
-    if (choice==OPTIONS_DUNGEON_MUSIC_INGLEBARD) return 2u;
-    if (choice==OPTIONS_DUNGEON_MUSIC_CYBERDEOUS) return 3u;
-    /* Source .songs repeats Zelda/New Light/Perils/Triforce Power twice. */
-    if (choice==OPTIONS_DUNGEON_MUSIC_REDUX)
-        return level==9u ? 9u : (unsigned char)(5u+((level-1u)&3u));
-    return 0u;
+    /* Saved catalog IDs: Inglebard 2, Cyberdeous 3, Redux 5..9. */
+    static const unsigned char tracks[OPTIONS_DUNGEON_MUSIC_SONGS+1u]={0u,2u,3u,5u,6u,7u,8u,9u};
+    return tracks[options_dungeon_music_get(level)];
 }
 
 unsigned char options_get(unsigned int id)
@@ -205,6 +220,8 @@ unsigned char options_get(unsigned int id)
     case OPTION_ID_DARK_ROOM_LIGHT:    return g_options.dark_room;
     case OPTION_ID_ROOM_SCROLL:        return g_options.room_scroll;
     case OPTION_ID_UW_MUSIC:           return g_options.uw_music;
+    case OPTION_ID_SPRITE_OVERFLOW:    return g_options.reserved[OPTIONS_SPRITES_OFFSET - 13u];
+    case OPTION_ID_SCROLL_SPEED:       return g_options.reserved[OPTIONS_SCROLL_SPEED_OFFSET - 13u];
     default:                           return 0u;
     }
 }
@@ -254,6 +271,14 @@ void options_set(unsigned int id, unsigned char value)
     case OPTION_ID_UW_MUSIC:
         if (value < OPTIONS_UWMUSIC_COUNT) g_options.uw_music = value;
         break;
+    case OPTION_ID_SPRITE_OVERFLOW:
+        if (value < OPTIONS_SPRITES_COUNT)
+            g_options.reserved[OPTIONS_SPRITES_OFFSET - 13u] = value;
+        break;
+    case OPTION_ID_SCROLL_SPEED:
+        if (value < OPTIONS_SCROLL_SPEED_COUNT)
+            g_options.reserved[OPTIONS_SCROLL_SPEED_OFFSET - 13u] = value;
+        break;
     default:
         return;
     }
@@ -284,6 +309,8 @@ unsigned char options_runtime_validate(void)
     if (g_options.dark_room    >= OPTIONS_DARK_COUNT)     return 0u;
     if (g_options.room_scroll  >= OPTIONS_SCROLL_COUNT)   return 0u;
     if (g_options.uw_music     >= OPTIONS_UWMUSIC_COUNT)  return 0u;
+    if (g_options.reserved[OPTIONS_SPRITES_OFFSET - 13u] >= OPTIONS_SPRITES_COUNT) return 0u;
+    if (g_options.reserved[OPTIONS_SCROLL_SPEED_OFFSET - 13u] >= OPTIONS_SCROLL_SPEED_COUNT) return 0u;
     for (i=0u; i<OPTIONS_MUSIC_SLOTS; ++i)
         if (g_options.reserved[i] >= OPTIONS_MUSIC_TRACK_COUNT) return 0u;
     if (g_options.start_hearts <  OPTIONS_START_HEARTS_MIN) return 0u;
@@ -342,6 +369,8 @@ unsigned char options_runtime_apply(const unsigned char *buf,
     if (tmp[10] >= OPTIONS_DARK_COUNT)     return 0u;
     if (tmp[11] >= OPTIONS_SCROLL_COUNT)   return 0u;
     if (tmp[12] >= OPTIONS_UWMUSIC_COUNT)  return 0u;
+    if (tmp[OPTIONS_SPRITES_OFFSET] >= OPTIONS_SPRITES_COUNT) return 0u;
+    if (tmp[OPTIONS_SCROLL_SPEED_OFFSET] >= OPTIONS_SCROLL_SPEED_COUNT) return 0u;
     /* Validate the original checksum before migrating old reserved bytes. */
     if (tmp[2] < OPTIONS_VERSION_V4) {
         for (i = 0u; i < OPTIONS_MUSIC_SLOTS; ++i) tmp[13u+i] = 0u;
@@ -357,17 +386,35 @@ unsigned char options_runtime_apply(const unsigned char *buf,
         unsigned char uw=tmp[13u] ? tmp[13u] : tmp[15u];
         unsigned char l9=tmp[13u] ? tmp[13u] : tmp[16u];
         unsigned char level;
-        tmp[23]=tmp[24]=tmp[25]=0u;
+        tmp[23]=tmp[24]=tmp[25]=tmp[27]=tmp[28]=0u;
         if (tmp[14]!=1u && tmp[14]!=4u) tmp[14]=0u;
         for (level=1u; level<=9u; ++level) {
             unsigned char track=level==9u ? l9 : uw;
-            unsigned char mode=track==2u ? 1u : track==3u ? 2u :
-                ((track>=5u && track<=9u) ? 3u : 0u);
+            /* Catalog track -> song choice: 2,3 -> 1,2; Redux 5..9 -> 3..7. */
+            unsigned char song=track==2u ? 1u : track==3u ? 2u :
+                ((track>=5u && track<=9u) ? (unsigned char)(track-2u) : 0u);
             unsigned char index=(unsigned char)(level-1u);
-            tmp[23u+(index>>2)] |= (unsigned char)(mode<<((index&3u)*2u));
+            tmp[23u+(index>>2)] |= (unsigned char)((song&3u)<<((index&3u)*2u));
+            tmp[27u+(index>>3)] |= (unsigned char)(((song>>2)&1u)<<(index&7u));
         }
         tmp[13]=0u;
         for (i=15u; i<=22u; ++i) tmp[i]=0u;
+        tmp[2]=OPTIONS_VERSION_CURRENT;
+        write_be_u16(&tmp[30],compute_checksum(tmp));
+    } else if (buf[2] == OPTIONS_VERSION_V5) {
+        /* v5 two-bit choice3 was REDUX = each dungeon's own Redux theme; v6
+         * names that song explicitly. Offsets 27..28 were unassigned. */
+        unsigned char index;
+        tmp[27]=tmp[28]=0u;
+        for (index=0u; index<9u; ++index) {
+            unsigned char shift=(unsigned char)((index&3u)*2u);
+            if (((tmp[23u+(index>>2)]>>shift)&3u)==3u) {
+                unsigned char song=index==8u ? 7u : (unsigned char)(3u+(index&3u));
+                tmp[23u+(index>>2)]=(unsigned char)((tmp[23u+(index>>2)] & ~(3u<<shift)) |
+                                                    ((song&3u)<<shift));
+                tmp[27u+(index>>3)] |= (unsigned char)(((song>>2)&1u)<<(index&7u));
+            }
+        }
         tmp[2]=OPTIONS_VERSION_CURRENT;
         write_be_u16(&tmp[30],compute_checksum(tmp));
     }

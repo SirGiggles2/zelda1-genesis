@@ -23,6 +23,9 @@ unsigned char targeting_get_one_direction_and_distance_to_target(
  * NES GetDirectionsAndDistancesToTarget. */
 void targeting_get_directions_and_distances_to_target(
     unsigned char target_slot, unsigned int origin_slot);
+/* Same drained axis calculation with explicitly owned target coordinates. */
+void targeting_get_directions_and_distances_to_point(
+    unsigned char target_x, unsigned char target_y, unsigned int origin_slot);
 
 /* Refine an axis speed-table mid index into a diagonal speed index based
  * on H_DIST/V_DIST proportions. Returns the refined index.

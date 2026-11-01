@@ -15,9 +15,12 @@
 #include <genesis.h>
 #include "../abi/audio_abi.h"
 #include "../game/debug/state_dump.h"
+#include "frame_pipeline.h"
 
 static void audio_vblank_hook(void)
 {
+    /* T-393: a committed game frame is published first in the blank. */
+    frame_pipeline_vint();
     /* Route through audio_adapter.c so the XGM-owns-chip flag can gate
      * the legacy music_tick. Direct music_tick() call here would race
      * the XGM Z80 driver when the OW VGM is playing. */

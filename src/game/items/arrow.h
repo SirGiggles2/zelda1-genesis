@@ -17,6 +17,14 @@
 void roomrom_arrow_init(void);
 void roomrom_arrow_fire(link_face_t face, short link_x, short link_y);
 void roomrom_arrow_update(void);
+void roomrom_arrow_update_for_player(unsigned char player);
 unsigned char roomrom_arrow_active(void);
+
+/* T-260 bomb arrow (Remix combo). Uses the caller's loaded player context;
+ * the recipe has already charged. live = flying or blast still pending. */
+void roomrom_arrow_fire_explosive(unsigned char player);
+unsigned char roomrom_arrow_explosive_live(unsigned char player);
+void roomrom_arrow_explosive_clear(void);
+void roomrom_arrow_explosive_contact(unsigned char player);
 
 #endif

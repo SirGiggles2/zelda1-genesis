@@ -33,6 +33,8 @@
  *             matching the gleeok-head pattern (boss_gleeok.c:674).
  */
 
+/* Shared boss-owned child protection gate; no enemy update or mutation. */
+unsigned char boss_patra_has_children(void);
 void boss_patra_update(unsigned int slot);
 
 #endif /* GAME_ENEMIES_BOSSES_BOSS_PATRA_H */

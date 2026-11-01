@@ -159,7 +159,7 @@ void c_reset_shove_info(unsigned int slot)
      * ObjShoveDir ($00C0) + ObjShoveDistance ($00D3). Falls through
      * to SetShoveInfoWith0 in NES; same observable. */
     ENEMY_OBJ_SHOVE_DIR(slot) = 0u;
-    OBJ(0x00D3u, slot)        = 0u;
+    F_ram_00D3_O(slot)        = 0u;
 }
 
 void c_draw_object_mirrored_with_frame(unsigned int frame, unsigned int slot)
@@ -223,7 +223,7 @@ static void flyer_chase(unsigned int slot)
      * read so behavior mirrors NES exactly. */
     unsigned char target = 0u;
     {
-        unsigned char lx = (unsigned char)RAM(0x0061u);
+        unsigned char lx = (unsigned char)F_CHASE_TARGET_X_R;
         unsigned char ox = (unsigned char)ENEMY_X(slot);
         if (lx > ox) {
             target = 1u;            /* right */
@@ -232,7 +232,7 @@ static void flyer_chase(unsigned int slot)
         }
     }
     {
-        unsigned char ly = (unsigned char)RAM(0x0062u);
+        unsigned char ly = (unsigned char)F_CHASE_TARGET_Y_R;
         unsigned char oy = (unsigned char)ENEMY_Y(slot);
         if (ly != oy) {
             /* NES: BCS branch -> Y stays 1 -> down ($04); fall-through
@@ -327,7 +327,7 @@ void c_turn_towards_player8(void)
     const unsigned int slot = (unsigned int)ENEMY_THROWER_SLOT;
     unsigned char target = 0u;
     {
-        unsigned char lx = (unsigned char)RAM(0x0061u);
+        unsigned char lx = (unsigned char)F_CHASE_TARGET_X_R;
         unsigned char ox = (unsigned char)ENEMY_X(slot);
         if (lx > ox) {
             target = 1u;
@@ -336,7 +336,7 @@ void c_turn_towards_player8(void)
         }
     }
     {
-        unsigned char ly = (unsigned char)RAM(0x0062u);
+        unsigned char ly = (unsigned char)F_CHASE_TARGET_Y_R;
         unsigned char oy = (unsigned char)ENEMY_Y(slot);
         if (ly != oy) {
             unsigned char vbits = (ly < oy) ? 0x08u : 0x04u;
@@ -528,17 +528,17 @@ extern unsigned char enrt_rotate_object_location(unsigned char cosine_bits,
                                                  unsigned char sine_bits,
                                                  unsigned int slot);
 
-#define PF_WORLD_IS_FILLING_HEARTS RAM(0x0063u)
+#define PF_WORLD_IS_FILLING_HEARTS F_ram_0063_R
 extern void roomrom_main_link_end_move_from_object(void);   /* engine main.c */
-#define PF_LINK_STATE              RAM(0x00ACu)
-#define PF_LINK_X                  RAM(0x0070u)
-#define PF_LINK_Y                  RAM(0x0084u)
-#define PF_INPUT_DIR               RAM(0x03F8u)
-#define PF_STATE(s)                RAM(0x00ACu + (s))
-#define PF_TIMER(s)                RAM(0x0028u + (s))
-#define PF_X(s)                    RAM(0x0070u + (s))
-#define PF_Y(s)                    RAM(0x0084u + (s))
-#define PF_DIR(s)                  RAM(0x0098u + (s))
+#define PF_LINK_STATE              F_ram_00AC_R
+#define PF_LINK_X                  F_ram_0070_R
+#define PF_LINK_Y                  F_ram_0084_R
+#define PF_INPUT_DIR               F_ram_03F8_R
+#define PF_STATE(s)                F_ram_00AC_R5((s))
+#define PF_TIMER(s)                F_ram_0028_R4((s))
+#define PF_X(s)                    F_ram_0070_R4((s))
+#define PF_Y(s)                    F_ram_0084_R4((s))
+#define PF_DIR(s)                  F_ram_0098_R3((s))
 
 static const unsigned char k_pond_heart_start_angles[7] = {
     0x14u, 0x10u, 0x0Cu, 0x08u, 0x04u, 0x00u, 0x1Cu
@@ -565,11 +565,11 @@ static void pond_fairy_move_hearts(unsigned int fairy)
         }
         enrt_decrease_object_angle(0x60u, 0x00u, x);
         PF_Y(x) = enrt_rotate_object_location(0x06u, 0x06u, x);
-        RAM(0x0004u) = 0x02u;                         /* red row */
-        RAM(0x0005u) = 0x02u;
-        RAM(0x0000u) = PF_X(x);                       /* Anim_FetchObjPos */
-        RAM(0x0001u) = PF_Y(x);
-        RAM(0x000Fu) = 0u;
+        F_ram_0004_R = 0x02u;                         /* red row */
+        F_ram_0005_R = 0x02u;
+        F_ram_0000_R = PF_X(x);                       /* Anim_FetchObjPos */
+        F_ram_0001_R = PF_Y(x);
+        F_ram_000F_R = 0u;
         draw_object_not_mirrored(0u, fairy);          /* LDX CurObjIndex */
     }
 }

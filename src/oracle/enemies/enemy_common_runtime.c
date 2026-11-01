@@ -32,7 +32,7 @@ void enrt_update_gibdo(unsigned int slot) {
 /* RoomObjCount — bumped when Zol splits so the kill-bookkeeping stays
  * balanced after the parent destroys itself but spawns two children.
  */
-#define ROOM_OBJ_COUNT RAM(0x034E)
+#define ROOM_OBJ_COUNT F_ram_034E_R
 
 /* ZolGelDelays — index by (RNG & 3) for Zol, +4 for Gel. */
 static const unsigned char enrt_zol_gel_delays[8] = {
@@ -111,13 +111,13 @@ static void enrt_update_zol_state_2_split(unsigned int slot) {
 static unsigned int enrt_create_child_gel(unsigned int slot) {
     /* NES LDA #$14 / STA $00: the shot type goes in [00]; the parent
      * Zol keeps its own type (T-147). */
-    RAM(0x0000u) = 0x14u;
+    F_ram_0000_R = 0x14u;
     unsigned int result = c_shoot_limited(slot);
     unsigned int child = result & 0xFFu;
 
     /* New child starts in wander state and inherits grid offset. */
     ENEMY_STATE_TIMER(child) = 0;
-    OBJ(NES_OBJ_GRID_OFFSET, child) = OBJ(NES_OBJ_GRID_OFFSET, slot);
+    F_ram_0394_O(child) = F_ram_0394_O(slot);
     return child;
 }
 
@@ -182,7 +182,7 @@ void enrt_gel_move(unsigned int slot) {
          */
         ENEMY_X(slot) = (unsigned char)(((ENEMY_X(slot) + 8u) & 0xF0u));
         ENEMY_Y(slot) = (unsigned char)((((ENEMY_Y(slot) + 8u) & 0xF0u) | 0x0Du));
-        OBJ(NES_OBJ_GRID_OFFSET, slot) = 0;
+        F_ram_0394_O(slot) = 0;
         ENEMY_STATE_TIMER(slot) = (unsigned char)(ENEMY_STATE_TIMER(slot) + 1);
         return;
     }
@@ -205,7 +205,7 @@ void enrt_update_normal_zol_or_gel(unsigned char qspeed, unsigned int slot) {
     /* If between squares (grid offset != 0) or move timer is non-zero,
      * skip the new-delay assignment.
      */
-    if ((OBJ(NES_OBJ_GRID_OFFSET, slot) | ENEMY_MOVE_TIMER(slot)) != 0)
+    if ((F_ram_0394_O(slot) | ENEMY_MOVE_TIMER(slot)) != 0)
         return;
 
     /* Pick a delay table index from the slot's RNG byte; Gels use the
@@ -227,12 +227,12 @@ void enrt_update_normal_zol_or_gel(unsigned char qspeed, unsigned int slot) {
 unsigned int enrt_gel_move_splitting(unsigned int slot) {
     ENEMY_WALK_SPEED(slot) = 0xFF;
     /* Copy facing direction → global moving-direction cell ($000F). */
-    RAM(NES_OBJ_DIR) = ENEMY_DIR(slot);
+    F_ram_000F_R2 = ENEMY_DIR(slot);
 
     /* If sitting at a tile boundary (grid offset == 0), check the next
      * tile we'd step onto.
      */
-    if (OBJ(NES_OBJ_GRID_OFFSET, slot) == 0) {
+    if (F_ram_0394_O(slot) == 0) {
         unsigned char tile = z07_get_colliding_tile_moving(slot);
         unsigned char floor = ENEMY_DUNGEON_TILE_FLOOR;  /* dungeon tile floor */
         /* CMP D1,D0; bcc → 6502 carry set when D0 (tile) >= D1 (floor),
@@ -250,10 +250,10 @@ unsigned int enrt_gel_move_splitting(unsigned int slot) {
     c_move_object((unsigned short)slot);
 
     /* Mask grid offset back into 0..$0F if it's snapped to a tile. */
-    unsigned char off = OBJ(NES_OBJ_GRID_OFFSET, slot);
+    unsigned char off = F_ram_0394_O(slot);
     unsigned char masked = (unsigned char)(off & 0x0Fu);
     if (masked == 0) {
-        OBJ(NES_OBJ_GRID_OFFSET, slot) = 0;
+        F_ram_0394_O(slot) = 0;
     }
     return 0;
 }
@@ -266,7 +266,7 @@ unsigned int enrt_gel_move_splitting(unsigned int slot) {
  * but we mirror the original behaviour exactly.
  */
 void enrt_gel_check_collisions(unsigned int slot) {
-    RAM(NES_SCRATCH_2) = ENEMY_X(slot);
-    RAM(NES_SCRATCH_3) = ENEMY_Y(slot);
+    F_ram_0002_R3 = ENEMY_X(slot);
+    F_ram_0003_R4 = ENEMY_Y(slot);
     c_check_monster_collisions(slot);
 }

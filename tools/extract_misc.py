@@ -35,6 +35,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.nesdata.pieces import write_piece  # noqa: E402
+
 # Canonical NES ROM SHA256 (locked in spec Section 0 / docs/audit/baseline_rom.md).
 NES_ROM_SHA256 = "8f72dc2e98572eb4ba7c3a902bca5f69c448fc4391837e5f8f0d4556280440ac"
 
@@ -563,25 +566,18 @@ def write_palettes_c(out_dir, z01_blocks, z02_blocks):
     payload = b"".join(chunks)
     content = bytes_to_c_array(payload, "misc_palettes")
     write_c_file(os.path.join(out_dir, "palettes.c"), content)
-    write_gray_table_c(out_dir, lookup_words)
+    write_gray_table_piece(lookup_words)
     return meta
 
 
-def write_gray_table_c(out_dir, lookup_words):
-    """Emit the ROM lookup using the original runtime's first-index rule."""
+def write_gray_table_piece(lookup_words):
+    """k_gray_by_word[512] (.nesdata), big-endian u16, using the original runtime's first-index rule."""
     table = [lookup_words[0]] * 512
     for index in range(63, -1, -1):
         word = lookup_words[index]
         key = ((word >> 1) & 7) | ((word >> 2) & 0x38) | ((word >> 3) & 0x1C0)
         table[key] = lookup_words[index & 0x30]
-    lines = ["/* Generated from misc_palettes; do not edit by hand. */",
-             "const unsigned short k_gray_by_word[512] = {"]
-    for offset in range(0, 512, 8):
-        values = ", ".join(f"0x{word:03X}u" for word in table[offset:offset + 8])
-        lines.append("    " + values + ("," if offset < 504 else ""))
-    lines.append("};")
-    with open(os.path.join(out_dir, "gray_table.c"), "w", encoding="utf-8", newline="\n") as output:
-        output.write("\n".join(lines) + "\n")
+    write_piece("gray_by_word", b"".join(w.to_bytes(2, "big") for w in table))
 
 
 def write_person_text_c(out_dir, z01_blocks, person_text_data):

@@ -65,19 +65,19 @@ static unsigned char sgdk_to_nes_buttons(u16 joy)
 
 void nes_ram_sync_input(u16 held, u16 edge_pressed)
 {
-    nes_ram[NES_RAM_BUTTONS_PRESSED] = sgdk_to_nes_buttons(edge_pressed);
-    nes_ram[NES_RAM_BUTTONS_DOWN]    = sgdk_to_nes_buttons(held);
+    F_ram_00F8_N = sgdk_to_nes_buttons(edge_pressed);
+    F_NES_RAM_BUTTONS_DOWN_00FA_N    = sgdk_to_nes_buttons(held);
     /* ObjInputDir ($03F8): NES UpdateMode5Play sets it from ButtonsDown &
      * $0F every play frame before UpdatePlayer (Z_05.asm, "Save current
      * direction from input buttons"). Read by tile-object pushes (T-050)
      * and Wallmaster. UpdatePlayer's later adjustments are Link's (T-102). */
-    nes_ram[0x03F8u] = (unsigned char)(nes_ram[NES_RAM_BUTTONS_DOWN] & 0x0Fu);
+    F_ram_03F8 = (unsigned char)(F_NES_RAM_BUTTONS_DOWN_00FA_N & 0x0Fu);
 }
 
 void nes_ram_sync_input2(u16 held, u16 edge_pressed)
 {
-    nes_ram[NES_RAM_BUTTONS_PRESSED + 1u] = sgdk_to_nes_buttons(edge_pressed);
-    nes_ram[NES_RAM_BUTTONS_DOWN + 1u]    = sgdk_to_nes_buttons(held);
+    F_NES_RAM_BUTTONS_PRESSED_N = sgdk_to_nes_buttons(edge_pressed);
+    F_NES_RAM_BUTTONS_DOWN_00FB_N    = sgdk_to_nes_buttons(held);
 }
 
 /* Per-frame sync: nes_ram is canonical for drained combat
@@ -89,21 +89,21 @@ void nes_ram_sync_input2(u16 held, u16 edge_pressed)
  * nes_ram_seed_inventory_hearts(). */
 void nes_ram_sync_inventory_hearts(void)
 {
-    g_inventory.heart_values  = nes_ram[NES_RAM_HEART_VALUES];
-    g_inventory.heart_partial = nes_ram[NES_RAM_HEART_PARTIAL];
+    g_inventory.heart_values  = F_ram_066F_N;
+    g_inventory.heart_partial = F_ram_0670_N;
 }
 
 void nes_ram_seed_inventory_hearts(void)
 {
-    nes_ram[NES_RAM_HEART_VALUES]  = g_inventory.heart_values;
-    nes_ram[NES_RAM_HEART_PARTIAL] = g_inventory.heart_partial;
+    F_ram_066F_N  = g_inventory.heart_values;
+    F_ram_0670_N = g_inventory.heart_partial;
 }
 
 void nes_ram_sync_link_face(void)
 {
-    unsigned char idx = (unsigned char)players[0].face;
+    unsigned char idx = (unsigned char)PLAYER(0).face;
     if (idx > 3u) idx = 0u;
-    nes_ram[NES_RAM_OBJDIR_LINK] = k_face_to_nes_dir[idx];
+    F_ram_0098_N2 = k_face_to_nes_dir[idx];
 }
 
 /* NES Variables.inc cell bases.
@@ -130,23 +130,23 @@ void nes_ram_sync_sword(void)
 {
     unsigned char st  = roomrom_combat_get_swing_state();
     if (st == 0u) {
-        nes_ram[NES_OBJ_STATE_BASE + NES_SWORD_SLOT] = 0u;
+        F_ram_00B9_N = 0u;
     } else {
         unsigned char fi = (unsigned char)roomrom_combat_get_swing_face();
         if (fi > 3u) {
             fi = 0u;
         }
-        nes_ram[NES_OBJ_DIR_BASE + NES_SWORD_SLOT] = k_face_to_nes_dir[fi];
-        nes_ram[NES_OBJ_X_BASE + NES_SWORD_SLOT] =
+        F_ram_00A5_N = k_face_to_nes_dir[fi];
+        F_ram_007D_N =
             (unsigned char)roomrom_combat_get_swing_x();
-        nes_ram[NES_OBJ_Y_BASE + NES_SWORD_SLOT] =
+        F_ram_0091_N =
             (unsigned char)roomrom_combat_get_swing_y();
-        nes_ram[NES_OBJ_STATE_BASE + NES_SWORD_SLOT] = st;
+        F_ram_00B9_N = st;
     }
 
 }
 
 void nes_ram_seed_sword_level(unsigned char level)
 {
-    nes_ram[NES_ITEM_SWORD_LEVEL] = level;
+    F_ram_0657_N = level;
 }

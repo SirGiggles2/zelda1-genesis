@@ -57,6 +57,20 @@ static void control_patra_flight(unsigned int slot)
     }
 }
 
+/* NES source: Z_04.asm:UpdatePatra @LoopChildren (slots9..2).
+ * Drained C: boss_patra_update child-search branch formerly below.
+ * Coverage: both Patra types, world and extra-player weapon admission.
+ * Stance: EXTEND the existing boss-owned protection predicate. */
+unsigned char boss_patra_has_children(void)
+{
+    unsigned int slot;
+    for (slot = 9u; slot >= 2u; --slot) {
+        const unsigned char type = (unsigned char)ENEMY_TYPE(slot);
+        if (type == 0x25u || type == 0x26u) return 1u;
+    }
+    return 0u;
+}
+
 /* UpdatePatra (NES Z_04.asm:10070). */
 void boss_patra_update(unsigned int slot)
 {
@@ -73,18 +87,7 @@ void boss_patra_update(unsigned int slot)
     c_move_flyer(slot);
     enrt_animate_and_draw_common_object(2u, slot);
 
-    /* @LoopChildren — scan slots 9..2 for a live patra child.
-     * NES uses LDY #$08 / LDA ObjType+1, Y → reads ObjType[Y+1] for Y=8..1. */
-    {
-        unsigned int y;
-        for (y = 8u; y != 0u; --y) {
-            const unsigned char t = (unsigned char)OBJ(NES_OBJ_TYPE, y + 1u);
-            if (t == 0x25u || t == 0x26u) {
-                found_d3 = y;
-                break;
-            }
-        }
-    }
+    found_d3 = boss_patra_has_children();
 
     if (found_d3 != 0u) {
         /* Children alive — Link can be hurt, but Patra cannot. */
@@ -104,7 +107,7 @@ void boss_patra_update(unsigned int slot)
      * PatraManeuverTime[post-collision Y], not the child-search Y. */
     {
         const unsigned char timer = ENEMY_OBJ_TIMER_HI(slot);
-        const unsigned char angle_w_3 = (unsigned char)nes_ram[0x0394u + 3u];
+        const unsigned char angle_w_3 = (unsigned char)F_ram_0397_N;
         if ((unsigned char)(timer | angle_w_3) == 0u) {
             ENEMY_PATRA_MANEUVER_INDEX(slot) ^= 0x01u;
             ENEMY_OBJ_TIMER_HI(slot) =

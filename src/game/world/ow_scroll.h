@@ -28,6 +28,9 @@ void ow_scroll_begin_enter(unsigned char nes_dir);
  * Random and timer work must still run); read once, then cleared. */
 unsigned char ow_scroll_take_catch_up(void);
 unsigned char ow_scroll_tick(short *x, short *y);
+/* T-409 Remix SCROLL SPEED: more whole NES frames to run in this video
+ * frame while the room slides (mode 7 update): 0 (NORMAL), 1, 3. */
+unsigned char ow_scroll_extra_frames(void);
 /* UW InitMode_EnterRoom @Method2 for Link: DoorwayDir, X at the entered
  * edge (horizontal), ObjGridOffset from the entered door's type, and the
  * close command for an opened entered door. */

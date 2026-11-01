@@ -15,6 +15,8 @@ void roomrom_candle_fire_init(void);
 void roomrom_candle_fire_spawn(link_face_t face, short link_x, short link_y);
 void roomrom_candle_fire_update(void);
 unsigned char roomrom_candle_fire_active(void);
+/* Contact only, with the selected player's slot-0 context loaded. */
+void roomrom_candle_fire_check_player_contact(void);
 
 /* NES UsedCandle ($0513): blocks a second blue-candle fire. Cleared on
  * room entry (InitMode_EnterRoom clears $0300-$051F). */
@@ -23,7 +25,8 @@ void          roomrom_candle_fire_mark_used(void);
 void          roomrom_candle_fire_room_reset(void);
 
 /* HandleShotBlocked book fire: WieldCandle's slot search + fire setup
- * without Link's state change; returns the slot left in X. */
+ * without Link's state change; returns the slot left in X, or $FF on
+ * Remix allocation failure. Original retains the NES failure result. */
 unsigned char candle_fire_wield_from_shot(void);
 
 /* UpdateFire for slot x (state $21 moving / $22 standing). */

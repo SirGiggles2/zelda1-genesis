@@ -149,12 +149,12 @@ void enrt_init_moldorm(unsigned int slot)
     }
 
     /* Random head direction for slot 5. */
-    rnd = (unsigned char)(RAM(0x001Du) & 0x07u);
+    rnd = (unsigned char)(F_ram_001D_R & 0x07u);
     ENEMY_DIR(5) = Directions8[rnd];
     ENEMY_MOLDORM_OLD_DIR(5) = Directions8[rnd];
 
     /* Random head direction for slot $A. */
-    rnd = (unsigned char)(RAM(0x0022u) & 0x07u);
+    rnd = (unsigned char)(F_ram_0022_R & 0x07u);
     ENEMY_DIR(0x0A) = Directions8[rnd];
     ENEMY_MOLDORM_OLD_DIR(0x0A) = Directions8[rnd];
 
@@ -171,7 +171,6 @@ void enrt_update_moldorm(unsigned int slot)
 {
     unsigned char saved_timer;
     unsigned char saved_dir;
-    unsigned int y;
 
     if (ENEMY_DIR(slot) == 0u)
         return;
@@ -184,7 +183,7 @@ void enrt_update_moldorm(unsigned int slot)
     }
 
     /* Draw fireball tile $44, palette row 2 (red). */
-    RAM(0x0003u) = 0x02u;
+    F_ram_0003_R = 0x02u;
     c_anim_write_sprite(0x44u, slot);
 
     /* Save dir + timer across collision check (NES preserves both
@@ -195,6 +194,15 @@ void enrt_update_moldorm(unsigned int slot)
     ENEMY_MOVE_TIMER(slot) = saved_timer;
     ENEMY_DIR(slot) = saved_dir;
 
+    enrt_moldorm_finish_collisions(slot);
+}
+
+/* NES source: UpdateMoldorm post-collision tail. Drained C: unchanged body
+ * below. Coverage: P1 and party lethal hit finalization. Stance: EXTEND
+ * shared ownership; never move, draw or tick the enemy a second time. */
+void enrt_moldorm_finish_collisions(unsigned int slot)
+{
+    unsigned int y;
     /* Segment alive → done. */
     if (ENEMY_METASTATE(slot) == 0u)
         return;

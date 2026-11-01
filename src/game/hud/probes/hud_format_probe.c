@@ -57,8 +57,8 @@ static void format_with_counters(unsigned char rupees, unsigned char bombs,
     LINK_PARTIAL_HEART = 0u;
     LINK_RUPEES = rupees;
     LINK_BOMB_COUNT = bombs;
-    RAM(0x066Eu) = keys;
-    RAM(0x0664u) = master_key;
+    F_ram_066E_R2 = keys;
+    F_ram_0664_R = master_key;
     hud_format_status_bar_text();
 }
 
@@ -331,9 +331,9 @@ static void anim_setup(unsigned char rupees_to_add, signed char delta,
     LINK_HEARTS = 0x33u;            /* avoid heart-tile traps */
     LINK_PARTIAL_HEART = 0u;
     LINK_BOMB_COUNT = 0u;
-    RAM(0x066Eu) = 0u;              /* keys */
-    RAM(0x0664u) = 0u;              /* master_key */
-    RAM(0x067Du) = rupees_to_add;
+    F_ram_066E_R2 = 0u;              /* keys */
+    F_ram_0664_R = 0u;              /* master_key */
+    F_NES_RUPEES_TO_ADD_R = rupees_to_add;
     CAVE_DOOR_REPAIR_RUPEE_DELTA = delta;
     FRAME_COUNTER = fc;
     ROOM_TRANSFER_BUF_SELECT = buf_select;
@@ -350,7 +350,7 @@ static unsigned char test_anim_buf_select_skip(void)
     /* BUF_SELECT=1: function returns immediately; $067D unchanged. */
     anim_setup(5u, 0, 10u, 0u, /*buf_select=*/1u, /*bit7=*/1u);
     hud_world_change_rupees();
-    const unsigned char ok = (RAM(0x067Du) == 5u
+    const unsigned char ok = (F_NES_RUPEES_TO_ADD_R == 5u
                            && (unsigned char)LINK_RUPEES == 10u
                            && ROOM_SFX_MAIN == 0u) ? 1u : 0u;
     ROOM_TRANSFER_BUF_SELECT = 0u;
@@ -362,7 +362,7 @@ static unsigned char test_anim_high_bit_clear_skip(void)
     /* TRANSFER_BUF_BYTE(0) bit 7 clear: return; $067D unchanged. */
     anim_setup(5u, 0, 10u, 0u, /*buf_select=*/0u, /*bit7=*/0u);
     hud_world_change_rupees();
-    return (RAM(0x067Du) == 5u
+    return (F_NES_RUPEES_TO_ADD_R == 5u
          && (unsigned char)LINK_RUPEES == 10u
          && ROOM_SFX_MAIN == 0u) ? 1u : 0u;
 }
@@ -372,7 +372,7 @@ static unsigned char test_anim_odd_frame_skip(void)
     /* FRAME_COUNTER odd → return after inventory edge checks. */
     anim_setup(5u, 0, 10u, 1u, /*buf_select=*/0u, /*bit7=*/1u);
     hud_world_change_rupees();
-    return (RAM(0x067Du) == 5u
+    return (F_NES_RUPEES_TO_ADD_R == 5u
          && (unsigned char)LINK_RUPEES == 10u
          && ROOM_SFX_MAIN == 0u) ? 1u : 0u;
 }
@@ -382,7 +382,7 @@ static unsigned char test_anim_credit_tick(void)
     /* $067D=5, RUPEES=10, delta=0 → $067D=4, RUPEES=11, sfx=16. */
     anim_setup(5u, 0, 10u, 0u, /*buf_select=*/0u, /*bit7=*/1u);
     hud_world_change_rupees();
-    return (RAM(0x067Du) == 4u
+    return (F_NES_RUPEES_TO_ADD_R == 4u
          && (unsigned char)LINK_RUPEES == 11u
          && ROOM_SFX_MAIN == 16u) ? 1u : 0u;
 }
@@ -419,7 +419,7 @@ static unsigned char test_anim_max_clears_rta(void)
     anim_setup(/*rta=*/5u, /*delta=*/0, /*rupees=*/0xFFu, /*fc=*/1u,
                /*buf_select=*/0u, /*bit7=*/1u);
     hud_world_change_rupees();
-    return (RAM(0x067Du) == 0u
+    return (F_NES_RUPEES_TO_ADD_R == 0u
          && (unsigned char)LINK_RUPEES == 0xFFu) ? 1u : 0u;
 }
 
@@ -441,9 +441,9 @@ void hud_format_probe_run(void)
     const unsigned char saved_partial    = (unsigned char)LINK_PARTIAL_HEART;
     const unsigned char saved_rupees     = (unsigned char)LINK_RUPEES;
     const unsigned char saved_bombs      = (unsigned char)LINK_BOMB_COUNT;
-    const unsigned char saved_keys       = (unsigned char)RAM(0x066Eu);
-    const unsigned char saved_master_key = (unsigned char)RAM(0x0664u);
-    const unsigned char saved_rta        = (unsigned char)RAM(0x067Du);
+    const unsigned char saved_keys       = (unsigned char)F_ram_066E_R2;
+    const unsigned char saved_master_key = (unsigned char)F_ram_0664_R;
+    const unsigned char saved_rta        = (unsigned char)F_NES_RUPEES_TO_ADD_R;
     const signed char   saved_delta      = (signed char)CAVE_DOOR_REPAIR_RUPEE_DELTA;
     const unsigned char saved_buf_sel    = (unsigned char)ROOM_TRANSFER_BUF_SELECT;
     const unsigned char saved_fc         = (unsigned char)FRAME_COUNTER;
@@ -496,9 +496,9 @@ void hud_format_probe_run(void)
     LINK_PARTIAL_HEART = saved_partial;
     LINK_RUPEES = saved_rupees;
     LINK_BOMB_COUNT = saved_bombs;
-    RAM(0x066Eu) = saved_keys;
-    RAM(0x0664u) = saved_master_key;
-    RAM(0x067Du) = saved_rta;
+    F_ram_066E_R2 = saved_keys;
+    F_ram_0664_R = saved_master_key;
+    F_NES_RUPEES_TO_ADD_R = saved_rta;
     CAVE_DOOR_REPAIR_RUPEE_DELTA = saved_delta;
     ROOM_TRANSFER_BUF_SELECT = saved_buf_sel;
     FRAME_COUNTER = saved_fc;

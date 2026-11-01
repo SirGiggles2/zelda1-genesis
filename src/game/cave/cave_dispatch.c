@@ -34,6 +34,11 @@
                                          * core_abs, core_unhalt_link */
 #include "items/item_dispatch.h"        /* item_take_item */
 #include "../../state/game_profile.h"
+#include "../../state/player_state.h"
+#include "../../state/input_state.h"
+#include "../../state/loadout.h"
+#include "../../state/weapon_state.h"
+#include "../items/item_upgrades.h"
 
 /* Phase D3 (2026-05-24): correct PersonTextAddrs to its Genesis layout.
  * The data file (src/data/person_text_data.c) emits a 38-pointer array
@@ -181,30 +186,30 @@ void cave_init_person(unsigned int slot)
     /* SetUpCommonCaveObjects (Z_01.asm:271): person at ($78, $80), HP 0,
      * attr $81; halt Link; bonfires $40 in the next two slots at
      * ($48, $80) and ($A8, $80). */
-    RAM(0x0070u + slot) = 0x78u;          /* ObjX */
-    RAM(0x0084u + slot) = 0x80u;          /* ObjY */
-    RAM(0x0485u + slot) = 0x00u;          /* ObjHP */
+    F_ram_0070_R4(slot) = 0x78u;          /* ObjX */
+    F_ram_0084_R4(slot) = 0x80u;          /* ObjY */
+    F_ram_0485_R(slot) = 0x00u;          /* ObjHP */
     /* NES source: Redux bugfixes/cave_room_timer.asm:$86A3.
      * Drained C: cavert_init_cave / cave_init_person (Original inherits29).
      * Coverage: FULL(profile-specific initialization); live lifecycle separate.
      * Stance: EXTEND. Redux resets the shared cloud/text timer here. */
-    if (game_profile_is_remix()) RAM(0x0029u) = 0u;
-    RAM(0x04BFu + slot) = 0x81u;          /* ObjAttr */
-    RAM(0x00ACu) = 0x40u;                 /* ObjState (Link) = halted */
-    RAM(0x034Fu + 2u) = 0x40u;            /* ObjType+2 = StandingFire */
-    RAM(0x034Fu + 3u) = 0x40u;            /* ObjType+3 */
-    RAM(0x0070u + slot + 1u) = 0x48u;     /* ObjX+1,X */
-    RAM(0x0070u + slot + 2u) = 0xA8u;     /* ObjX+2,X */
-    RAM(0x0084u + slot + 1u) = 0x80u;     /* ObjY+1,X */
-    RAM(0x0084u + slot + 2u) = 0x80u;     /* ObjY+2,X */
+    if (game_profile_is_remix()) F_ram_0029_R = 0u;
+    F_ram_04BF_R(slot) = 0x81u;          /* ObjAttr */
+    F_ram_00AC_R = 0x40u;                 /* ObjState (Link) = halted */
+    F_ram_0351_R2 = 0x40u;            /* ObjType+2 = StandingFire */
+    F_ram_0352_R = 0x40u;            /* ObjType+3 */
+    F_ENEMY_GLEEOK_BASE_X_R3(slot) = 0x48u;     /* ObjX+1,X */
+    F_ram_0072_R2(slot) = 0xA8u;     /* ObjX+2,X */
+    F_ENEMY_GLEEOK_BASE_Y_R3(slot) = 0x80u;     /* ObjY+1,X */
+    F_ram_0086_R2(slot) = 0x80u;     /* ObjY+2,X */
 
     /* @TakeType: give-item ($6A-$6D, $71, $72) and door-charge/money
      * ($7B+) people show nothing once their item was taken: destroy the
      * person and unhalt Link. */
     if (cave_id == 0x72u || cave_id == 0x71u || cave_id >= 0x7Bu || cave_id < 0x6Eu) {
         if (progress_get_room_flag_uw_item_state() != 0u) {
-            RAM(0x034Fu + 1u) = 0u;       /* ObjType+1 */
-            RAM(0x00ACu) = 0u;            /* UnhaltLink */
+            F_CAVE_ROOM_TYPE_R2 = 0u;       /* ObjType+1 */
+            F_ram_00AC_R = 0u;            /* UnhaltLink */
             return;
         }
     }
@@ -231,10 +236,10 @@ void cave_init_person(unsigned int slot)
         /* LevelBlockAttrsE / +60 in WRAM: the installed OW level block
          * (level_info_install_ow), read as the NES reads it. */
         for (unsigned char i = 0u; i < 3u; ++i) {
-            unsigned char ware  = (unsigned char)RAM(NES_SRAM_LBA_E_BASE + ware_off + i);
-            unsigned char price = (unsigned char)RAM(NES_SRAM_LBA_E_PRICE + ware_off + i);
-            RAM(0x0422u + i) = ware;                   /* CaveItemIds */
-            RAM(0x0430u + i) = price;                  /* CavePrices */
+            unsigned char ware  = (unsigned char)F_ram_6A7E_R(ware_off, i);
+            unsigned char price = (unsigned char)F_NES_SRAM_LBA_E_PRICE_R(ware_off, i);
+            F_ram_0422_R(i) = ware;                   /* CaveItemIds */
+            F_ram_0430_R2(i) = price;                  /* CavePrices */
             if (i == 0u) ware_flag_0 = (unsigned char)(ware & 0xC0u);
             if (i == 1u) ware_flag_1 = (unsigned char)(ware & 0xC0u);
             if (i == 2u) ware_flag_2 = (unsigned char)(ware & 0xC0u);
@@ -245,10 +250,10 @@ void cave_init_person(unsigned int slot)
                                                    (ware_flag_1 >> 2));
         /* Scratch as the NES leaves it: [00] combined flags (without
          * item 1's), [01]/[02] item 1/2 flags, [03] text-selector flags. */
-        RAM(0x0000u) = (unsigned char)(ware_flag_0 | (tmp_flags_top >> 6) | (ware_flag_2 >> 4));
-        RAM(0x0001u) = ware_flag_1;
-        RAM(0x0002u) = ware_flag_2;
-        RAM(0x0003u) = tmp_flags_top;
+        F_ram_0000_R = (unsigned char)(ware_flag_0 | (tmp_flags_top >> 6) | (ware_flag_2 >> 4));
+        F_ram_0001_R = ware_flag_1;
+        F_ram_0002_R = ware_flag_2;
+        F_ram_0003_R = tmp_flags_top;
         cave_flags_set(cave_flags);
 
         if (cave_flags & 0x20u) {
@@ -294,10 +299,10 @@ void cave_exit(void)
      * enemy_loop would otherwise tick + draw them on every OW frame after
      * cave exit (NES InitMode_EnterRoom: types cleared, $492 DEC to $FF,
      * positions left as they were). */
-    RAM(0x034Fu + 2u) = 0u;   /* ObjType+2 = 0 */
-    RAM(0x034Fu + 3u) = 0u;   /* ObjType+3 = 0 */
-    RAM(0x0492u + 2u) = 0xFFu;
-    RAM(0x0492u + 3u) = 0xFFu;
+    F_ram_0351_R2 = 0u;   /* ObjType+2 = 0 */
+    F_ram_0352_R = 0u;   /* ObjType+3 = 0 */
+    F_ram_0494_R = 0xFFu;
+    F_ram_0495_R = 0xFFu;
 }
 
 cave_id_t cave_current_id(void)
@@ -392,10 +397,10 @@ void cave_draw_items(void)
             /* ObjX/ObjY for slot 19 = CAVE_WARE_DRAW_SLOT.
              * NES: STA ObjX+19 / STA ObjY+19. ObjX base = $0070 → +19 = $0083.
              * ObjY base = $0084 → +19 = $0097. */
-            RAM(0x0083) = k_cave_ware_xs[i];
-            RAM(0x0097) = 0x98u;
+            F_ram_0083_R2 = k_cave_ware_xs[i];
+            F_ram_0097_R2 = 0x98u;
             /* CaveItemIds[i] = $0422 + i (CAVE_WARE_ITEM macro). $3F = sentinel. */
-            const unsigned char item = (unsigned char)(RAM(0x0422 + i) & 0x3Fu);
+            const unsigned char item = (unsigned char)(F_ram_0422_R2(i) & 0x3Fu);
             if (item != 0x3Fu) {
                 draw_animate_item_object(item, 19u);
             }
@@ -406,10 +411,28 @@ void cave_draw_items(void)
 
     /* Show-prices flag → draw rupee sprite at ($30, $AB), item id $18 (rupee). */
     if (cave_flags_get() & 0x08u) {
-        RAM(0x0083) = 0x30u;
-        RAM(0x0097) = 0xABu;
+        F_ram_0083_R2 = 0x30u;
+        F_ram_0097_R2 = 0xABu;
         draw_animate_item_object(0x18u, 19u);
     }
+}
+
+/* NES source: Z_01.asm:UpdateCavePersonState_TalkOrShopOrDoorCharge.
+ * Drained C: the ware scan below; Coverage: PARTIAL party toucher only.
+ * Stance: EXTEND exact NES X/Y contact, shared prices and award owner. */
+static unsigned char cave_ware_toucher(unsigned char x)
+{
+    unsigned char player;
+    if (F_ram_0070_R2 == x &&
+        cave_abs_inline((unsigned char)(F_ram_0084_R2 - 0x98u)) < 6u)
+        return 0u;
+    for (player = 1u; player < g_player_count; ++player) {
+        const PlayerState *actor = &PLAYER(player);
+        if ((actor->state & 0xC0u) != 0x40u && (unsigned char)actor->x == x &&
+            cave_abs_inline((unsigned char)(actor->y - 0x98u)) < 6u)
+            return player;
+    }
+    return PLAYER_REF_NONE;
 }
 
 void cave_update_talk_shop_or_door_charge(void)
@@ -437,22 +460,15 @@ void cave_update_talk_shop_or_door_charge(void)
 
     /* Branch 3: ware-purchase loop. Scan slots 2,1,0. NES: LDX #$02 / DEX / BPL. */
     for (signed int i = 2; i >= 0; --i) {
-        const unsigned char item = (unsigned char)(RAM(0x0422 + i) & 0x3Fu);
+        const unsigned char item = (unsigned char)(F_ram_0422_R2(i) & 0x3Fu);
         if (item == 0x3Fu) {
             continue;
         }
-        /* Link X ($0070) must equal ware slot's X. */
-        if (RAM(0x0070) != k_cave_ware_xs[i]) {
-            continue;
-        }
-        /* abs(Link Y ($0084) - 0x98) < 6. */
-        const unsigned char dist = cave_abs_inline((unsigned char)(RAM(0x0084) - 0x98u));
-        if (dist >= 6u) {
-            continue;
-        }
+        const unsigned char taker = cave_ware_toucher(k_cave_ware_xs[i]);
+        if (taker == PLAYER_REF_NONE) continue;
 
         /* Selected ware index latches. */
-        RAM(0x0438) = (unsigned char)i;  /* NES $0438 = CAVE_SELECTED_WARE_INDEX */
+        F_CAVE_SELECTED_WARE_INDEX_R = (unsigned char)i;  /* NES $0438 = CAVE_SELECTED_WARE_INDEX */
 
         const unsigned char flags30 = (unsigned char)(cave_flags_get() & 0x30u);
         if (flags30) {
@@ -462,20 +478,20 @@ void cave_update_talk_shop_or_door_charge(void)
                 return;
             }
             /* Pay then advance. */
-            if (LINK_RUPEES < RAM(0x0430 + i)) {
+            if (LINK_RUPEES < F_ram_0430_R3(i)) {
                 return;  /* not enough rupees */
             }
-            core_post_debit((unsigned int)RAM(0x0430 + i));
+            core_post_debit((unsigned int)F_ram_0430_R3(i));
             CAVE_PERSON_STATE = 5u;
             return;
         }
 
         /* No $30 flags: regular ware purchase. */
         if (cave_flags_get() & 0x02u) {
-            if (LINK_RUPEES < RAM(0x0430 + i)) {
+            if (LINK_RUPEES < F_ram_0430_R3(i)) {
                 return;
             }
-            core_post_debit((unsigned int)RAM(0x0430 + i));
+            core_post_debit((unsigned int)F_ram_0430_R3(i));
         }
         if (cave_flags_get() & 0x40u) {
             const unsigned char min_hearts =
@@ -486,13 +502,13 @@ void cave_update_talk_shop_or_door_charge(void)
         }
         /* Take the ware. */
         progress_set_room_flag_uw_item_state();
-        RAM(0x0422 + i) = 0xFFu;  /* CAVE_WARE_ITEM(i) = 0xFF */
+        F_ram_0422_R2(i) = 0xFFu;  /* CAVE_WARE_ITEM(i) = 0xFF */
         /* Phase D4 (2026-05-24): wire item_take_item. Sets
          * ITEM_FREEZE_FLAG=$80 + ITEM_PICKUP_ID=item (cave is not
          * GAME_MODE 5) so existing held-item overlay drives the
          * cave-shop ware acquisition flash. NES TakeItem at
          * Z_05.asm:5040. */
-        item_take_item(item);
+        item_take_item_for_player(item, taker);
         /* NES source: Redux arrows.asm:ShopArrow, Y=arrow inventory slot2.
          * Drained C: cave_update_talk_shop_or_door_charge purchase path.
          * Coverage: FULL(wood/silver grants capped30/60 after acquisition).
@@ -561,13 +577,13 @@ void cave_write_prices_to_dynamic_transfer_buf(unsigned char price_char)
      *     dynamic transfer buffer at offset.
      * Bumps delay timer to 10 frames + cues advance-state. */
     /* Live Redux price records use LOW_X ($62), also used by its HUD. */
-    RAM(0x0305) = (game_profile_is_remix() && price_char == 0x21u)
+    F_M8_DYN_TILE_BUF_0305_R2 = (game_profile_is_remix() && price_char == 0x21u)
         ? 0x62u : price_char;        /* DynTileBuf+3 = price char */
     CAVE_TRANSFER_PRICE_COUNT  = 0u; /* CaveCurPriceIndex  = $042E */
     CAVE_TRANSFER_PRICE_OFFSET = 0u; /* CaveCurPriceOffset = $042F */
     do {
         const unsigned char price_index = CAVE_TRANSFER_PRICE_COUNT;
-        const unsigned char price = (unsigned char)RAM(0x0430 + price_index);
+        const unsigned char price = (unsigned char)F_ram_0430_R3(price_index);
         unsigned char dash;
         unsigned char off;
 
@@ -623,7 +639,7 @@ void cave_copy_price_list_template(void)
      * z01_copy_price_list_template transpile shim that did not link
      * into Zelda.md. */
     for (unsigned char i = 0u; i < sizeof(k_cave_price_list_template); ++i) {
-        RAM(CAVE_TRANSFER_BUF_CHAR_BASE + i) = k_cave_price_list_template[i];
+        F_ram_0302_R(i) = k_cave_price_list_template[i];
     }
 }
 
@@ -651,7 +667,7 @@ void cave_update_cave_person(unsigned int slot)
      * dispatch. NES `LDA ObjState+1 / CMP #4 / BNE :+ / LDA FrameCounter
      *               / AND #$01 / BNE @UpdateCavePersonDirect`. */
     const unsigned char state = CAVE_PERSON_STATE;
-    if (!(state == 4u && (RAM(0x0015) & 1u))) {  /* FrameCounter = $0015 */
+    if (!(state == 4u && (F_ram_0015_R3 & 1u))) {  /* FrameCounter = $0015 */
         /* Set CurObjIndex ($0340 = ENEMY_THROWER_SLOT) before draw so
          * enemy_render_publish_pair_left tags the cache entry with the
          * cave NPC slot rather than the last-set enemy thrower slot.
@@ -664,13 +680,38 @@ void cave_update_cave_person(unsigned int slot)
         /* Medicine-shop letter ($74) logic. NES: `LDA ObjType+1 / CMP #$74
          *   / BNE @DrawItems / LDA InvLetter / CMP #$02 / BEQ @DrawItems`. */
         if (cave_room_type_get() == 0x74u && CAVE_ROOM_SCRIPT_STATE != 2u) {
-            /* SelectedItemSlot ($0656) == 0x0F (letter slot) AND B pressed
-             * (ButtonsPressed bit 0x40) → use letter. */
-            if (RAM(0x0656) == 0x0Fu && (CAVE_LINK_INPUT_FLAGS & 0x40u)) {
-                RAM(0x0602) = 4u;                /* Tune1Request = secret-found tune */
+            /* NES source: Z_01.asm:UpdateCavePerson @UseLetter.
+             * Drained C: cavert_update_cave_person.
+             * Coverage: PARTIAL (NES B plus Remix party B/C; shared shop owner).
+             * Stance: EXTEND without changing Original's B path. InputState
+             * holds normalized SGDK bits; B/C are 0x10/0x20 (joy.h). */
+            unsigned char b_letter = (unsigned char)(F_ram_0656_R3 == 0x0Fu && (CAVE_LINK_INPUT_FLAGS & 0x40u));
+            unsigned char c_letter = 0u;
+            unsigned char letter_player = 0u;
+            if (game_profile_is_remix()) {
+                for (unsigned char player=0u; player<g_player_count; ++player) {
+                    const unsigned short pressed=input_state_game_pressed(player);
+                    const unsigned char b=player?loadout_party_b(player):F_ram_0656_R3;
+                    const unsigned char c=player?loadout_party_c(player):loadout_c_slot();
+                    if (!b_letter && b==0x0Fu && (pressed & 0x10u)) {
+                        b_letter=1u;letter_player=player;
+                    }
+                    if (!b_letter && !c_letter && c==0x0Fu && (pressed & 0x20u) && !(pressed & 0x10u)) {
+                        c_letter=1u;letter_player=player;
+                    }
+                }
+            }
+            if (b_letter) c_letter=0u; /* A B-letter interaction wins the shared shop. */
+            if (b_letter || c_letter) {
+                F_ram_0602_R2 = 4u;                /* Tune1Request = secret-found tune */
                 CAVE_ROOM_SCRIPT_STATE =
                     (uint8_t)(CAVE_ROOM_SCRIPT_STATE + 1u);  /* INC InvLetter */
-                RAM(0x0656) = 7u;                /* SelectedItemSlot = potion */
+                if(game_profile_is_remix() && letter_player) {
+                    unsigned char b=loadout_party_b(letter_player),c=loadout_party_c(letter_player);
+                    if(c_letter)c=7u;else b=7u;
+                    (void)loadout_party_set(letter_player,b,c);
+                } else if (c_letter) loadout_set_c_slot(7u);
+                else F_ram_0656_R3 = 7u;
                 /* Falls through to draw_items + dispatch below. */
             } else {
                 /* @Unhalt: if halted (ObjState == $40), unhalt. NES UnhaltLink
@@ -739,7 +780,7 @@ void cave_update_hint_or_money_game(void)
         const unsigned char base_off =
             (cave_room_type_get() == 0x75u) ? 0u : 3u;
         const unsigned char sel_idx =
-            (unsigned char)(base_off + RAM(0x0438));  /* CAVE_SELECTED_WARE_INDEX */
+            (unsigned char)(base_off + F_CAVE_SELECTED_WARE_INDEX_R);  /* CAVE_SELECTED_WARE_INDEX */
         CAVE_TEXT_SELECTOR    = k_hint_cave_text_selectors[sel_idx];
         CAVE_TEXT_LINE_ADDR_LO = k_textbox_line_addrs_lo[2];
         CAVE_TEXT_CHAR_INDEX  = 0u;
@@ -757,7 +798,7 @@ void cave_update_hint_or_money_game(void)
         CAVE_TEXT_TICK_SFX = 8u;
         progress_set_room_flag_uw_item_state();
         CAVE_PERSON_STATE  = 8u;
-        core_post_credit((unsigned int)RAM(0x0430 + 1));  /* CAVE_PRICE(1) */
+        core_post_credit((unsigned int)F_ram_0431_R);  /* CAVE_PRICE(1) */
         return;
     }
 
@@ -767,17 +808,17 @@ void cave_update_hint_or_money_game(void)
     }
     CAVE_TEXT_TICK_SFX = 8u;
     /* Copy prize amounts to ware prices (3 slots). */
-    RAM(0x0430 + 0) = RAM(0x0448 + 0);  /* CAVE_PRICE(0) = CAVE_PRIZE_ORDER(0) */
-    RAM(0x0430 + 1) = RAM(0x0448 + 1);
-    RAM(0x0430 + 2) = RAM(0x0448 + 2);
+    F_ram_0430_R = F_ram_0448_R;  /* CAVE_PRICE(0) = CAVE_PRIZE_ORDER(0) */
+    F_ram_0431_R = F_ram_0449_R;
+    F_ram_0432_R = F_ram_044A_R;
     cave_write_prices_transfer_buf();
     CAVE_PERSON_STATE = 8u;
-    cave_prepend_sign_to_price_inline(RAM(0x0448 + 0), 1u);
-    cave_prepend_sign_to_price_inline(RAM(0x0448 + 1), 5u);
-    cave_prepend_sign_to_price_inline(RAM(0x0448 + 2), 9u);
+    cave_prepend_sign_to_price_inline(F_ram_0448_R, 1u);
+    cave_prepend_sign_to_price_inline(F_ram_0449_R, 5u);
+    cave_prepend_sign_to_price_inline(F_ram_044A_R, 9u);
     {
-        const unsigned char chosen = RAM(0x0438);  /* CAVE_SELECTED_WARE_INDEX */
-        const unsigned char amount = RAM(0x0448 + chosen);  /* CAVE_PRIZE_ORDER */
+        const unsigned char chosen = F_CAVE_SELECTED_WARE_INDEX_R;  /* CAVE_SELECTED_WARE_INDEX */
+        const unsigned char amount = F_ram_0448_R2(chosen);  /* CAVE_PRIZE_ORDER */
         if (amount == 0x14u || amount == 0x32u) {
             core_post_credit((unsigned int)amount);
         } else {
@@ -807,36 +848,58 @@ void cave_draw_person(unsigned int slot)
 void cave_try_take_item(unsigned int slot)
 {
     /* drain at cave_runtime.c:356-378. */
-    if ((unsigned char)RAM(0x03A8u + slot) >= 0xF0u) {
+    unsigned char player;
+    if ((unsigned char)F_ram_03A8_R3(slot) >= 0xF0u) {
         return;
     }
-    {
+    /* T-418: available room rewards use the same grace, award, lift and
+     * room-flag owner as body contact. Shop transactions never enter here.
+     * The one shared boomerang attributes the reward to its actual caster. */
+    if (slot == CAVE_WARE_DRAW_SLOT && item_upgrade_boomerang()) {
+        const PlayerBoomerangState *b = &g_player_boomerang;
+        if (b->owner < g_player_count && b->state != 0u &&
+            (b->state & 0x80u) == 0u &&
+            ((b->owner == 0u ? CAVE_LINK_ACTION_TIMER : PLAYER(b->owner).state) & 0xC0u) != 0x40u &&
+            core_abs((unsigned char)(b->y + 3u - OBJ_Y(slot))) < 9u &&
+            core_abs((unsigned char)(b->x - OBJ_X(slot))) < 9u) {
+            OBJ_STATE(slot) = 0xFFu;
+            OBJ_Y(slot) = 0xFFu;
+            progress_set_room_flag_uw_item_state();
+            item_take_item_for_player((unsigned char)CAVE_TMP4, b->owner);
+            return;
+        }
+    }
+    for (player = 0u; player < g_player_count; ++player) {
+        const unsigned char state = player == 0u ? CAVE_LINK_ACTION_TIMER : PLAYER(player).state;
+        const unsigned char x = player == 0u ? F_ram_0070_R : (unsigned char)PLAYER(player).x;
+        const unsigned char y = player == 0u ? F_ram_0084_R : (unsigned char)PLAYER(player).y;
+        if ((state & 0xC0u) == 0x40u) continue;
         const unsigned char dy = (unsigned char)(
-            (unsigned char)RAM(0x0084u) + 3u - (unsigned char)OBJ_Y(slot));
+            y + 3u - (unsigned char)OBJ_Y(slot));
         if (core_abs((unsigned int)dy) >= 9u) {
-            return;
+            continue;
         }
-    }
-    {
         const unsigned char dx = (unsigned char)(
-            (unsigned char)RAM(0x0070u) - (unsigned char)OBJ_X(slot));
+            x - (unsigned char)OBJ_X(slot));
         if (core_abs((unsigned int)dx) >= 9u) {
-            return;
+            continue;
         }
+        OBJ_STATE(slot) = 0xFFu;
+        OBJ_Y(slot) = 0xFFu;
+        if (slot == CAVE_WARE_DRAW_SLOT) {
+            progress_set_room_flag_uw_item_state();
+        }
+        item_take_item_for_player((unsigned char)CAVE_TMP4, player);
+        return;
     }
-    OBJ_STATE(slot) = 0xFFu;
-    OBJ_Y(slot) = 0xFFu;
-    if (slot == CAVE_WARE_DRAW_SLOT) {
-        progress_set_room_flag_uw_item_state();
-    }
-    item_take_item((unsigned char)CAVE_TMP4);
 }
 
 void cave_try_take_room_item(void)
 {
     /* drain at cave_runtime.c:380-393. */
     const unsigned int slot = CAVE_WARE_DRAW_SLOT;
-    if (((unsigned char)CAVE_LINK_ACTION_TIMER & 0xC0u) == 0x40u) {
+    if (g_player_count <= 1u &&
+        ((unsigned char)CAVE_LINK_ACTION_TIMER & 0xC0u) == 0x40u) {
         return;
     }
     if (progress_get_room_flag_uw_item_state() != 0u) {
@@ -900,7 +963,7 @@ void cave_update_person_state_textbox(void)
     /* Copy 5-byte textbox char transfer record template into
      * CAVE_TRANSFER_BUF_CHAR_BASE ($0302..$0306). */
     for (signed int i = 4; i >= 0; --i) {
-        RAM(CAVE_TRANSFER_BUF_CHAR_BASE + (unsigned char)i) =
+        F_ram_0302_R((unsigned char)i) =
             TextboxCharTransferRecTemplate[i];
     }
 
@@ -910,7 +973,7 @@ void cave_update_person_state_textbox(void)
     const unsigned char *text;
     /* Skip $25 (no-op char). */
     do {
-        RAM(0x0303u) = (unsigned char)CAVE_TEXT_LINE_ADDR_LO;
+        F_M8_DYN_TILE_BUF_0303_R2 = (unsigned char)CAVE_TEXT_LINE_ADDR_LO;
         CAVE_TEXT_LINE_ADDR_LO =
             (uint8_t)((unsigned char)CAVE_TEXT_LINE_ADDR_LO + 1u);
         {
@@ -927,8 +990,8 @@ void cave_update_person_state_textbox(void)
              * Stance: EXTEND the pointer owner; preserve Original data. */
             if (game_profile_is_remix()) {
                 if (selector == 4u) {
-                    const unsigned char room = RAM(0x00EBu);
-                    RAM(0x7F02u) = 0xFFu; /* native blank map scratch */
+                    const unsigned char room = F_ram_00EB_R;
+                    F_ram_7F02_R = 0xFFu; /* native blank map scratch */
                     entry = room == 0x23u ? 38u : room == 0x1Du ? 39u :
                             room == 0x49u ? 40u : 41u;
                 }
@@ -947,7 +1010,7 @@ void cave_update_person_state_textbox(void)
         ch = (unsigned char)(raw & 0x3Fu);
     } while (ch == 0x25u);
 
-    RAM(0x0305u) = ch;
+    F_M8_DYN_TILE_BUF_0305_R3 = ch;
     CAVE_TEXT_TICK_SFX = 16u;
 
     /* Phase J2 (2026-05-28): publish the 5-byte char transfer record so
@@ -958,7 +1021,7 @@ void cave_update_person_state_textbox(void)
      * length, so drain_dynamic_buffer saw end==0 and skipped it — the
      * old-man text never rendered. Drain resets POS=0 after, so one glyph
      * streams per CAVE_DELAY_TIMER tick (matches NES cadence). */
-    RAM(0x0301u) = 5u;   /* TRANSFER_BUF_POS (world_state.h) = record len */
+    F_ram_0301_R3 = 5u;   /* TRANSFER_BUF_POS (world_state.h) = record len */
 
     const unsigned char line_flags = (unsigned char)(raw & 0xC0u);
     if (line_flags == 0u) {

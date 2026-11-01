@@ -18,16 +18,23 @@
  */
 
 #include "enemy_render.h"
+#include "../hud/boss_overlay.h"                 /* T-261 bars + banner */
 #include "platform_abi.h"
 #include "render_abi.h"
 #include "world/render/sprite_slots.h"
+#include "world/render/mp_sprite_runtime.h"
+#include "inventory/inventory_render.h"
+#include "player_state.h"
 #include "world/render/sprite_render.h"  /* roomrom_sprites_item_chr_variant */
 #include "world/render/redux_chr.h"
 #include "world/render/subpal_routing.h"  /* Phase AA centralized sub-pal -> OAM pal API */
 #include "world/render/green_rupee.h"     /* T-317 green world rupee tile */
+#include "items/arrow_diag_chr.h"         /* T-260 diagonal arrow */
+#include "items/combo_ram.h"              /* T-260 burst sprites */
 #include "enemy_loop.h"   /* ENEMY_LOOP_SLOT_FIRST/LAST */
 #include "enemy_state.h"  /* ENEMY_X, ENEMY_Y, ENEMY_ALIVE_FLAG, ENEMY_THROWER_SLOT */
 #include "../../state/game_profile.h"
+#include "../options/options_consumer.h"  /* T-398 SPRITES option */
 #include "../../../engine/src/vram_layout.h"  /* canonical ROOMROM_SPR_TILE_BASE */
 #include "../../../engine/src/atlas/level_chr_swap.h"  /* sub-pal 3 cache flush key */
 
@@ -50,9 +57,9 @@ static const unsigned char k_sprite_offsets[41] = {
 };
 
 /* NES_OBJ_X + slot, NES_OBJ_Y + slot per platform_abi.h. */
-#define ENEMY_RENDER_OBJ_X(slot)  OBJ(NES_OBJ_X, (slot))
-#define ENEMY_RENDER_OBJ_Y(slot)  OBJ(NES_OBJ_Y, (slot))
-#define ENEMY_RENDER_INV_TIMER(slot) OBJ(NES_OBJ_INV_TIMER_BASE, (slot))
+#define ENEMY_RENDER_OBJ_X(slot)  F_ram_0070_O2((slot))
+#define ENEMY_RENDER_OBJ_Y(slot)  F_ram_0084_O2((slot))
+#define ENEMY_RENDER_INV_TIMER(slot) F_ram_04F0_O2((slot))
 
 /* T-358: direct-OAM boss producer latch; reset at frame start. */
 static unsigned char s_boss_oam_written = 0u;
@@ -60,9 +67,9 @@ static unsigned char s_boss_oam_written = 0u;
 /* NES Z_01.asm:3088 — CycleCurSpriteIndex: advance + wrap at $28. */
 static inline void cycle_cur_sprite_index(void)
 {
-    unsigned char r = (unsigned char)(RAM(NES_ROLLING_SPR_INDEX) + 1u);
+    unsigned char r = (unsigned char)(F_ram_0341_R3 + 1u);
     if (r >= 0x28u) r = 0u;
-    RAM(NES_ROLLING_SPR_INDEX) = r;
+    F_ram_0341_R3 = r;
 }
 
 /* Phase E 2026-05-15: multi-latch cache. Each ENEMY_LOOP slot can
@@ -72,20 +79,22 @@ static inline void cycle_cur_sprite_index(void)
  * Worst case: 11 slots * 4 entries = 44 SAT writes/frame, well under
  * H32's 64-slot hardware budget. Per-tile h_flip preserved (each entry
  * stores its own attrs byte) — fixes spec gap #5. */
-/* T-050: 20 — the pond fairy draws itself plus eight orbiting hearts
- * through its own slot (PondFairy_MoveHearts uses CurObjIndex). */
-#define ENEMY_RENDER_MAX_PER_SLOT  20u
-
-typedef struct {
-    unsigned char tile;
-    unsigned char attrs;
-    unsigned char x;
-    unsigned char y;
-} enemy_render_entry_t;
-
+/* T-050: ENEMY_RENDER_MAX_PER_SLOT (enemy_render.h) is 20 — the pond fairy
+ * draws itself plus eight orbiting hearts through its own slot
+ * (PondFairy_MoveHearts uses CurObjIndex). */
+_Static_assert(ENEMY_RENDER_CACHE_SLOTS == ENEMY_LOOP_SLOT_LAST + 1u,
+               "one native cache row per monster slot");
 static enemy_render_entry_t
     s_enemy_entries[ENEMY_LOOP_SLOT_LAST + 1u][ENEMY_RENDER_MAX_PER_SLOT];
-static unsigned char s_enemy_count[ENEMY_LOOP_SLOT_LAST + 1u];
+unsigned char g_enemy_render_count[ENEMY_LOOP_SLOT_LAST + 1u];
+/* T392: fixed row pointers avoid repeated 80-byte row multiplication in the
+ * measured pair writer (enemy_render.h publishes it inline, T-397). */
+enemy_render_entry_t *const g_enemy_render_rows[ENEMY_LOOP_SLOT_LAST + 1u] = {
+    s_enemy_entries[0], s_enemy_entries[1], s_enemy_entries[2],
+    s_enemy_entries[3], s_enemy_entries[4], s_enemy_entries[5],
+    s_enemy_entries[6], s_enemy_entries[7], s_enemy_entries[8],
+    s_enemy_entries[9], s_enemy_entries[10], s_enemy_entries[11]
+};
 /* Entry written by Anim_WriteSprite (single sprite), which flashes with
  * FrameCounter bits; the pair writer (Anim_WriteSpritePair) already put
  * ObjInvincibilityTimer bits in the attrs (NES Z_01.asm:5151, 5365).
@@ -96,7 +105,7 @@ void enemy_render_native_reset(void)
 {
     unsigned char i;
     for (i = 0u; i <= ENEMY_LOOP_SLOT_LAST; ++i) {
-        s_enemy_count[i] = 0u;
+        g_enemy_render_count[i] = 0u;
     }
 }
 
@@ -108,7 +117,7 @@ void anim_write_sprite_drained(unsigned int tile, unsigned int slot)
      * NES Z_01.asm:5367-5371 stays for compat — the OAM byte we
      * write below still reflects the latched state if any external
      * consumer reads it. */
-    unsigned char attrs = RAM(NES_SCRATCH_03);
+    unsigned char attrs = F_ram_0003_R2;
 
     /* Phase E 2026-05-15 — multi-latch append: each anim_write call
      * adds one entry to the slot's cache (capped at MAX_PER_SLOT).
@@ -118,14 +127,14 @@ void anim_write_sprite_drained(unsigned int tile, unsigned int slot)
     {
         unsigned char cur_slot = ENEMY_THROWER_SLOT;
         if (cur_slot <= ENEMY_LOOP_SLOT_LAST) {
-            unsigned char n = s_enemy_count[cur_slot];
+            unsigned char n = g_enemy_render_count[cur_slot];
             if (n < ENEMY_RENDER_MAX_PER_SLOT) {
                 enemy_render_entry_t *e = &s_enemy_entries[cur_slot][n];
                 e->tile  = (unsigned char)tile;
                 e->attrs = (unsigned char)(attrs | ANIM_WRITE_SPRITE_MARKER);
                 e->x     = ENEMY_RENDER_OBJ_X(slot);
                 e->y     = ENEMY_RENDER_OBJ_Y(slot);
-                s_enemy_count[cur_slot] = (unsigned char)(n + 1u);
+                g_enemy_render_count[cur_slot] = (unsigned char)(n + 1u);
             }
         }
     }
@@ -166,14 +175,14 @@ __attribute__((always_inline)) void enemy_render_publish_pair_left(unsigned char
 {
     unsigned char cur_slot = ENEMY_THROWER_SLOT;
     if (cur_slot <= ENEMY_LOOP_SLOT_LAST) {
-        unsigned char n = s_enemy_count[cur_slot];
+        unsigned char n = g_enemy_render_count[cur_slot];
         if (n < ENEMY_RENDER_MAX_PER_SLOT) {
             enemy_render_entry_t *e = &s_enemy_entries[cur_slot][n];
             e->tile  = tile;
             e->attrs = attrs;
             e->x     = x;
             e->y     = y;
-            s_enemy_count[cur_slot] = (unsigned char)(n + 1u);
+            g_enemy_render_count[cur_slot] = (unsigned char)(n + 1u);
         }
     } else {
         /* T-130: item objects above the monster slots (the room item $13)
@@ -195,7 +204,7 @@ void enemy_render_wallmaster_patch(unsigned char slot, unsigned char closed_hand
     unsigned char n, k;
     enemy_render_entry_t *pair;
     if (slot > ENEMY_LOOP_SLOT_LAST) return;
-    n = s_enemy_count[slot];
+    n = g_enemy_render_count[slot];
     if (n < 2u) return;
     pair = &s_enemy_entries[slot][n - 2u];
     for (k = 0u; k < 2u; ++k) {
@@ -221,31 +230,18 @@ void enemy_render_publish_native_pair(unsigned char left_tile,
                                       unsigned char right_x,
                                       unsigned char y)
 {
-    unsigned char slot = ENEMY_THROWER_SLOT;
-    unsigned char n;
-    enemy_render_entry_t *e;
-    if (slot > ENEMY_LOOP_SLOT_LAST) {
-        enemy_render_publish_pair_left(left_tile, left_attrs, left_x, y);
-        enemy_render_publish_pair_left(right_tile, right_attrs, right_x, y);
-        return;
-    }
-    n = s_enemy_count[slot];
-    if (n >= ENEMY_RENDER_MAX_PER_SLOT) return;
-    e = &s_enemy_entries[slot][n];
-    e->tile = left_tile;
-    e->attrs = left_attrs;
-    e->x = left_x;
-    e->y = y;
-    ++n;
-    if (n < ENEMY_RENDER_MAX_PER_SLOT) {
-        ++e;
-        e->tile = right_tile;
-        e->attrs = right_attrs;
-        e->x = right_x;
-        e->y = y;
-        ++n;
-    }
-    s_enemy_count[slot] = n;
+    enemy_render_publish_native_pair_at(ENEMY_THROWER_SLOT, left_tile, left_attrs,
+                                        right_tile, right_attrs, left_x, right_x, y);
+}
+
+/* Slots above the monster rows (room item $13) use the weapon cache. */
+void enemy_render_publish_pair_above(unsigned char left_tile, unsigned char left_attrs,
+                                     unsigned char right_tile, unsigned char right_attrs,
+                                     unsigned char left_x, unsigned char right_x,
+                                     unsigned char y)
+{
+    enemy_render_publish_pair_left(left_tile, left_attrs, left_x, y);
+    enemy_render_publish_pair_left(right_tile, right_attrs, right_x, y);
 }
 
 /* Phase D 2026-05-15 — meta-object (spark / cloud) frame publisher.
@@ -569,7 +565,7 @@ void enemy_render_publish_meta(unsigned int slot)
     eR->x     = (unsigned char)(x + ((ms >= 0x10u) ? 7u : 8u));
     eR->y     = y;
 
-    s_enemy_count[slot] = 2u;
+    g_enemy_render_count[slot] = 2u;
 }
 
 void enemy_render_reset_oam(void)
@@ -584,13 +580,13 @@ void enemy_render_reset_oam(void)
     enemy_render_native_reset();
     {
         /* T-125: 8 stores per step (runs every frame). */
-        unsigned char *p = &RAM(NES_SPRITES_BASE + 24u * 4u);
+        unsigned char *p = &RAM(NES_SPRITES_BASE + 24u * 4u); /* native_ram bulk:dyn_addr */
         for (i = 0u; i < 5u; ++i, p += 32) {
             p[0] = 0xF0u;  p[4] = 0xF0u;  p[8] = 0xF0u;  p[12] = 0xF0u;
             p[16] = 0xF0u; p[20] = 0xF0u; p[24] = 0xF0u; p[28] = 0xF0u;
         }
     }
-    RAM(NES_ROLLING_SPR_INDEX) = 0u;
+    F_ram_0341_R3 = 0u;
 }
 
 /* Genesis-native sweep: NES OAM mirror -> SGDK SAT slots 32-72.
@@ -766,8 +762,8 @@ static unsigned char s_chr_stage_stamp = 0xFFu;
 
 static unsigned long *chr_stage_take(void)
 {
-    if (s_chr_stage_stamp != (unsigned char)RAM(0x0015u)) {
-        s_chr_stage_stamp = (unsigned char)RAM(0x0015u);
+    if (s_chr_stage_stamp != (unsigned char)F_ram_0015_R) {
+        s_chr_stage_stamp = (unsigned char)F_ram_0015_R;
         s_chr_stage_used = 0u;
     }
     if (s_chr_stage_used >= CHR_STAGE_BUFS) return (unsigned long *)0;
@@ -799,7 +795,7 @@ static void chr_clear_color(unsigned long *d, unsigned char words, unsigned char
 static unsigned short pt1_pair(unsigned char nes_tile, unsigned char sub_pal)
 {
     const unsigned char top = (unsigned char)(nes_tile & 0xFEu);
-    const unsigned char lvl = nes_ram[0x0010u];
+    const unsigned char lvl = F_ram_0010;
     const unsigned char variant = roomrom_sprites_item_chr_variant();
     unsigned char i, k;
     for (i = 0u; i < PT1_PAIR_SLOTS; ++i) {
@@ -972,8 +968,8 @@ static unsigned char sp3_fill_item(unsigned short src, unsigned char i)
     const unsigned long *s;
     unsigned long *d;
     unsigned char w;
-    if (s_sp3_dma_stamp != (unsigned char)RAM(0x0015u)) {
-        s_sp3_dma_stamp = (unsigned char)RAM(0x0015u);
+    if (s_sp3_dma_stamp != (unsigned char)F_ram_0015_R) {
+        s_sp3_dma_stamp = (unsigned char)F_ram_0015_R;
         s_sp3_dma_used = 0u;
     }
     if (s_sp3_dma_used >= SP3_QUEUE_BUFS) return 0u;
@@ -1050,8 +1046,8 @@ static inline unsigned short sp3_pair(unsigned short src)
     const unsigned char i = (unsigned char)((src >> 1) & (SP3_PAIRS - 1u));
     /* Validated once per tick, on the first sub-palette 3 sprite: rooms
      * without one pay nothing. */
-    if (s_sp3_stamp != (unsigned short)RAM(0x0015u)) {
-        s_sp3_stamp = (unsigned short)RAM(0x0015u);
+    if (s_sp3_stamp != (unsigned short)F_ram_0015_R) {
+        s_sp3_stamp = (unsigned short)F_ram_0015_R;
         sp3_validate();
     }
     if (s_sp3_src[i] == (unsigned short)(src + 1u))
@@ -1107,6 +1103,16 @@ static inline unsigned short translate_tile(unsigned char nes_tile,
         if (nes_tile == GREEN_RUPEE_NES_TILE)
             return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
                                     GREEN_RUPEE_ATLAS_IDX);
+        if (nes_tile == RED_RUPEE_NES_TILE)
+            return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
+                                    RED_RUPEE_ATLAS_IDX);
+        /* T-260: user-drawn diagonal arrow columns (Remix burst bomb). */
+        if (nes_tile == ARROW_DIAG_LEFT_NES_TILE)
+            return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
+                                    ARROW_DIAG_LEFT_ATLAS);
+        if (nes_tile == ARROW_DIAG_RIGHT_NES_TILE)
+            return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
+                                    ARROW_DIAG_RIGHT_ATLAS);
         unsigned char atlas_idx = k_nes_item_tile_to_atlas_idx[nes_tile];
         if (atlas_idx != 0xFFu)
             return (unsigned short)(ROOMROM_ITEM_TILE_BASE +
@@ -1163,7 +1169,7 @@ static inline unsigned short translate_tile(unsigned char nes_tile,
     if (nes_tile & 1u) {                         /* T-169: pattern table 1 */
         return pt1_pair(nes_tile, (unsigned char)(nes_attrs & 0x03u));
     }
-    const unsigned char bank_first = nes_ram[0x0010u] ? 0x9Eu : NES_OWSP_BANK_FIRST;
+    const unsigned char bank_first = F_ram_0010 ? 0x9Eu : NES_OWSP_BANK_FIRST;
     if (nes_tile < bank_first) {
         /* Common sprite pattern block at SPR_BASE 1:1. */
         return (unsigned short)(ROOMROM_SPR_TILE_BASE + (unsigned short)nes_tile);
@@ -1236,7 +1242,7 @@ static inline unsigned short translate_attrs(unsigned char nes_attrs,
 
 /* T-118: lookup tables for the per-sprite translate_tile/translate_attrs
  * work in emit_native_entries (PC profile, busy UW room: ~100 68000
- * instructions per sprite, 11% of the frame). s_xlat_tile holds
+ * instructions per sprite, 11% of the frame). s_xlat_even (even tiles) holds
  * translate_tile(t, 0) for the current (boss bank, OW/UW) state and is
  * rebuilt when that state changes; XLAT_SLOW keeps the full function for
  * the fireball tiles (lazy CHR upload side effect); xlat_sat applies the
@@ -1244,46 +1250,11 @@ static inline unsigned short translate_attrs(unsigned char nes_attrs,
  * full function. s_xlat_attr holds translate_attrs(a, 0): the tile only
  * matters for the boss sub-pal 3 range, patched in xlat_sat. */
 #define XLAT_SLOW 0xFFFFu
-static unsigned short s_xlat_tile[256];
-/* NES source: OAM attribute bits; drained C: translate_attrs(a, 0).
- * Coverage: FULL all 256 attribute values; stance EXTEND.
- * Exact 512 bytes captured from the initialized native table in the paired
- * T172 baseline. These values depend only on attributes, not scene/bank/mode.
- * Keep the lookup in ROM and release its redundant RAM initialization. */
-static const unsigned short s_xlat_attr[256] = {
-    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
-    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
-    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
-    0xA000u,0xC000u,0xE000u,0xC000u,0xA000u,0xC000u,0xE000u,0xC000u,
-    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
-    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
-    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
-    0x2000u,0x4000u,0x6000u,0x4000u,0x2000u,0x4000u,0x6000u,0x4000u,
-    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
-    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
-    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
-    0xA800u,0xC800u,0xE800u,0xC800u,0xA800u,0xC800u,0xE800u,0xC800u,
-    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
-    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
-    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
-    0x2800u,0x4800u,0x6800u,0x4800u,0x2800u,0x4800u,0x6800u,0x4800u,
-    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
-    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
-    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
-    0xB000u,0xD000u,0xF000u,0xD000u,0xB000u,0xD000u,0xF000u,0xD000u,
-    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
-    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
-    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
-    0x3000u,0x5000u,0x7000u,0x5000u,0x3000u,0x5000u,0x7000u,0x5000u,
-    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
-    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
-    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
-    0xB800u,0xD800u,0xF800u,0xD800u,0xB800u,0xD800u,0xF800u,0xD800u,
-    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
-    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
-    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
-    0x3800u,0x5800u,0x7800u,0x5800u,0x3800u,0x5800u,0x7800u,0x5800u,
-};
+/* T-397: odd tiles select PT1 (lazy pair, XLAT_SLOW) except $F3 and the
+ * fire bottoms, whose entries do not depend on the key: only even tiles
+ * need the RAM table (indexed tile >> 1). */
+static unsigned short s_xlat_even[128];
+#include "enemy_render_attr.h"   /* s_xlat_attr, k_fast_attr */
 static unsigned char s_xlat_key = 0xFFu;
 
 /* Tiles whose copy already holds the colors: drawn with sprite PAL1
@@ -1307,12 +1278,9 @@ static inline unsigned char xlat_force_pal1(unsigned short tid)
 #define XLAT_PAL1 0x8000u
 #define XLAT_BOSS 0x4000u
 
-static void xlat_refresh(void)
+static void __attribute__((noinline)) xlat_rebuild(unsigned char key)
 {
-    unsigned char key = (unsigned char)((s_boss_bank_active ? 1u : 0u) |
-                                        (nes_ram[0x0010u] ? 2u : 0u));
     unsigned int t, first = 0u;
-    if (key == s_xlat_key) return;
     if (s_xlat_key != 0xFFu && (unsigned char)(key ^ s_xlat_key) == 1u) {
         /* T-172: the boss bank only remaps tiles $C0..$FF (translate_tile);
          * the full rebuild on a boss room's first ready tick cost a lag
@@ -1320,23 +1288,46 @@ static void xlat_refresh(void)
         first = 0xC0u;
     }
     s_xlat_key = key;
-    for (t = first; t < 256u; ++t) {
-        if (t == 0x44u || t == 0x45u ||
-            ((t & 1u) && t != 0xF3u && !(t >= NES_FIRE_TILE_FIRST && t <= NES_FIRE_TILE_LAST))) {
-            s_xlat_tile[t] = XLAT_SLOW;          /* attrs-dependent / lazy CHR */
+    for (t = first; t < 256u; t += 2u) {
+        if (t == 0x44u) {
+            s_xlat_even[t >> 1] = XLAT_SLOW;     /* lazy fireball CHR */
         } else {
             unsigned short tid = translate_tile((unsigned char)t, 0u);
-            s_xlat_tile[t] = (unsigned short)((tid & 0x07FFu) |
+            s_xlat_even[t >> 1] = (unsigned short)((tid & 0x07FFu) |
                 (xlat_force_pal1(tid) ? XLAT_PAL1 : 0u) |
-                ((s_boss_bank_active && t >= 0xC0u && t != 0xF3u) ? XLAT_BOSS : 0u));
+                ((s_boss_bank_active && t >= 0xC0u) ? XLAT_BOSS : 0u));
         }
     }
+}
+
+/* The former s_xlat_tile[tile]. */
+static unsigned short __attribute__((noinline)) xlat_entry_odd(unsigned char t)
+{
+    unsigned short tid;
+    if (t != 0xF3u && !(t >= NES_FIRE_TILE_FIRST && t <= NES_FIRE_TILE_LAST))
+        return XLAT_SLOW;                        /* attrs-dependent / lazy CHR */
+    tid = translate_tile(t, 0u);
+    return (unsigned short)((tid & 0x07FFu) | (xlat_force_pal1(tid) ? XLAT_PAL1 : 0u));
+}
+
+static inline __attribute__((always_inline)) unsigned short xlat_entry(unsigned char tile)
+{
+    return (tile & 1u) ? xlat_entry_odd(tile) : s_xlat_even[tile >> 1];
+}
+
+/* T-396: the unchanged-key test runs per beam piece and per sweep; keep it
+ * inline (the out-of-line rebuild saved registers before returning). */
+static inline __attribute__((always_inline)) void xlat_refresh(void)
+{
+    const unsigned char key = (unsigned char)((s_boss_bank_active ? 1u : 0u) |
+                                              (F_ram_0010 ? 2u : 0u));
+    if (key != s_xlat_key) xlat_rebuild(key);
 }
 
 /* == translate_attrs(attrs, translate_tile(tile, attrs)). */
 static inline __attribute__((always_inline)) unsigned short xlat_sat(unsigned char tile, unsigned char attrs)
 {
-    const unsigned short e = s_xlat_tile[tile];
+    const unsigned short e = xlat_entry(tile);
     unsigned short tid;
     unsigned char force;
     unsigned short sat;
@@ -1426,7 +1417,7 @@ static unsigned short emit_native_entries(unsigned short sat_slot, unsigned char
     unsigned short slot;
     xlat_refresh();
     for (slot = ENEMY_LOOP_SLOT_FIRST; slot <= ENEMY_LOOP_SLOT_LAST; ++slot) {
-        unsigned char n = s_enemy_count[slot];
+        unsigned char n = g_enemy_render_count[slot];
         unsigned char ei;
         /* Entries are this frame's draw submissions (reset with OAM).
          * A producer may clear its type and still draw its final form:
@@ -1435,7 +1426,7 @@ static unsigned short emit_native_entries(unsigned short sat_slot, unsigned char
         if (sat_slot > ENEMY_RENDER_SLOT_LAST) break;
         const unsigned char capture_hand = (unsigned char)(
             captured_hand_sat && *captured_hand_sat == 0u && n >= 2u &&
-            ENEMY_TYPE(slot) == 0x27u && RAM(0x042Cu + slot) != 0u);
+            ENEMY_TYPE(slot) == 0x27u && F_ram_042C_R(slot) != 0u);
 
         /* Anim_WriteSprite flashes with FrameCounter bits (single-sprite
          * entries, ANIM_WRITE_SPRITE_MARKER, and meta clouds). The pair
@@ -1457,7 +1448,7 @@ static unsigned short emit_native_entries(unsigned short sat_slot, unsigned char
             if (e->attrs & (ANIM_WRITE_SPRITE_MARKER | META_ATTR_MARKER)) {
                 unsigned char inv_timer = ENEMY_RENDER_INV_TIMER(slot);
                 if (inv_timer != 0u) {
-                    unsigned char flash_pal = (unsigned char)(RAM(NES_FRAME_COUNTER) & 3u);
+                    unsigned char flash_pal = (unsigned char)(F_ram_0015_R2 & 3u);
                     if ((e->attrs & META_ATTR_MARKER) &&
                         e->tile >= ENEMY_RENDER_META_SPARK_OFFSET &&
                         e->tile < ENEMY_RENDER_META_SPARK_OFFSET + ROOMROM_SPARK_TILE_COUNT)
@@ -1507,8 +1498,67 @@ static unsigned short emit_native_entries(unsigned short sat_slot, unsigned char
             }
         }
     }
+    /* T-260: Remix burst arrows, after the weapons. */
+    if (pass != NATIVE_PASS_FIREBALLS) {
+        unsigned char n, ei;
+        const enemy_render_entry_t *e = combo_burst_sprites(&n);
+        for (ei = 0u; ei < n && sat_slot <= ENEMY_RENDER_SLOT_LAST; ++ei, ++e) {
+            unsigned short sat_attrs = xlat_sat(e->tile, (unsigned char)(e->attrs | ITEM_ATTR_MARKER));
+            unsigned char link = (sat_slot < ENEMY_RENDER_SLOT_LAST)
+                                     ? (unsigned char)(sat_slot + 1u) : 0u;
+            render_set_sprite_inline((unsigned short)sat_slot,
+                                     (signed short)e->x,
+                                     (signed short)(e->y + ROOMROM_PLAY_SPRITE_DY),
+                                     RENDER_SPRITE_SIZE(1, 2), sat_attrs, link);
+            ++sat_slot;
+        }
+    }
 
     return sat_slot;
+}
+
+/* T-396: xlat_sat's lazy CHR / sub-pal-3 / marker paths, out of line so
+ * the sweep loops below keep their state in registers (the inlined copy
+ * spilled the walking pointers: ~330 cycles per 4P sprite). The loops test
+ * xlat_sat's own two leading fast-path conditions first and call this for
+ * everything else, so each entry's word is xlat_sat(tile, attrs) exactly. */
+static unsigned short __attribute__((noinline)) xlat_sat_slow(unsigned char tile,
+                                                             unsigned char attrs)
+{
+    return xlat_sat(tile, attrs);
+}
+
+/* xlat_sat's ordinary-tile fast path (T-172), plus the meta cloud/spark
+ * entries outside sub-palette 3 (translate_tile's META branch: no CHR
+ * side effect, no sp3 copy); 0 = take xlat_sat_slow. Never 0 on success:
+ * s_xlat_attr entries all have palette bits set. */
+static inline __attribute__((always_inline)) unsigned short xlat_sat_fast(
+    unsigned char tile, unsigned char attrs)
+{
+    if ((attrs & 3u) == 3u) return 0u;
+    if (!(attrs & (META_ATTR_MARKER | ITEM_ATTR_MARKER))) {
+        /* Odd tiles and $44 (XLAT_SLOW) take the slow path. */
+        if (!(tile & 1u)) {
+            const unsigned short e = s_xlat_even[tile >> 1];
+            if (e < 0x0800u) return (unsigned short)(s_xlat_attr[attrs] | e);
+        }
+    } else if (!(attrs & ITEM_ATTR_MARKER)) {
+        const unsigned short tid = (unsigned short)(ENEMY_RENDER_META_VRAM_TILE +
+                                                    (unsigned short)tile);
+        const unsigned short sat = (unsigned short)(s_xlat_attr[attrs] | (tid & 0x07FFu));
+        return xlat_force_pal1(tid) ? (unsigned short)((sat & 0x9FFFu) | (RENDER_PAL1 << 13))
+                                    : sat;
+    }
+    return 0u;
+}
+
+/* T-397: xlat_sat_fast then xlat_sat_slow (same word); the sweep inlines
+ * the k_fast_attr case before reaching this. */
+static inline __attribute__((always_inline)) unsigned short xlat_sat_fast_slow(
+    unsigned char tile, unsigned char attrs)
+{
+    const unsigned short word = xlat_sat_fast(tile, attrs);
+    return word ? word : xlat_sat_slow(tile, attrs);
 }
 
 /* NES source: Z_01.asm:Anim_WriteSprite / Anim_WriteSpritePair submissions.
@@ -1518,7 +1568,12 @@ static unsigned short emit_native_entries(unsigned short sat_slot, unsigned char
  * T-172 room $38: one pass with a walking SAT pointer; the per-slot
  * invincibility timer is read once (nothing writes it during the sweep).
  * End-of-tick SAT/RAM parity vs the generic emitter: 300/300 ticks in both
- * Remix and Original (tools/build/t172_tick_parity.py). */
+ * Remix and Original (tools/build/t172_tick_parity.py).
+ * T-396: a slot with no flash and no captured hand (every slot outside a
+ * hit or a Wallmaster grab) takes a register-only loop; the cursor bound is
+ * one countdown. Same entries, order, words and cursor as the generic loop. */
+/* One SAT word written through a byte pair (size + link). */
+typedef unsigned short __attribute__((may_alias)) SatWord;
 static unsigned short emit_native_entries_all(unsigned short sat_slot,
                                               unsigned char *captured_hand_sat)
 {
@@ -1526,15 +1581,54 @@ static unsigned short emit_native_entries_all(unsigned short sat_slot,
     unsigned short slot;
     xlat_refresh();
     for (slot = ENEMY_LOOP_SLOT_FIRST; slot <= ENEMY_LOOP_SLOT_LAST; ++slot) {
-        const unsigned char n = s_enemy_count[slot];
+        const unsigned char n = g_enemy_render_count[slot];
         const enemy_render_entry_t *e;
         unsigned char ei, inv_timer, capture_hand;
         if (n == 0u) continue;
         if (sat_slot > ENEMY_RENDER_SLOT_LAST) break;
         capture_hand = (unsigned char)(*captured_hand_sat == 0u && n >= 2u &&
-            ENEMY_TYPE(slot) == 0x27u && RAM(0x042Cu + slot) != 0u);
+            ENEMY_TYPE(slot) == 0x27u && F_ram_042C_R(slot) != 0u);
         inv_timer = ENEMY_RENDER_INV_TIMER(slot);
         e = &s_enemy_entries[slot][0];
+        if (!capture_hand && inv_timer == 0u) {
+            const enemy_render_entry_t *const end = e + n;
+            /* SAT slots left before the cursor passes the last one. */
+            unsigned short room = (unsigned short)(ENEMY_RENDER_SLOT_LAST + 1u - sat_slot);
+            unsigned short size_link =
+                (unsigned short)((RENDER_SPRITE_SIZE(1, 2) << 8) | sat_slot);
+            for (; e != end; ++e) {
+                const unsigned char y = e->y;
+                unsigned short word;
+                if (y == 0xF0u) continue;
+                if (room == 0u) break;
+                {
+                    /* T-397: xlat_sat_fast's ordinary case in one attrs
+                     * lookup (k_fast_attr ignores the ANIM marker). */
+                    const unsigned char tile = e->tile, attrs = e->attrs;
+                    const unsigned short a = k_fast_attr[attrs];
+                    unsigned short t;
+                    /* Even tile t is s_xlat_even[t >> 1], at byte offset t. */
+                    if (a && !(tile & 1u) &&
+                        (t = *(const unsigned short *)(const void *)
+                             ((const unsigned char *)s_xlat_even + tile)) < 0x0800u)
+                        word = (unsigned short)(a | t);
+                    else
+                        word = xlat_sat_fast_slow(tile, (unsigned char)(attrs & ~ANIM_WRITE_SPRITE_MARKER));
+                }
+                ++sat_slot;
+                --room;
+                sat->y = (signed short)(y + ROOMROM_PLAY_SPRITE_DY + 0x80);
+                /* size (8x16) and link (next slot) as one word; the last
+                 * link: below. */
+                *(SatWord *)(void *)&sat->size = ++size_link;
+                sat->attribut = word;
+                sat->x = (signed short)(e->x + 0x80);
+                ++sat;
+            }
+            /* The entry that took the last SAT slot ends the chain. */
+            if (room == 0u) sat[-1].link = 0u;
+            continue;
+        }
         for (ei = 0u; ei < n; ++ei, ++e) {
             const unsigned char y = e->y;
             const unsigned char attrs = e->attrs;
@@ -1545,7 +1639,7 @@ static unsigned short emit_native_entries_all(unsigned short sat_slot,
                 *captured_hand_sat = (unsigned char)sat_slot;
             render_attrs = (unsigned char)(attrs & ~ANIM_WRITE_SPRITE_MARKER);
             if ((attrs & (ANIM_WRITE_SPRITE_MARKER | META_ATTR_MARKER)) && inv_timer != 0u) {
-                unsigned char flash_pal = (unsigned char)(RAM(NES_FRAME_COUNTER) & 3u);
+                unsigned char flash_pal = (unsigned char)(F_ram_0015_R2 & 3u);
                 if ((attrs & META_ATTR_MARKER) &&
                     e->tile >= ENEMY_RENDER_META_SPARK_OFFSET &&
                     e->tile < ENEMY_RENDER_META_SPARK_OFFSET + ROOMROM_SPARK_TILE_COUNT)
@@ -1555,27 +1649,44 @@ static unsigned short emit_native_entries_all(unsigned short sat_slot,
             sat->y = (signed short)(y + ROOMROM_PLAY_SPRITE_DY + 0x80);
             sat->size = (unsigned char)RENDER_SPRITE_SIZE(1, 2);
             sat->link = (sat_slot < ENEMY_RENDER_SLOT_LAST) ? (unsigned char)(sat_slot + 1u) : 0u;
-            sat->attribut = xlat_sat(e->tile, render_attrs);
+            sat->attribut = xlat_sat_slow(e->tile, render_attrs);
             sat->x = (signed short)(e->x + 0x80);
             ++sat;
             ++sat_slot;
         }
     }
     {
-        unsigned char wi, ei;
+        unsigned char wi;
         for (wi = 0u; wi < ENEMY_RENDER_WEAPON_SLOTS; ++wi) {
             const enemy_render_entry_t *e = &s_weapon_entries[wi][0];
-            for (ei = 0u; ei < s_weapon_count[wi]; ++ei, ++e) {
+            const enemy_render_entry_t *const end = e + s_weapon_count[wi];
+            for (; e != end; ++e) {
+                unsigned short word;
                 if (sat_slot > ENEMY_RENDER_SLOT_LAST) break;
                 if (e->y == 0xF0u) continue;
+                word = xlat_sat_fast(e->tile, e->attrs);
+                if (word == 0u) word = xlat_sat_slow(e->tile, e->attrs);
                 sat->y = (signed short)(e->y + ROOMROM_PLAY_SPRITE_DY + 0x80);
                 sat->size = (unsigned char)RENDER_SPRITE_SIZE(1, 2);
                 sat->link = (sat_slot < ENEMY_RENDER_SLOT_LAST) ? (unsigned char)(sat_slot + 1u) : 0u;
-                sat->attribut = xlat_sat(e->tile, e->attrs);
+                sat->attribut = word;
                 sat->x = (signed short)(e->x + 0x80);
                 ++sat;
                 ++sat_slot;
             }
+        }
+    }
+    {   /* T-260: Remix burst arrows, after the weapons. */
+        unsigned char n, ei;
+        const enemy_render_entry_t *e = combo_burst_sprites(&n);
+        for (ei = 0u; ei < n && sat_slot <= ENEMY_RENDER_SLOT_LAST; ++ei, ++e) {
+            sat->y = (signed short)(e->y + ROOMROM_PLAY_SPRITE_DY + 0x80);
+            sat->size = (unsigned char)RENDER_SPRITE_SIZE(1, 2);
+            sat->link = (sat_slot < ENEMY_RENDER_SLOT_LAST) ? (unsigned char)(sat_slot + 1u) : 0u;
+            sat->attribut = xlat_sat_slow(e->tile, (unsigned char)(e->attrs | ITEM_ATTR_MARKER));
+            sat->x = (signed short)(e->x + 0x80);
+            ++sat;
+            ++sat_slot;
         }
     }
     return sat_slot;
@@ -1589,7 +1700,7 @@ static unsigned short emit_native_entries_all(unsigned short sat_slot,
  * manual OAM. RoomObjTemplateType survives splits and boss death. */
 unsigned char enemy_render_needs_oam_sweep(void)
 {
-    unsigned char room_type = RAM(0x035F);
+    unsigned char room_type = F_DUNGEON_ROOM_TEMPLATE_TYPE_R;
     /* NES source: Z_04 UpdateMoldorm -> Anim_WriteSprite.
      * Drained C: enemy_moldorm_runtime + anim_write_sprite_drained above.
      * Coverage: Remix Moldorm segments/death FX and cached weapons.
@@ -1614,6 +1725,8 @@ unsigned char enemy_render_needs_oam_sweep(void)
 
 void enemy_render_sweep_oam_to_sat(void)
 {
+    mp_sprite_overlay_retire();
+    if (g_player_count > 1u) mp_sprite_restore_links(g_player_count);
     /* $07FE belongs to native UW progress; rendering must not mutate it. */
 
     /* CHR residency survives the boss's type changes and death. In
@@ -1624,6 +1737,7 @@ void enemy_render_sweep_oam_to_sat(void)
 
     unsigned int i;
     unsigned short sat_slot = ROOMROM_SPRITE_SLOT_ENEMY_FIRST;
+    sat_slot = mp_sprite_emit(sat_slot, ENEMY_RENDER_SLOT_LAST, g_player_count);
 
     /* Anim_WriteSprite's SpriteOffsets reach slots 24..63, but Gleeok
      * draws its heads and the base neck segments in slots 0..15 (Sprites +
@@ -1640,7 +1754,7 @@ void enemy_render_sweep_oam_to_sat(void)
      * long read paid 68000 long shifts (swap / lsr.l #8) on every one of the
      * 64 records, mostly hidden ones (Manhandla room: ~65k master clocks
      * per tick). Same three skip tests on the same bytes. */
-    const unsigned char *oam = (const unsigned char *)&nes_ram[NES_SPRITES_BASE];
+    const unsigned char *oam = (const unsigned char *)&nes_ram[NES_SPRITES_BASE]; /* native_ram bulk:src/game/enemies/enemy_render.c:1646 */
     for (i = 0u; i < NES_OAM_SLOT_COUNT; ++i, oam += 4) {
         const unsigned char y = oam[0];
 
@@ -1686,6 +1800,7 @@ void enemy_render_sweep_oam_to_sat(void)
     }
 
     sat_slot = emit_native_entries(sat_slot, NATIVE_PASS_OTHER, 0);
+    sat_slot = boss_overlay_emit_guarded(sat_slot, ENEMY_RENDER_SLOT_LAST);  /* T-261 */
 
     /* 2026-05-15 perf fix: drop the up-to-54-slot pad loop. Write a
      * single terminator at the next slot with link=0, hiding it off-
@@ -1710,7 +1825,16 @@ void enemy_render_sweep_oam_to_sat(void)
      * DMA'd only up to the stale native/init count (=ENEMY_FIRST) -> boss
      * slots beyond it were never uploaded to VRAM SAT -> Aquamentus showed
      * only its first sprite. +1 to include the terminator (matches native). */
-    g_enemy_render_last_sat_slot = (unsigned char)(sat_slot + 1u);
+    g_enemy_render_last_sat_slot = (unsigned char)
+        (sat_slot < ROOMROM_SPRITE_UPLOAD_COUNT_H32 ? sat_slot + 1u :
+                                                   ROOMROM_SPRITE_UPLOAD_COUNT_H32);
+    if (g_player_count > 1u) {
+        /* T-397: canonical chain through the terminator (or all 64 slots). */
+        mp_sprite_chain_built(g_enemy_render_last_sat_slot);
+        g_mp_sprite_overflow_mode = options_consumer_get_sprite_overflow();
+        mp_sprite_limit_lines(g_player_count, F_ram_0015_R, 0u);
+    }
+    inventory_ring_capture(0u);
 }
 
 /* 2026-05-15 Genesis-native enemy renderer.
@@ -1764,7 +1888,9 @@ extern unsigned char roomrom_is_scrolling(void);
 
 void enemy_render_native_sweep(void)
 {
+    mp_sprite_overlay_retire();
     unsigned char captured_hand_sat = 0u;
+    if (g_player_count > 1u) mp_sprite_restore_links(g_player_count);
     /* A captured hand temporarily takes the mask-to-Link SAT link below.
      * Restore the normal chain even if the next frame is a scroll or the
      * Wallmaster has finished its trip. Otherwise Link stays skipped after
@@ -1787,11 +1913,14 @@ void enemy_render_native_sweep(void)
                                  (signed short)-32, (signed short)-32,
                                  RENDER_SPRITE_SIZE(1, 1), 0u, 0u);
         g_enemy_render_last_sat_slot = (unsigned char)(sat_slot + 1u);
+        inventory_ring_capture(0u);
         return;
     }
 
 
+    sat_slot = mp_sprite_emit(sat_slot, ENEMY_RENDER_SLOT_LAST, g_player_count);
     sat_slot = emit_native_entries_all(sat_slot, &captured_hand_sat);
+    sat_slot = boss_overlay_emit_guarded(sat_slot, ENEMY_RENDER_SLOT_LAST);  /* T-261 */
 
     /* Terminator: hide remaining SAT slots via chain break (link=0). */
     if (sat_slot <= ENEMY_RENDER_SLOT_LAST) {
@@ -1819,12 +1948,21 @@ void enemy_render_native_sweep(void)
             ROOMROM_SPRITE_SLOT_LINK;
     }
 
+    if (g_player_count > 1u) {
+        /* T-397: canonical chain through the terminator (or all 64 slots);
+         * a captured hand relinks it, and the limiter then walks. */
+        mp_sprite_chain_built(g_enemy_render_last_sat_slot);
+        g_mp_sprite_overflow_mode = options_consumer_get_sprite_overflow();
+        mp_sprite_limit_lines(g_player_count, F_ram_0015_R, captured_hand_sat);
+    }
+    inventory_ring_capture(captured_hand_sat);
+
     /* Clear per-slot entry counts for next frame; entries arrays stay
      * populated (overwritten as anim_write calls append). */
     {
         unsigned char i;
         for (i = 0u; i <= ENEMY_LOOP_SLOT_LAST; ++i) {
-            s_enemy_count[i] = 0u;
+            g_enemy_render_count[i] = 0u;
         }
     }
 }

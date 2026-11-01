@@ -27,10 +27,10 @@ unsigned int world_get_shortcut_or_item_xy_for_room(unsigned int room_id)
      *
      * Native packs (X, Y) into one return: (X << 8) | Y. */
     const unsigned char lookup =
-        nes_ram[NES_SRAM_BASE + 0x0AFEu + (room_id & 0xFFu)];
+        F_NES_SRAM_BASE_6AFE_X2((room_id & 0xFFu));
     const unsigned char type_idx = (unsigned char)((lookup & 0x30u) >> 4);
     const unsigned char entry =
-        nes_ram[NES_SRAM_BASE + 0x0BA7u + type_idx];
+        F_NES_SRAM_BASE_6BA7_X(type_idx);
     const unsigned char y = (unsigned char)((entry & 0x0Fu) << 4);
     const unsigned char x = (unsigned char)(entry & 0xF0u);
     return ((unsigned int)x << 8) | (unsigned int)y;
@@ -83,7 +83,7 @@ unsigned int world_animate_world_fading(void)
     WORLD_TMP0 = 8u;
     while (WORLD_TMP0 != 0u) {
         TRANSFER_BUF_BYTE(pos) =
-            nes_ram[NES_SRAM_BASE + 0x0BFAu + sram_idx];
+            F_ram_6BFA_X(sram_idx);
         sram_idx = (unsigned char)(sram_idx + 1u);
         pos      = (unsigned char)(pos + 1u);
         WORLD_TMP0 = (uint8_t)(WORLD_TMP0 - 1u);
@@ -193,10 +193,10 @@ void world_get_object_middle(unsigned int slot)
  * NES pointer [00:01] at $67F0, as the loop does. */
 void world_fill_tile_map(void)
 {
-    const unsigned char tile = (unsigned char)nes_ram[0x000Au];
+    const unsigned char tile = (unsigned char)F_ZP_TMPA;
     unsigned int a;
     for (a = 0x6530u; a < 0x67F0u; ++a)
-        nes_ram[a] = tile;
-    nes_ram[0x0000u] = 0xF0u;
-    nes_ram[0x0001u] = 0x67u;
+        nes_ram[a] = tile; /* native_ram bulk:dyn_addr */
+    F_ram_0000 = 0xF0u;
+    F_ram_0001 = 0x67u;
 }

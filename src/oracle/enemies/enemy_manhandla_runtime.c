@@ -27,17 +27,17 @@ void enrt_init_manhandla(unsigned int slot) {
 
     for (seg = 4; seg >= 0; --seg) {
         unsigned char uidx = (unsigned char)seg;
-        RAM(0x0099u + uidx) = RAM(0x0099u);
-        RAM(0x0350u + uidx) = 60;
-        RAM(0x04B3u + uidx) = 0xE2;
-        RAM(0x0479u + uidx) = kManhandlaBaseFrameImagesAndAttrs[uidx];
-        RAM(0x0406u + uidx) = 0;
-        RAM(0x0493u + uidx) = 0;
-        RAM(0x04C0u + uidx) = RAM(0x04C0u);
-        RAM(0x0486u + uidx) = RAM(0x0486u);
-        RAM(0x0071u + uidx) = (unsigned char)(RAM(0x0075u) + kManhandlaSegmentOffsetsX[uidx]);
-        RAM(0x0085u + uidx) = (unsigned char)(RAM(0x0089u) + kManhandlaSegmentOffsetsY[uidx]);
-        RAM(0x0420u + uidx) = 0x80;
+        F_ram_0099_R2(uidx) = F_ram_0099_R;
+        F_CAVE_ROOM_TYPE_R5(uidx) = 60;
+        F_ram_04B3_R(uidx) = 0xE2;
+        F_ram_0479_R(uidx) = kManhandlaBaseFrameImagesAndAttrs[uidx];
+        F_ram_0406_R(uidx) = 0;
+        F_ram_0493_R(uidx) = 0;
+        F_ram_04C0_R2(uidx) = F_ram_04C0_R;
+        F_ram_0486_R2(uidx) = F_ram_0486_R;
+        F_ENEMY_GLEEOK_BASE_X_R5(uidx) = (unsigned char)(F_ENEMY_GLEEOK_HEAD_X_R2 + kManhandlaSegmentOffsetsX[uidx]);
+        F_ENEMY_GLEEOK_BASE_Y_R5(uidx) = (unsigned char)(F_ENEMY_GLEEOK_HEAD_Y_R2 + kManhandlaSegmentOffsetsY[uidx]);
+        F_ram_0420_R(uidx) = 0x80;
     }
 }
 
@@ -51,16 +51,16 @@ void enrt_update_manhandla(unsigned int slot) {
         if (ENEMY_MANHANDLA_SEGMENT_DIED_FLAG != 0) {
             for (seg = 4; seg >= 0; --seg) {
                 unsigned char uidx = (unsigned char)seg;
-                unsigned int sum = (unsigned int)RAM(0x0420u + uidx) + 0x80u;
-                RAM(0x0420u + uidx) = (unsigned char)sum;
-                RAM(0x042Du + uidx) = (unsigned char)(RAM(0x042Du + uidx)
+                unsigned int sum = (unsigned int)F_ram_0420_R(uidx) + 0x80u;
+                F_ram_0420_R(uidx) = (unsigned char)sum;
+                F_ram_042D_R(uidx) = (unsigned char)(F_ram_042D_R(uidx)
                                                    + (unsigned char)(sum >> 8));
             }
             ENEMY_MANHANDLA_SEGMENT_DIED_FLAG = 0;
         }
 
-        if (RAM(0x0385u) != 0) {
-            enrt_manhandla_set_all_segments_direction(RAM(0x0385u));
+        if (F_ram_0385_R != 0) {
+            enrt_manhandla_set_all_segments_direction(F_ram_0385_R);
         }
 
         if (ENEMY_MOVE_TIMER(slot) == 0) {
@@ -72,26 +72,26 @@ void enrt_update_manhandla(unsigned int slot) {
                 c_turn_randomly_dir8(slot);
             }
             new_dir = ENEMY_DIR(slot);
-            RAM(0x0385u) = new_dir;
+            F_ram_0385_R = new_dir;
             enrt_manhandla_set_all_segments_direction(new_dir);
         }
     }
 
     if (slot == 5) {
-        RAM(0x0384u) = ENEMY_DIR(slot);
+        F_ram_0384_R = ENEMY_DIR(slot);
     }
     enrt_manhandla_move(slot);
     enrt_manhandla_check_collisions(slot);
 
     {
         unsigned char post_dir = ENEMY_DIR(slot);
-        if (post_dir != RAM(0x0384u)) {
-            RAM(0x0385u) = post_dir;
+        if (post_dir != F_ram_0384_R) {
+            F_ram_0385_R = post_dir;
         }
     }
 
     frame = (unsigned char)((ENEMY_MANHANDLA_FRAME_ACCUM(slot) & 0x10u) >> 4);
-    RAM(0x0000u) = frame;
+    F_ram_0000_R = frame;
     new_frame_attrs = (unsigned char)((ENEMY_MANHANDLA_FRAME_ATTR(slot) & 0xFEu) | frame);
     ENEMY_MANHANDLA_FRAME_ATTR(slot) = new_frame_attrs;
 
@@ -100,12 +100,12 @@ void enrt_update_manhandla(unsigned int slot) {
         return;
     }
 
-    old_frame_attrs = OBJ(0x0437u, slot);
+    old_frame_attrs = F_ram_0437_O(slot);
     if (new_frame_attrs == old_frame_attrs) {
         enrt_manhandla_draw(slot);
         return;
     }
-    OBJ(0x0437u, slot) = new_frame_attrs;
+    F_ram_0437_O(slot) = new_frame_attrs;
 
     if (new_frame_attrs & 0x01u) {
         enrt_manhandla_draw(slot);
@@ -189,8 +189,8 @@ void enrt_manhandla_move(unsigned int slot) {
               + ((unsigned int)ENEMY_AIR_SPEED(slot) & 0xE0u);
     ENEMY_PUSH_TIMER(slot) = (unsigned char)speed_sum;
     step = (unsigned char)(ENEMY_TURN_TIMER(slot) + (unsigned char)(speed_sum >> 8));
-    RAM(0x0003u) = step;            /* NES [03] step, [02] mask $A1 << 3 (T-171) */
-    RAM(0x0002u) = 0x08u;
+    F_ram_0003_R = step;            /* NES [03] step, [02] mask $A1 << 3 (T-171) */
+    F_ram_0002_R = 0x08u;
 
     if (dir & 0x01)
         ENEMY_X(slot) = (unsigned char)(ENEMY_X(slot) + step);

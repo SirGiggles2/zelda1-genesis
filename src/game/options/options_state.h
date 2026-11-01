@@ -24,8 +24,10 @@
  *   off 11     room_scroll  u8      OPTIONS_SCROLL_*   radio   (v2)
  *   off 12     uw_music     u8      OPTIONS_UWMUSIC_*  radio   (v3)
  *   off 13..22 legacy cues v4 (v5 consumes only OW byte14)
- *   off 23..25 dungeon music v5, nine packed two-bit choices
- *   off 26..29 reserved     4 bytes — future growth
+ *   off 23..25 dungeon music v5, nine packed two-bit choices (low bits)
+ *   off 26     sprites      u8      OPTIONS_SPRITES_*  radio   (T-398; zero in every older image)
+ *   off 27..28 dungeon music v6 high bits: off27 bit(L-1) L1..8, off28 bit0 L9
+ *   off 29     scroll_speed u8      OPTIONS_SCROLL_SPEED_* radio (T-409; zero in every older image)
  *   off 30..31 checksum     be u16  add-all-bytes-mod-65536
  *
  * Bitfield assignments inside `bool_bits` (set = enabled):
@@ -56,7 +58,8 @@ extern "C" {
 #define OPTIONS_VERSION_V3      0x03u  /* uw_music option */
 #define OPTIONS_VERSION_V4      0x04u  /* per-cue music in reserved bytes13..22 */
 #define OPTIONS_VERSION_V5      0x05u  /* per-dungeon 2-bit choices, bytes23..25 */
-#define OPTIONS_VERSION_CURRENT OPTIONS_VERSION_V5
+#define OPTIONS_VERSION_V6      0x06u  /* per-dungeon 3-bit song, high bits27..28 */
+#define OPTIONS_VERSION_CURRENT OPTIONS_VERSION_V6
 
 #define OPTIONS_STATE_SIZE      32u
 
@@ -79,7 +82,9 @@ typedef enum {
     OPTION_ID_DARK_ROOM_LIGHT    = 13,  /* enum */
     OPTION_ID_ROOM_SCROLL        = 14,  /* enum */
     OPTION_ID_UW_MUSIC           = 15,  /* enum */
-    OPTION_ID_COUNT              = 16
+    OPTION_ID_SPRITE_OVERFLOW    = 16,  /* enum, stored reserved[13] (off 26) */
+    OPTION_ID_SCROLL_SPEED       = 17,  /* enum, stored reserved[16] (off 29) */
+    OPTION_ID_COUNT              = 18
 } OptionId;
 
 /* Bitfield bit indices inside `bool_bits` u16. */
@@ -135,6 +140,25 @@ typedef enum {
 #define OPTIONS_UWMUSIC_CYBERDEOUS 1u
 #define OPTIONS_UWMUSIC_COUNT      2u
 
+/* sprites enum (T-398): multiplayer sprite-line overflow policy.
+ * SMART rotates only when a band can overflow; WHOLE is the exact
+ * whole-sprite admission; NES rotates every frame and lets the VDP drop
+ * per line. Offset 26 is zero in every image older than T-398. */
+#define OPTIONS_SPRITES_SMART      0u  /* default */
+#define OPTIONS_SPRITES_WHOLE      1u
+#define OPTIONS_SPRITES_NES        2u
+#define OPTIONS_SPRITES_COUNT      3u
+#define OPTIONS_SPRITES_OFFSET     26u
+
+/* scroll_speed enum (T-409, Remix only): NES frames run per video frame
+ * while the room slides (mode 7 update): 1 / 2 / 4. Every NES frame still
+ * runs, so NES state matches; FAST and FASTER show fewer of them. */
+#define OPTIONS_SCROLL_SPEED_NORMAL 0u  /* default */
+#define OPTIONS_SCROLL_SPEED_FAST   1u
+#define OPTIONS_SCROLL_SPEED_FASTER 2u
+#define OPTIONS_SCROLL_SPEED_COUNT  3u
+#define OPTIONS_SCROLL_SPEED_OFFSET 29u
+
 /* Stable legacy track IDs in reserved[0..9]. v4 slots were all, OW, UW,
  * L9, Ganon, Triforce, Zelda, item, ending, post-Ganon. v5 playback reads
  * only OW (slot1), with zero/one Inglebard and four Redux. It ignores the
@@ -143,12 +167,20 @@ typedef enum {
 #define OPTIONS_MUSIC_SLOTS 10u
 #define OPTIONS_MUSIC_TRACK_COUNT 17u
 
-/* Per-dungeon choices. Zero in the packed save retains the previous normal
- * cue (the UW preference for1..8, Redux Level9); getters resolve that value.
- * Public choice0 on ALL DUNGEONS means DEFAULT: individual dungeon choices. */
-#define OPTIONS_DUNGEON_MUSIC_INGLEBARD 1u
-#define OPTIONS_DUNGEON_MUSIC_CYBERDEOUS 2u
-#define OPTIONS_DUNGEON_MUSIC_REDUX 3u
+/* Per-dungeon song (T-408: any dungeon song on any dungeon). Zero in the
+ * packed save retains the previous normal cue (the UW preference for1..8,
+ * Redux Level9); getters resolve that value. Choices1..7 name one song.
+ * ALL DUNGEONS public choice0 means DEFAULT (individual choices differ) and
+ * choice8 REDUX gives each dungeon its own Redux theme (dungeon_music.asm). */
+#define OPTIONS_DUNGEON_MUSIC_INGLEBARD   1u
+#define OPTIONS_DUNGEON_MUSIC_CYBERDEOUS  2u
+#define OPTIONS_DUNGEON_MUSIC_ZELDA       3u
+#define OPTIONS_DUNGEON_MUSIC_NEW_LIGHT   4u
+#define OPTIONS_DUNGEON_MUSIC_PERILS      5u
+#define OPTIONS_DUNGEON_MUSIC_TRIFORCE    6u
+#define OPTIONS_DUNGEON_MUSIC_LEVEL_NINE  7u
+#define OPTIONS_DUNGEON_MUSIC_SONGS       7u
+#define OPTIONS_DUNGEON_MUSIC_REDUX       8u  /* ALL DUNGEONS preset only */
 
 /* start_hearts numeric — clamp range. */
 #define OPTIONS_START_HEARTS_MIN   3u

@@ -40,9 +40,12 @@ CANDIDATES = (
 # Shipped whatever the trace shows: entry points and files a Linux trace
 # cannot reach (Windows launchers, the GUI, dependency install, docs).
 ALWAYS = (
-    "Converter.bat", "Build.bat", "docs/CONVERTER.md",
+    "Converter.bat", "Converter.command", "Converter.sh", "Build.bat", "docs/CONVERTER.md",
     "tools/converter/gui.py", "tools/converter/converter_core.py",
     "tools/converter/requirements.txt",
+    "tools/converter/launch.py", "tools/converter/web_builder.py",
+    "tools/converter/package_workspace.py",
+    "tools/converter/web/index.html", "tools/converter/web/style.css", "tools/converter/web/app.js",
 )
 MANIFEST = ROOT / "tools" / "converter" / "package_manifest.txt"
 EXCLUDE_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".mp3", ".mp4",

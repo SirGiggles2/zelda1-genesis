@@ -26,6 +26,20 @@ YM_DATA1        equ $A04001     ; YM2612 Part I data
 YM_ADDR2        equ $A04002     ; YM2612 Part II address (ch 3-5 / ch 6 DAC pan)
 YM_DATA2        equ $A04003     ; YM2612 Part II data
 PSG_PORT        equ $C00011     ; SN76489 PSG data
+Z80_BUSREQ      equ $A11100     ; word: write $0100 = request; read bit 8 0 = granted
+Z80_RESET       equ $A11200     ; word: $0100 = Z80 out of reset
+
+;----------------------------------------------------------------------
+; T-416: the YM2612 sits on the Z80 bus. Once the XGM Z80 driver runs,
+; the 68k may touch $A04000 only while it holds that bus (plutiedev
+; "Using the Z80"; SGDK YM2612_write* do the same). Without it a real
+; console can stall on the busy poll with V-Int masked. Emulators let
+; the access through, so only hardware froze (cave entry hands the chip
+; back to this driver while the stairs PCM plays on the Z80).
+; ym_bus_take returns D2 = 1 when it took the bus (ym_bus_give releases).
+; Callers hold SR at level 6, so V-Int cannot interleave its own
+; request/release with ours.
+;----------------------------------------------------------------------
 
 ;----------------------------------------------------------------------
 ; NES source: Z_07.asm:DriveAudio / Tune request cells.
@@ -87,9 +101,31 @@ NES_YM_K5_TRI   equ 68803
 ; 4) for the duration of the pair by raising SR interrupt level to 6, then
 ; restore the caller's SR on exit.  Cost: ~16 cycles per call.
 ;==============================================================================
+ym_bus_take:
+    moveq   #0,D2
+    btst    #0,(Z80_BUSREQ).l       ; 0 = bus already granted to the 68k
+    beq.s   .have
+    moveq   #1,D2
+    move.w  #$0100,(Z80_BUSREQ).l
+    move.w  #$0100,(Z80_RESET).l
+.grant:
+    btst    #0,(Z80_BUSREQ).l
+    bne.s   .grant
+.have:
+    rts
+
+ym_bus_give:
+    tst.b   D2
+    beq.s   .kept
+    move.w  #0,(Z80_BUSREQ).l
+.kept:
+    rts
+
 ym_write1:
     move.w  SR,-(SP)                ; save caller's SR
     ori.w   #$0600,SR               ; mask HINT (level 4) + its below
+    move.l  D2,-(SP)
+    bsr     ym_bus_take             ; T-416
 .wait_ym1:
     tst.b   (YM_ADDR1).l            ; bit 7 = busy flag
     bmi.s   .wait_ym1
@@ -98,6 +134,8 @@ ym_write1:
     nop
     nop
     move.b  D1,(YM_DATA1).l         ; write data
+    bsr     ym_bus_give
+    move.l  (SP)+,D2
     move.w  (SP)+,SR                ; restore SR (re-enables HINT)
     rts
 
@@ -116,6 +154,8 @@ ym_write1:
 ym_write2:
     move.w  SR,-(SP)
     ori.w   #$0600,SR
+    move.l  D2,-(SP)
+    bsr     ym_bus_take             ; T-416
 .wait:
     tst.b   (YM_ADDR1).l            ; busy flag is shared between parts
     bmi.s   .wait
@@ -124,6 +164,8 @@ ym_write2:
     nop
     nop
     move.b  D1,(YM_DATA2).l         ; write data (Part II)
+    bsr     ym_bus_give
+    move.l  (SP)+,D2
     move.w  (SP)+,SR
     rts
 
@@ -667,15 +709,13 @@ music_tick:
     ; labeled rts — the call costs ~20 cycles total and lets us defer
     ; removing it to a later cleanup pass.
     ;------------------------------------------------------------------
-    ; Attract-mode-exit hook: the game's DriveAudio is NOP'd, so the
-    ; audio driver's own SilenceSong paths (via DriveTune0 → $0604 bit7
-    ; and DriveTune1 → $0602 bit7) never run.  Game logic still writes
-    ; the request bytes at state transitions.  The attract-to-file-menu
-    ; path (UpdateMode0Demo_Sub0 → SilenceAllSound in z_01.asm:4118)
-    ; sets $0604 = $80 and $0603 = $80.  Poll both $0604 and $0602 for
-    ; the silence-request bit 7 and route it into native music_silence.
-    ; Also clear $0605/$0607 (current-tune shadows) so the game's own
-    ; "nothing playing" markers stay coherent with our silenced state.
+    ; NES source: Z_00.asm DriveTune0/DriveTune1/SilenceSong.
+    ; Drained C: src/game/audio/audio_requests.c:drive_tunes.
+    ; Coverage: FULL (tune/effect request consumption); Stance: ADOPT.
+    ; The native NMI consumer owns $0602..$0604. The obsolete VBlank
+    ; silence poll stole Tune1 $80 before it could start the death PCM.
+    ; Keep only the SongRequest bridge here; never clear another owner's
+    ; pending tune/effect requests or current-tune shadows.
     ; SongRequest bridge: game writes native RAM $0600 (SongRequest) at
     ; every song change (title/gameplay/dungeon/etc.). Forward to m_song_req
     ; and clear the game-side byte so the game's own driver-absent check
@@ -688,18 +728,6 @@ music_tick:
     clr.b   $0600(A0)
     move.b  D0,(m_song_req).l
 .no_song_req_bridge:
-    move.b  $0604(A0),D0          ; Tune 0 request (SilenceAllSound)
-    bmi.s   .do_silence
-    move.b  $0602(A0),D0          ; Tune 1 request (silence-then-play)
-    bpl.s   .no_silence_req
-.do_silence:
-    clr.b   $0602(A0)
-    clr.b   $0603(A0)
-    clr.b   $0604(A0)
-    clr.b   $0605(A0)
-    clr.b   $0607(A0)
-    bsr     music_silence
-    bra.s   .done
 .no_silence_req:
     move.b  (m_song_req).l,D0
     beq.s   .no_req
@@ -1388,11 +1416,9 @@ PsgDrumTable:
 
 ;==============================================================================
 ; MusicBlob — SongTable + 9 song headers + 9 song scripts (2757 bytes)
-; Pulled verbatim from PRG bank 0 at NES $8D60.
+; Pulled verbatim from PRG bank 0 at NES $8D60. T-419: it is the .nesdata
+; piece "music_blob" (tools/nesdata/pieces.py); the label resolves at link.
 ;==============================================================================
-MusicBlob:
-    incbin  "src/data/music_blob.dat"
-    even
 
 ; DMC samples now ship as 14 kHz PCM C arrays in data/audio/sfx_pcm.c
 ; and play through SGDK's XGM Z80 driver. The legacy dmc_samples.inc

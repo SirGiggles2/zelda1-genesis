@@ -16,6 +16,9 @@
 extern "C" {
 #endif
 
+void link_collision_check_dodongo_part_for_player(unsigned int slot, unsigned char player,
+                                                 unsigned char context);
+
 /* Apply Link damage: rings shift threshold, deduct heart slack +
  * partial, on death set MODE_VALUE=17 + clear stun. NES LinkBeHarmed.
  * drain at link_collision_runtime.c:6-46. */
@@ -48,6 +51,24 @@ void link_collision_check_link_collision(unsigned int monster_slot);
  * monsters ($27/$17) and dying-monster cleanup ($05/$06). NES
  * CheckMonsterCollisions. drain at link_collision_runtime.c:100-128. */
 void link_collision_check_monster_collisions(unsigned int monster_slot);
+/* Multiplayer-only P1 weapon checks against a hand carrying a teammate. */
+void link_collision_check_wallmaster_rescue(unsigned int slot);
+/* Same battery for an explicit owner whose legacy weapon context is loaded. */
+void link_collision_check_monster_collisions_for_player(unsigned int monster_slot,
+                                                       unsigned char player);
+/* Same source sword/contact rules, without reading unrelated weapon slots. */
+void link_collision_check_monster_melee_collisions(unsigned int monster_slot);
+void link_collision_check_monster_melee_for_player(unsigned int slot, unsigned char player);
+void link_collision_check_player_body(unsigned int slot, unsigned char player);
+void link_collision_check_gleeok_head_part(unsigned int slot, unsigned char player,
+                                           unsigned char context);
+/* Internal Gohma-owner callback after its part is selected. No recursive
+ * boss dispatch: context0 full,1 melee,2 sword/beam,3 body only. */
+void link_collision_check_gohma_part_for_player(unsigned int slot, unsigned char player,
+                                              unsigned char context);
+/* Owned sword/beam and body only; unrelated ranged slots are never consumed. */
+void link_collision_check_monster_sword_beam_collisions(unsigned int monster_slot,
+                                                       unsigned char player);
 
 #ifdef __cplusplus
 }

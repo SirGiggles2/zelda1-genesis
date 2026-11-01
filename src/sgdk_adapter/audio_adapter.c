@@ -116,7 +116,7 @@ static unsigned char music_choice_for_song(unsigned char song)
         return choice==4u ? 4u : 1u;
     }
     if (song==0x40u || song==0x20u)
-        return options_dungeon_music_track(nes_ram[0x0010u]);
+        return options_dungeon_music_track(F_ram_0010);
     return 0u;
 }
 
@@ -125,7 +125,7 @@ static const u8 *xgm_blob_for_song(unsigned char song)
     unsigned char resolved = song;
     /* A level-9 request has its own generated tune; a user can override
      * that tune specifically or override the requested dungeon song. */
-    if (song == SONG_UW_BITMAP && nes_ram[0x0010u] == 9u) resolved = 0x20u;
+    if (song == SONG_UW_BITMAP && F_ram_0010 == 9u) resolved = 0x20u;
     {
         unsigned char choice = music_choice_for_song(resolved);
         if (choice == 1u) return ow_theme_xgm;
@@ -161,7 +161,7 @@ static const u8 *xgm_blob_for_song(unsigned char song)
 
 void audio_xgm_init(void)
 {
-    audio_native_ram_base = nes_ram;
+    audio_native_ram_base = nes_ram; /* native_ram bulk:image_ptr */
     if (xgm_initialized) return;
     xgm_initialized = 1;
 
@@ -326,7 +326,11 @@ void audio_music_play(unsigned char song)
 
 /* T-272: all compiled versions are independently playable, including
  * built-in arrangements that generated NES/local routing can override.
- * The future custom Quest-2 credits song has no asset/catalog entry yet. */
+ * Order: three arrangements, the twelve Redux bank tracks (saved choice
+ * IDs 4..15), the custom Lullaby (choice 16), then the NES port. */
+#define SOUND_TEST_REDUX_FIRST 3u
+#define SOUND_TEST_LULLABY (SOUND_TEST_REDUX_FIRST+12u)
+#define SOUND_TEST_FIXED (SOUND_TEST_LULLABY+1u)
 static const char *sound_test_song_name(unsigned char song) {
     switch (song) {
     case 0x80u: return "TITLE";
@@ -342,7 +346,7 @@ static const char *sound_test_song_name(unsigned char song) {
     }
 }
 unsigned char audio_sound_test_count(void) {
-    unsigned char n=3u;
+    unsigned char n=SOUND_TEST_FIXED;
 #ifdef ZELDA_NES_MUSIC
     n+=nes_music_count;
 #endif
@@ -352,12 +356,17 @@ unsigned char audio_sound_test_count(void) {
     return n;
 }
 static const u8 *sound_test_blob(unsigned char index,unsigned char *song,const char **source) {
-    if (index<3u) {
+    if (index<SOUND_TEST_REDUX_FIRST) {
         *source=index==2u ? "CYBERDEOUS" : "INGLEBARD";
         *song=index==0u ? 1u : 0x40u;
         return index==0u ? ow_theme_xgm : index==1u ? uw_theme_xgm : uw_theme_cyberdeous_xgm;
     }
-    index-=3u;
+    if (index<SOUND_TEST_LULLABY) {
+        *song=0x01u; *source="ZELDA REDUX";
+        return redux_music[index-SOUND_TEST_REDUX_FIRST].xgm;
+    }
+    if (index==SOUND_TEST_LULLABY) { *song=0x03u; *source="CUSTOM"; return post_ganon_lullaby_xgm; }
+    index-=SOUND_TEST_FIXED;
 #ifdef ZELDA_NES_MUSIC
     if (index<nes_music_count) { *song=nes_music[index].song; *source="NES PORT"; return nes_music[index].xgm; }
     index-=nes_music_count;
@@ -373,6 +382,9 @@ const char *audio_sound_test_name(unsigned char index) {
     if (index==0u) return "OVERWORLD ARRANGEMENT";
     if (index==1u) return "DUNGEON ARRANGEMENT";
     if (index==2u) return "DUNGEON REMIX";
+    /* Redux and Lullaby share the saved Music-choice labels. */
+    if (index<SOUND_TEST_FIXED)
+        return audio_music_choice_name((unsigned char)(index-SOUND_TEST_REDUX_FIRST+4u));
     (void)sound_test_blob(index,&song,&source);
     return sound_test_song_name(song);
 }

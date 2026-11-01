@@ -9,22 +9,22 @@
 #define TRAP_ALT_OBJ_TYPE              30u
 #define TRAP_PUSHED_OBJ_TYPE           34u
 
-#define WHIRLWIND_ACTIVE_FLAG          RAM(0x0508)
-#define TELEPORT_ACTIVE_FLAG           RAM(0x0522)
-#define TELEPORT_LEVEL_INDEX           RAM(0x0523)
-#define WHIRLWIND_PREV_ROOM_ID         RAM(0x00EA)
+#define WHIRLWIND_ACTIVE_FLAG          F_WHIRLWIND_ACTIVE_FLAG_R
+#define TELEPORT_ACTIVE_FLAG           F_ram_0522_R2
+#define TELEPORT_LEVEL_INDEX           F_TELEPORT_LEVEL_INDEX_R
+#define WHIRLWIND_PREV_ROOM_ID         F_WHIRLWIND_PREV_ROOM_ID_R
 
-#define LINK_CELLAR_FLAG               RAM(0x005A)
-#define MODE_TIMER                     RAM(0x0011)
+#define LINK_CELLAR_FLAG               F_ram_005A_R2
+#define MODE_TIMER                     F_ram_0011_R2
 /* SUBMODE_VALUE comes from progress_state.h (already included above). */
 
-#define OAM_HIDE_2                     RAM(0x0248)
-#define OAM_HIDE_3                     RAM(0x024C)
+#define OAM_HIDE_2                     F_OAM_HIDE_2_R
+#define OAM_HIDE_3                     F_OAM_HIDE_3_R
 
-#define RUPEE_STASH_FLAG               RAM(0x034E)
-#define TRAP_BASE_SLOT                 RAM(0x0340)
-#define PASSIVE_OBJ_FLAG               RAM(0x03F8)
+#define RUPEE_STASH_FLAG               F_ram_034E_R
+#define TRAP_BASE_SLOT                 F_ram_0340_R2
+#define PASSIVE_OBJ_FLAG               F_ram_03F8_R2
 
-#define TRAP_RETURN_COORD(slot)        OBJ(0x0380, (slot))
+#define TRAP_RETURN_COORD(slot)        F_ram_0380_O((slot))
 
 #endif

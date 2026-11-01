@@ -20,6 +20,7 @@ extern "C" {
  *
  * NES TakeItem (item_runtime.c:110-137). */
 void item_take_item(unsigned char item_id);
+void item_take_item_for_player(unsigned char item_id, unsigned char player);
 /* Redux saved ammunition owner; shop/drop callers use30/5 respectively. */
 void item_add_arrow_ammunition(unsigned char amount);
 

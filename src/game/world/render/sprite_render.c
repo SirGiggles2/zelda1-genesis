@@ -13,6 +13,7 @@
 #include "../../enemies/enemy_render.h"
 #include "render_abi.h"
 #include "sprite_slots.h"
+#include "mp_sprite_runtime.h"
 #include "../../../../engine/src/vram_layout.h"
 /* FU3+FU4: renderer reads from atlas/items_chr_x4 (byte-identical to
  * legacy expanded_sprite_chr via FU2).  ROOMROM_ITEM_TILE_* tile-index
@@ -32,6 +33,8 @@
  * roomrom_spr_subpal_to_pal() directly. */
 #include "subpal_routing.h"
 #include "green_rupee.h"
+#include "../../items/arrow_diag_chr.h"    /* T-260 diagonal arrow */
+#include "../../../state/game_profile.h"
 #include "platform_abi.h"                   /* nes_ram: CurLevel, RoomId */
 #include "../../dungeon/uw_render.h"        /* level / quest of the UW room */
 #include "../../dungeon/cellar_meta.h"      /* roomrom_uw_room_is_cellar */
@@ -125,17 +128,23 @@ void roomrom_sprites_mp_invalidate(void)
 }
 static unsigned short wslot(unsigned short base)
 {
+    unsigned char family;
     if (s_weapon_player == 0u) return base;
-    if (base == ROOMROM_SPRITE_SLOT_BEAM ||
-        base == ROOMROM_SPRITE_SLOT_BOOMERANG ||
-        base == ROOMROM_SPRITE_SLOT_ARROW)
-        return ROOMROM_MP_SHOT_SLOT(s_weapon_player);
-    if (base == ROOMROM_SPRITE_SLOT_BOMB ||
-        base == ROOMROM_SPRITE_SLOT_EXPLOSION ||
-        base == ROOMROM_SPRITE_SLOT_CANDLE_FIRE ||
-        base == ROOMROM_SPRITE_SLOT_MAGIC_SHOT)
-        return ROOMROM_MP_FX_SLOT(s_weapon_player);
-    return base;
+    switch (base) {
+    case ROOMROM_SPRITE_SLOT_BEAM: family = 0u; break;
+    case ROOMROM_SPRITE_SLOT_BOOMERANG: family = 4u; break;
+    case ROOMROM_SPRITE_SLOT_ARROW: family = 5u; break;
+    case ROOMROM_SPRITE_SLOT_BOMB: family = 6u; break;
+    case ROOMROM_SPRITE_SLOT_EXPLOSION: family = 7u; break;
+    case ROOMROM_SPRITE_SLOT_CANDLE_FIRE: family = 8u; break;
+    case ROOMROM_SPRITE_SLOT_MAGIC_SHOT: family = 9u; break;
+    default: return base;
+    }
+    return (unsigned short)ROOMROM_MP_WEAPON_TOKEN(s_weapon_player, family);
+}
+void roomrom_sprites_clear_mp_weapons_from(unsigned char player)
+{
+    mp_sprite_clear_from(player);
 }
 
 /* HUD backdrop sprite strip retired 2026-05-15. H32 SAT is gameplay-only;
@@ -261,7 +270,12 @@ void roomrom_sprites_invalidate_cache(void)
     }
 }
 
-static void roomrom_sprites_set_full_cached(unsigned short slot,
+/* T-397: inline at each call site (most pass constant slots, so the slot
+ * tests fold away); the out-of-line call cost ~865 cycles a sprite, mostly
+ * argument passing and register saves. render_set_sprite_inline writes
+ * the SAT cache entry exactly as SGDK VDP_setSpriteFull (vdp_spr.c). */
+static inline __attribute__((always_inline)) void roomrom_sprites_set_full_cached(
+                                            unsigned short slot,
                                             signed short   x,
                                             signed short   y,
                                             unsigned short size,
@@ -275,7 +289,7 @@ static void roomrom_sprites_set_full_cached(unsigned short slot,
     /* NES item and weapon sprites draw in front of the background; in the
      * UW the edge and door BG tiles are high priority (T-131), so these
      * sprites are too. */
-    if (nes_ram[0x0010u] != 0u &&
+    if (F_ram_0010 != 0u &&
         slot >= ROOMROM_SPRITE_SLOT_SWORD && slot <= ROOMROM_SPRITE_SLOT_MAGIC_SHOT)
         attr = (unsigned short)(attr | 0x8000u);
     if (slot < ROOMROM_SPRITE_CACHE_COUNT) {
@@ -293,9 +307,27 @@ static void roomrom_sprites_set_full_cached(unsigned short slot,
         c->valid = 1u;
     }
     /* Phase 12.2 SGDK-1 cleanup: route SAT slot write through adapter. */
-    render_set_sprite_full(slot, x, y, size, attr, link);
+    render_set_sprite_inline(slot, x, y, size, attr, (unsigned char)link);
 }
 
+/* Keep the established fixed-slot cache body separate, so constant Link/HUD
+ * calls retain their compiler specializations. The virtual branch is removed
+ * at those call sites; only extra item APIs enter the staging path. */
+static inline void roomrom_sprites_set_full_routed(unsigned short slot,
+                                                   short x, short y,
+                                                   unsigned short size,
+                                                   unsigned short attr,
+                                                   unsigned short link)
+{
+    /* T363: virtual owner/family IDs cannot alias swords or enemy SAT.
+     * The compositor assigns physical slots after all producers have run. */
+    if (slot >= ROOMROM_MP_WEAPON_TOKEN_BASE) {
+        if (F_ram_0010 != 0u) attr = (unsigned short)(attr | 0x8000u);
+        mp_sprite_submit(slot, x, y, size, attr);
+        return;
+    }
+    roomrom_sprites_set_full_cached(slot, x, y, size, attr, link);
+}
 #define VDP_setSpriteFull roomrom_sprites_set_full_cached
 
 void roomrom_sprites_set_redux(unsigned char redux)
@@ -376,7 +408,7 @@ static void upload_pose(unsigned short vram_tile_base,
  * Like-Like eating it, Z_04). */
 static void upload_link_walk_banks(void)
 {
-    const unsigned char magic = (unsigned char)(nes_ram[0x0676u] != 0u);
+    const unsigned char magic = (unsigned char)(F_ram_0676 != 0u);
     const link_pose_def_t *poses = magic ? link_poses_magic : link_poses;
     unsigned char p;
     for (p = 0; p < LINK_POSE_COUNT; p++) {
@@ -389,9 +421,11 @@ static void upload_link_walk_banks(void)
     s_link_shield_bank = magic;
 }
 
+unsigned short roomrom_sprites_link_walk_tile(void) { return LINK_VRAM_TILE; }
+
 static void link_shield_sync(void)
 {
-    if (s_link_shield_bank != (unsigned char)(nes_ram[0x0676u] != 0u))
+    if (s_link_shield_bank != (unsigned char)(F_ram_0676 != 0u))
         upload_link_walk_banks();
 }
 
@@ -464,6 +498,23 @@ unsigned char roomrom_sprites_item_chr_variant(void)
     return s_item_chr_variant;
 }
 
+/* T-317: remapped copy of the two rupee tiles (64 bytes) into atlas pair
+ * `atlas_idx`: pixel 1 -> shade, 2 -> body, 3 -> light (first = shade, the
+ * three entries consecutive); 0 stays transparent. */
+static void upload_remapped_rupee(const unsigned char *src, unsigned char atlas_idx,
+                                  unsigned char first)
+{
+    unsigned char dst[64];
+    unsigned char i;
+    for (i = 0u; i < 64u; i++) {
+        const unsigned char hi = (unsigned char)(src[i] >> 4);
+        const unsigned char lo = (unsigned char)(src[i] & 0x0Fu);
+        dst[i] = (unsigned char)(((hi ? (unsigned char)(hi - 1u + first) : 0u) << 4) |
+                                 (lo ? (unsigned char)(lo - 1u + first) : 0u));
+    }
+    render_chr_upload((unsigned short)((ROOMROM_ITEM_TILE_BASE + atlas_idx) * 32u), dst, 64u);
+}
+
 void roomrom_sprites_upload_items_chr(void)
 {
     /* FU3 (atlas pipeline): N sub-pal copies of the item atlas from the
@@ -487,43 +538,27 @@ void roomrom_sprites_upload_items_chr(void)
         );
     }
 
-    /* T-317: world green rupee. Copy the rupee tile (atlas source index)
-     * into a free atlas slot, remapping the two NES color indices to the
-     * free PAL3 entries loaded by bg_palette.c. Genesis tiles are 4bpp
-     * planar: 4 planes x 8 rows, MSB = leftmost pixel. */
+    /* T-317: world green 1-rupee and red 20-rupee. Copy the 8x16 rupee pair
+     * (atlas source index) into a free atlas pair, remapping NES colour
+     * indices 1/2/3 to three free PAL3 entries loaded by bg_palette.c. Genesis
+     * tiles are packed 4bpp: 4 bytes per row, high nibble = left pixel
+     * (the first version decoded them as planar and drew garbage). */
     {
         const unsigned char *blob = variant ? core_redux_items_chr
                                             : &roomrom_atlas_items_x4[0][0];
-        const unsigned char *src =
-            &blob[GREEN_RUPEE_SRC_ATLAS_IDX * 32u];
-        unsigned char dst[32];
-        unsigned char row;
-        unsigned char plane;
-        for (plane = 0u; plane < 4u; plane++) {
-            for (row = 0u; row < 8u; row++) {
-                dst[plane * 8u + row] = 0u;
-            }
-        }
-        for (row = 0u; row < 8u; row++) {
-            for (plane = 0u; plane < 8u; plane++) {
-                unsigned char bit = (unsigned char)(7u - plane);
-                unsigned char idx = 0u;
-                unsigned char p;
-                for (p = 0u; p < 4u; p++) {
-                    idx |= (unsigned char)(((src[p * 8u + row] >> bit) & 1u) << p);
-                }
-                if (idx == 2u) idx = GREEN_RUPEE_PAL_BODY;
-                else if (idx == 3u) idx = GREEN_RUPEE_PAL_SHADE;
-                for (p = 0u; p < 4u; p++) {
-                    if ((idx >> p) & 1u) {
-                        dst[p * 8u + row] |= (unsigned char)(1u << bit);
-                    }
-                }
-            }
-        }
-        render_chr_upload(
-            (unsigned short)((ROOMROM_ITEM_TILE_BASE + GREEN_RUPEE_ATLAS_IDX) * 32u),
-            dst, 32u);
+        upload_remapped_rupee(&blob[GREEN_RUPEE_SRC_ATLAS_IDX * 32u],
+                              GREEN_RUPEE_ATLAS_IDX, GREEN_RUPEE_PAL_SHADE);
+        upload_remapped_rupee(&blob[GREEN_RUPEE_SRC_ATLAS_IDX * 32u],
+                              RED_RUPEE_ATLAS_IDX, RED_RUPEE_PAL_SHADE);
+    }
+
+    /* T-260: user-drawn diagonal arrow for the Remix burst bomb. Two 8x16
+     * columns into free atlas pairs; Original keeps its VRAM unchanged. */
+    if (game_profile_is_remix()) {
+        render_chr_upload((unsigned short)((ROOMROM_ITEM_TILE_BASE + ARROW_DIAG_LEFT_ATLAS) * 32u),
+                          &arrow_diag_chr[0], 64u);
+        render_chr_upload((unsigned short)((ROOMROM_ITEM_TILE_BASE + ARROW_DIAG_RIGHT_ATLAS) * 32u),
+                          &arrow_diag_chr[64], 64u);
     }
 }
 
@@ -550,10 +585,10 @@ void roomrom_sprites_load_palette(void)
  * membership for a controller-earned cellar (T-221 L3 raft). */
 static short link_draw_y(short y)
 {
-    if (nes_ram[0x0010u] == 0u || nes_ram[0x0012u] == 9u ||
+    if (F_ram_0010 == 0u || F_ram_0012 == 9u ||
         roomrom_uw_room_is_cellar(roomrom_uw_room_render_get_level(),
                                   roomrom_uw_room_render_get_quest(),
-                                  nes_ram[0x00EBu]))
+                                  F_ram_00EB))
         return (short)(y + 2);
     return y;
 }
@@ -579,14 +614,14 @@ static unsigned char link_half_prio(short hx,short hy)
      * Stance: EXTEND. CurLevel already names the destination while Link is
      * still outside. InitMode10 preserves foreground; subsequent stairs
      * updates put both halves behind BG, regardless of horizontal position. */
-    if (nes_ram[0x0012u] == 0x10u && nes_ram[0x0010u] != 0u)
-        return nes_ram[0x0011u] ? 0u : 1u;
-    if (nes_ram[0x0010u] == 0u) return 0u;
+    if (F_ram_0012 == 0x10u && F_ram_0010 != 0u)
+        return F_ram_0011 ? 0u : 1u;
+    if (F_ram_0010 == 0u) return 0u;
     /* T350: only halves overlapping a false face go behind its opaque
      * checker pixels. Normal wall/door priority rules are retained. */
     if (((hx<144 && hx+8>112) && ((sy<88 && sy+16>64)||(sy<224 && sy+16>200))) ||
         ((sy<160 && sy+16>128) && ((hx<32 && hx+8>8)||(hx<248 && hx+8>224)))) {
-        unsigned char mask=roomrom_uw_room_render_false_wall_mask(nes_ram[0xEBu]);
+        unsigned char mask=roomrom_uw_room_render_false_wall_mask(F_ram_00EB_N2);
         if (((mask&8u) && hx<144 && hx+8>112 && sy<88 && sy+16>64) ||
             ((mask&4u) && hx<144 && hx+8>112 && sy<224 && sy+16>200) ||
             ((mask&2u) && hx<32 && hx+8>8 && sy<160 && sy+16>128) ||
@@ -598,9 +633,9 @@ static unsigned char link_half_prio(short hx,short hy)
 static void set_door_masks(void)
 {
     static const unsigned char k_band_y[2] = { 0x3Du, 0xDDu };
-    unsigned char b, on = (nes_ram[0x0010u] != 0u &&
-                          nes_ram[0x0012u] != 0x10u && nes_ram[0x0012u] != 9u) ? 1u : 0u;
-    unsigned char walls=on?roomrom_uw_room_render_false_wall_mask(nes_ram[0xEBu]):0u;
+    unsigned char b, on = (F_ram_0010 != 0u &&
+                          F_ram_0012 != 0x10u && F_ram_0012 != 9u) ? 1u : 0u;
+    unsigned char walls=on?roomrom_uw_room_render_false_wall_mask(F_ram_00EB_N2):0u;
     unsigned char state=(unsigned char)(on|((walls&12u)<<1));
     if (state == s_door_masks_state) return;     /* SAT already holds them */
     s_door_masks_state = state;
@@ -630,7 +665,7 @@ static void set_link_halves(short x, short y, unsigned short tile,
      * = $F8) and nothing draws him (UpdatePlayer returns while halted,
      * Link_EndMoveAndAnimate while WhirlwindTeleportingState != 0) until
      * the drop-off (Z_01.asm UpdateWhirlwind_Full; T-171). */
-    if (nes_ram[0x0522u] != 0u) {
+    if (F_ram_0522 != 0u) {
         x = -32;
         gy = -32;
     }
@@ -652,7 +687,7 @@ static void set_link_halves_hflip(short x, short y, unsigned short tile,
                                   unsigned char pal_index)
 {
     signed short gy = (signed short)link_draw_y(y);
-    if (nes_ram[0x0522u] != 0u) {
+    if (F_ram_0522 != 0u) {
         x = -32;
         gy = -32;
     }
@@ -741,56 +776,72 @@ void roomrom_sprites_set_link_hurt_pose(short x, short y,
 /* T-251: copy one 2x2 pose into a player's scratch bank, remapping only
  * the tunic color index (NES Link sub-pal color 1) to that player's
  * identity slot. Transparent pixels stay 0 (same rule as upload_pose). */
-static void upload_pose_recolor(unsigned short vram_tile_base, const link_pose_def_t *pose,
-                                unsigned char from, unsigned char to)
+/* NES source: authenticated Link CHR and live-OAM pose descriptors above.
+ * Drained C: upload_pose_recolor, frozen transform verified by the build test.
+ * Coverage: both profiles/identities, walk/magic/attack; same committed bytes.
+ * Stance: EXTEND; immutable ROM poses remove runtime pixel work and stack copy. */
+/* T-011 live NES lifting descriptors, shared by the build-derived MP bank.
+ * Last two tiles are horizontally flipped in the packed pixel transform. */
+static const link_pose_def_t lift_poses[2] = {
+    { {0x78u, 0x79u, 0x78u, 0x79u}, 0xCu },
+    { {0x78u, 0x79u, 0x08u, 0x09u}, 0xCu },
+};
+/* T-251 P3.8: banks0..2 preserve red/blue/purple; bank3 maps only the
+ * tunic index to PAL1[5] white. NES hurt timer &3 selects normal identity
+ * at phase0 and the approved party white flash at phases1..3. Retain
+ * black/skin/transparent pixels and the same scratch/SAT reservations. */
+extern const unsigned short mp_link_pose_words[2][4][22][64];
+static void upload_mp_pose(unsigned short tile, unsigned char identity,
+                           unsigned char pose)
 {
-    unsigned char t, i;
-    unsigned char buf[LINK_TILES_PER_POSE * 32u];
-    for (t = 0; t < LINK_TILES_PER_POSE; t++) {
-        unsigned char *tile = &buf[(unsigned short)t * 32u];
-        unsigned short nes_off = (unsigned short)pose->nes_ids[t] * 32u;
-        if (pose->nes_ids[t] >= COMMON_SPRITE_PATTERN_TILE_COUNT) {
-            const unsigned char *demo = s_item_chr_variant ? core_redux_demo_chr : demo_chr;
-            const unsigned short demo_off =
-                (unsigned short)((pose->nes_ids[t] - 0x70u) * 32u);
-            for (i = 0; i < 32; i++) tile[i] = demo[demo_off + i];
-        } else {
-            const unsigned char *src = active_common_chr();
-            for (i = 0; i < 32; i++) tile[i] = src[nes_off + i];
-        }
-        if (pose->per_tile_hflip & (1u << t)) {
-            hflip_tile_inplace(tile);
-        }
-        for (i = 0u; i < 32u; ++i) {
-            const unsigned char hi = (unsigned char)(tile[i] >> 4);
-            const unsigned char lo = (unsigned char)(tile[i] & 0x0Fu);
-            tile[i] = (unsigned char)
-                (((hi == from ? to : hi) << 4) | (lo == from ? to : lo));
-        }
+    const unsigned short *words = mp_link_pose_words[s_item_chr_variant != 0u][identity][pose];
+    /* ROM remains stable through VBlank; no owned RAM copy is necessary. */
+    if (!render_vram_queue_words((unsigned short)(tile * 32u), words, 64u))
+        render_chr_upload((unsigned short)(tile * 32u),
+                          (const unsigned char *)words, 128u);
+}
+
+/* NES source: DrawLinkLiftingItem, T011 live OAM; Drained C: P1 lift
+ * renderer above. Coverage: FULL pose/identity, Stance: EXTEND MP slots. */
+void roomrom_sprites_set_mp_lift(unsigned char player, short x, short y,
+                                unsigned char one_hand)
+{
+    unsigned char index, pose;
+    unsigned short tile, slot;
+    if (player < 1u || player > 3u) return;
+    index = (unsigned char)(player - 1u);
+    pose = (unsigned char)(20u + (one_hand != 0u));
+    tile = (unsigned short)(ROOMROM_MP_LINK_TILE_BASE +
+                            index * ROOMROM_MP_LINK_TILES_PER_PLAYER);
+    if (s_mp_last_pose[index] != pose) {
+        upload_mp_pose(tile, index, pose);
+        s_mp_last_pose[index] = pose;
     }
-    /* One contiguous DMA instead of four. The four tiles are adjacent in
-     * VRAM, and each render_chr_upload masks interrupts and sets up DMA,
-     * so a single 128-byte transfer removes most of the pose-change spike
-     * that pushed 2P play ticks over their frame deadline. */
-    render_chr_upload((unsigned short)(vram_tile_base * 32u), buf,
-                      (unsigned short)sizeof(buf));
+    slot = ROOMROM_MP_LINK_SLOT(player);
+    VDP_setSpriteFull(slot, x, y, RENDER_SPRITE_SIZE(1, 2),
+        RENDER_TILE_ATTR_FULL(RENDER_PAL1, link_half_prio(x, y), 0, 0, tile),
+        ROOMROM_SPRITE_NEXT(slot));
+    VDP_setSpriteFull(slot + 1u, x + 8, y, RENDER_SPRITE_SIZE(1, 2),
+        RENDER_TILE_ATTR_FULL(RENDER_PAL1, link_half_prio(x + 8, y), 0, 0, tile + 2u),
+        ROOMROM_SPRITE_NEXT(slot + 1u));
 }
 
 /* T-251: extra-player attack pose (same tiles, identity recolor, own slots). */
 void roomrom_sprites_set_mp_attack_pose(unsigned char player, short x, short y,
-                                        link_face_t face)
+                                        link_face_t face, unsigned char hurt_timer)
 {
-    static const unsigned char k_color_idx[3] = { 4u, 8u, 12u };
     unsigned char slot_idx, key;
     unsigned short slot, tile;
     signed short gy;
     if (player < 1u || player > 3u) return;
     slot_idx = (unsigned char)(player - 1u);
-    key = (unsigned char)(0x80u | (unsigned char)face);
+    /* T-376: key is the immutable bank pose index: walk0..7, magic8..15,
+     * attack16..19. The former0x80 attack tag overlapped magic walking. */
+    key = (unsigned char)(16u + (unsigned char)face + ((hurt_timer & 3u) ? 64u : 0u));
     tile = (unsigned short)(ROOMROM_MP_LINK_TILE_BASE +
                             slot_idx * ROOMROM_MP_LINK_TILES_PER_PLAYER);
     if (s_mp_last_pose[slot_idx] != key) {
-        upload_pose_recolor(tile, &attack_poses[face], 1u, k_color_idx[slot_idx]);
+        upload_mp_pose(tile, (hurt_timer & 3u) ? 3u : slot_idx, (unsigned char)(16u + face));
         s_mp_last_pose[slot_idx] = key;
     }
     slot = (unsigned short)(ROOMROM_MP_LINK_SLOT(player));
@@ -810,24 +861,22 @@ void roomrom_sprites_set_mp_attack_pose(unsigned char player, short x, short y,
 
 void roomrom_sprites_set_mp_link_pose(unsigned char player,
                                       short x, short y,
-                                      link_face_t face, unsigned char frame)
+                                      link_face_t face, unsigned char frame,
+                                      unsigned char hurt_timer)
 {
-    static const unsigned char k_color_idx[3] = { 4u, 8u, 12u };
     unsigned char slot_idx, magic, pose_idx, pose_key;
     unsigned short slot, tile;
     signed short gy;
 
     if (player < 1u || player > 3u) return;
     slot_idx = (unsigned char)(player - 1u);
-    magic = (unsigned char)(nes_ram[0x0676u] != 0u);
+    magic = (unsigned char)(F_ram_0676 != 0u);
     pose_idx = (unsigned char)((unsigned char)face * 2u + frame);
-    pose_key = (unsigned char)(pose_idx | (magic ? 0x80u : 0x00u));
+    pose_key = (unsigned char)(pose_idx + (magic ? 8u : 0u) + ((hurt_timer & 3u) ? 64u : 0u));
     tile = (unsigned short)(ROOMROM_MP_LINK_TILE_BASE +
                             slot_idx * ROOMROM_MP_LINK_TILES_PER_PLAYER);
     if (s_mp_last_pose[slot_idx] != pose_key) {
-        const link_pose_def_t *poses = magic ? link_poses_magic : link_poses;
-        upload_pose_recolor(tile, &poses[pose_idx],
-                            1u, k_color_idx[slot_idx]);
+        upload_mp_pose(tile, (hurt_timer & 3u) ? 3u : slot_idx, (unsigned char)(pose_idx + (magic ? 8u : 0u)));
         s_mp_last_pose[slot_idx] = pose_key;
     }
 
@@ -851,7 +900,7 @@ void roomrom_sprites_set_link_attack_pose(short x, short y, link_face_t face,
 {
     unsigned short pose_idx = (unsigned short)face;
     unsigned short tile = ATTACK_VRAM_TILE + pose_idx * LINK_TILES_PER_POSE;
-    const unsigned char timer = nes_ram[0x04F0u];
+    const unsigned char timer = F_ram_04F0;
     unsigned char pal = RENDER_PAL1;
     if (timer != 0u) {
         const unsigned char subpal = (unsigned char)(timer & 3u);
@@ -878,31 +927,31 @@ void roomrom_sprites_spawn_link(short x, short y)
                       RENDER_SPRITE_SIZE(1, 2),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1,0, 0, 0, SWORD_VERT_VRAM_TILE),
                       ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_SWORD));
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BEAM),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BEAM),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 2),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1, 0, 0, 0, SWORD_VERT_VRAM_TILE),
                       ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_BEAM)));
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 1),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1,0, 0, 0, BOOMERANG_VRAM_TILE),
                       ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG)));
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 2),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1,0, 0, 0, ARROW_VERT_VRAM_TILE),
                       ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_ARROW)));
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOMB),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOMB),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 1),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1,0, 0, 0, BOMB_VRAM_TILE),
                       ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_BOMB)));
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_EXPLOSION),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_EXPLOSION),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(2, 2),
@@ -916,7 +965,7 @@ void roomrom_sprites_spawn_link(short x, short y)
                       RENDER_SPRITE_SIZE(1, 1),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1, 0, 0, 0, BOOMERANG_VRAM_TILE),
                       ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_ROOM_ITEM));
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(2, 2),
@@ -926,7 +975,7 @@ void roomrom_sprites_spawn_link(short x, short y)
                       ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE)));
     /* Slot 9 = magic_shot (rod projectile). Always 16x16 — vertical is
      * mirrored 8x16 ($7A + hflip), horizontal is wide flippable ($7C-$7F). */
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_MAGIC_SHOT),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_MAGIC_SHOT),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(2, 2),
@@ -1057,7 +1106,7 @@ void roomrom_sprites_set_mp_sword(unsigned char player, short x, short y,
 void roomrom_sprites_set_arrow_nes(short x, short y, unsigned char wide,
                                    unsigned short sat_attr)
 {
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW),
                       (signed short)x,
                       (signed short)y,
                       wide ? RENDER_SPRITE_SIZE(2, 2) : RENDER_SPRITE_SIZE(1, 2),
@@ -1068,7 +1117,7 @@ void roomrom_sprites_set_arrow_nes(short x, short y, unsigned char wide,
 /* T-116: Link's boomerang (slot $0F), one narrow 8x16 item sprite. */
 void roomrom_sprites_set_boomerang_nes(short x, short y, unsigned short sat_attr)
 {
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
                       (signed short)x,
                       (signed short)y,
                       RENDER_SPRITE_SIZE(1, 2),
@@ -1096,13 +1145,13 @@ void roomrom_sprites_set_sword_diagonal(short x, short y,
 {
     unsigned short tile = (unsigned short)(ROOMROM_ITEM_TILE_BASE_PAL(sub_pal)
                                            + ROOMROM_ITEM_TILE_SWORD_DIAG);
-    VDP_setSpriteFull(ROOMROM_SPRITE_SLOT_SWORD,
+    VDP_setSpriteFull(s_sword_slot,
                       (signed short)x,
                       (signed short)y,
                       RENDER_SPRITE_SIZE(1, 2),
                       RENDER_TILE_ATTR_FULL(ROOMROM_SUBPAL_PAL(sub_pal),
                                             0, vflip, hflip, tile),
-                      ROOMROM_SPRITE_NEXT(ROOMROM_SPRITE_SLOT_SWORD));
+                      ROOMROM_SPRITE_NEXT(s_sword_slot));
 }
 
 /* S7 v6 boomerang (slot 3). NES Z1 draws boomerang as a SINGLE 8x8
@@ -1140,7 +1189,7 @@ void roomrom_sprites_set_boomerang(short x, short y,
      * $36+$37 form one 8x16 OAM entry: $36 = upper 8x8 (rows 4-7 of cell),
      * $37 = lower 8x8 (rows 0-3). Atlas idx 6/7 are adjacent in items_chr_x4
      * so RENDER_SPRITE_SIZE(1,2) consumes both via column-major fetch. */
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
                       (signed short)x,
                       (signed short)y,
                       RENDER_SPRITE_SIZE(1, 2),
@@ -1151,7 +1200,7 @@ void roomrom_sprites_set_boomerang(short x, short y,
 
 void roomrom_sprites_clear_boomerang(void)
 {
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOOMERANG),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 2),
@@ -1319,7 +1368,7 @@ void roomrom_sprites_set_candle_fire(short x, short y,
     }
     unsigned short tile = (unsigned short)(ROOMROM_ITEM_TILE_BASE_PAL(sub_pal)
                                             + frame_offset);
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE),
                       (signed short)x, (signed short)y,
                       RENDER_SPRITE_SIZE(2, 2),
                       RENDER_TILE_ATTR_FULL(ROOMROM_SUBPAL_PAL(sub_pal),
@@ -1331,7 +1380,7 @@ void roomrom_sprites_clear_candle_fire(void)
 {
     unsigned short tile = (unsigned short)(ROOMROM_ITEM_TILE_BASE_PAL(0)
                                             + ROOMROM_ITEM_TILE_CANDLE_FIRE_F0);
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_CANDLE_FIRE),
                       (signed short)-32, (signed short)-32,
                       RENDER_SPRITE_SIZE(2, 2),
                       RENDER_TILE_ATTR_FULL(RENDER_PAL1, 1, 0, 0, tile),
@@ -1353,13 +1402,13 @@ void roomrom_sprites_set_arrow(short x, short y, link_face_t face,
         /* 5.8.1 diag: priority bit set so projectile renders ABOVE
          * BG_A door art (uses BG priority 0x8000). Codex H3
          * confirmed. Applies to all weapon projectile sprites. */
-        VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(1, 2),
+        roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(1, 2),
                           RENDER_TILE_ATTR_FULL(ROOMROM_SUBPAL_PAL(sub_pal),
                                                 1, 0, 0, tile_vert),
                           ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_ARROW)));
         break;
     case LINK_FACE_DOWN:
-        VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(1, 2),
+        roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(1, 2),
                           RENDER_TILE_ATTR_FULL(ROOMROM_SUBPAL_PAL(sub_pal),
                                                 1, 1, 0, tile_vert),
                           ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_ARROW)));
@@ -1367,13 +1416,13 @@ void roomrom_sprites_set_arrow(short x, short y, link_face_t face,
     case LINK_FACE_LEFT:
         /* Phase 1: horizontal arrow ($86..$89) now sourced from live NES
          * item atlas. RIGHT renders as-is, LEFT mirrors via hflip. */
-        VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(2, 2),
+        roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(2, 2),
                           RENDER_TILE_ATTR_FULL(ROOMROM_SUBPAL_PAL(sub_pal),
                                                 1, 0, 1, tile_horz),
                           ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_ARROW)));
         break;
     case LINK_FACE_RIGHT:
-        VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(2, 2),
+        roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW), (signed short)x, (signed short)y, RENDER_SPRITE_SIZE(2, 2),
                           RENDER_TILE_ATTR_FULL(ROOMROM_SUBPAL_PAL(sub_pal),
                                                 1, 0, 0, tile_horz),
                           ROOMROM_SPRITE_NEXT(wslot(ROOMROM_SPRITE_SLOT_ARROW)));
@@ -1386,7 +1435,7 @@ void roomrom_sprites_set_arrow(short x, short y, link_face_t face,
 
 void roomrom_sprites_clear_arrow(void)
 {
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_ARROW),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_ARROW),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 2),
@@ -1406,7 +1455,7 @@ void roomrom_sprites_set_bomb(short x, short y, unsigned char sub_pal)
 {
     unsigned short tile = (unsigned short)(ROOMROM_ITEM_TILE_BASE_PAL(sub_pal)
                                            + ROOMROM_ITEM_TILE_BOMB);
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOMB),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOMB),
                       (signed short)x,
                       (signed short)y,
                       RENDER_SPRITE_SIZE(1, 2),
@@ -1417,7 +1466,7 @@ void roomrom_sprites_set_bomb(short x, short y, unsigned char sub_pal)
 
 void roomrom_sprites_clear_bomb(void)
 {
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_BOMB),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_BOMB),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(1, 2),
@@ -1461,7 +1510,7 @@ void roomrom_sprites_set_explosion(short x, short y, unsigned char timer,
     unsigned short tile   = (unsigned short)(ROOMROM_ITEM_TILE_BASE_PAL(sub_pal)
                                              + ROOMROM_ITEM_TILE_EXPLOSION
                                              + (unsigned short)phase * 4u);
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_EXPLOSION),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_EXPLOSION),
                       (signed short)x,
                       (signed short)y,
                       RENDER_SPRITE_SIZE(2, 2),
@@ -1472,7 +1521,7 @@ void roomrom_sprites_set_explosion(short x, short y, unsigned char timer,
 
 void roomrom_sprites_clear_explosion(void)
 {
-    VDP_setSpriteFull(wslot(ROOMROM_SPRITE_SLOT_EXPLOSION),
+    roomrom_sprites_set_full_routed(wslot(ROOMROM_SPRITE_SLOT_EXPLOSION),
                       (signed short)-32,
                       (signed short)-32,
                       RENDER_SPRITE_SIZE(2, 2),

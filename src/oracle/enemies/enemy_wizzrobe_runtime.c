@@ -105,21 +105,21 @@ static const unsigned char k_rw_dirs[4] = {
 #define WIZ_DIR(s)            ENEMY_DIR(s)
 #define WIZ_X(s)              ENEMY_X(s)
 #define WIZ_Y(s)              ENEMY_Y(s)
-#define WIZ_OBJ_TIMER(s)      OBJ(0x0028u, (s))
+#define WIZ_OBJ_TIMER(s)      F_ram_0028_O((s))
 #define WIZ_OBJ_STATE(s)      ENEMY_STATE_TIMER(s)
-#define WIZ_REM_DIST(s)       OBJ(0x0394u, (s))
-#define WIZ_TURN_COUNTER(s)   OBJ(0x0412u, (s))
-#define WIZ_ANIM_COUNTER(s)   OBJ(0x0412u, (s))  /* alias for Red */
-#define WIZ_FADE_COUNTER(s)   OBJ(0x0394u, (s))  /* alias for Red */
-#define WIZ_LAST_TILE(s)      OBJ(0x041Fu, (s))
-#define WIZ_INV_MASK(s)       OBJ(0x04B2u, (s))
+#define WIZ_REM_DIST(s)       F_ram_0394_O4((s))
+#define WIZ_TURN_COUNTER(s)   F_ram_0412_O2((s))
+#define WIZ_ANIM_COUNTER(s)   F_ram_0412_O2((s))  /* alias for Red */
+#define WIZ_FADE_COUNTER(s)   F_ram_0394_O4((s))  /* alias for Red */
+#define WIZ_LAST_TILE(s)      F_ram_041F_O2((s))
+#define WIZ_INV_MASK(s)       F_ram_04B2_O((s))
 #define WIZ_INV_TIMER(s)      ENEMY_HIT_REACTION(s)
-#define WIZ_LINK_X            RAM(0x0070u)
-#define WIZ_LINK_Y            RAM(0x0084u)
-#define WIZ_FRAME_COUNTER     RAM(0x0015u)
-#define WIZ_INV_CLOCK         RAM(0x066Cu)  /* InvClock (T-147: was $0656 SelectedItemSlot) */
-#define WIZ_FIRST_UNWALK      RAM(0x034Au)
-#define WIZ_RANDOM(s)         OBJ(0x0018u, (s))  /* Random+slot */
+#define WIZ_LINK_X            F_ram_0070_R
+#define WIZ_LINK_Y            F_ram_0084_R
+#define WIZ_FRAME_COUNTER     F_ram_0015_R
+#define WIZ_INV_CLOCK         F_ram_066C_R  /* InvClock (T-147: was $0656 SelectedItemSlot) */
+#define WIZ_FIRST_UNWALK      F_ram_034A_R2
+#define WIZ_RANDOM(s)         F_ram_0018_O((s))  /* Random+slot */
 
 /* NES Z_04.asm:7212 BlueWizzrobe_Move. */
 void enrt_blue_wizzrobe_move(unsigned int slot)
@@ -344,9 +344,9 @@ static void blue_wizzrobe_walk_or_teleport(unsigned int slot)
 static void shoot_magic_shot(unsigned int slot, unsigned char shot_type)
 {
     if ((unsigned char)WIZ_INV_CLOCK != 0u) return;
-    RAM(0x0604u) = 0x04u;  /* Tune0Request ($0604; was $0608, T-171) = magic sound */
+    F_ram_0604_R = 0x04u;  /* Tune0Request ($0604; was $0608, T-171) = magic sound */
     /* Store shot type at [00] per NES STA $00 prologue. */
-    RAM(0x0000u) = shot_type;
+    F_ram_0000_R = shot_type;
     (void)c_shoot_limited(slot);
 }
 
@@ -411,7 +411,7 @@ static void wizzrobe_draw_and_check_collisions(unsigned int slot)
         c_draw_object_mirrored_with_frame((unsigned int)(frame + 2u), slot);
     } else {
         /* Horizontal: NES LSR / AND #$01 flips when facing left ($02). */
-        RAM(0x000Fu) = (unsigned char)((dir >> 1) & 0x01u);
+        F_ram_000F_R = (unsigned char)((dir >> 1) & 0x01u);
         c_draw_object_not_mirrored_with_frame((unsigned int)frame, slot);
     }
 }

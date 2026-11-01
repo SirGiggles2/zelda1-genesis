@@ -30,6 +30,13 @@ void trap_check_init_whirlwind_and_begin_update(void);
 /* Whirlwind half of CheckInitWhirlwindAndBeginUpdate; 1 = teleporting. */
 unsigned char trap_init_whirlwind_at_destination(void);
 
+/* T-258 Remix flute picker: the level index the summon chose (0..7), the
+ * entrance room of level index i (right of WhirlwindPrevRoomIdList[i]), and
+ * the picked destination (TeleportingLevelIndex + WhirlwindPrevRoomId). */
+unsigned char trap_whirlwind_level_index(void);
+unsigned char trap_whirlwind_entrance_room(unsigned char level_index);
+void trap_whirlwind_set_destination(unsigned char level_index);
+
 /* If MODE_VALUE == 5, walk LevelMasks[] to find an unconquered
  * level mask; if found and no whirlwind/teleport active, spawn
  * whirlwind in an empty enemy slot. NES SummonWhirlwind.

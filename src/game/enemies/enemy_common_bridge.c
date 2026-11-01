@@ -95,7 +95,7 @@ unsigned int c_shoot_limited(unsigned int slot)
 
     /* NES ShootLimited reads the shot type from [00] (T-147: read the
      * caller's ObjType, so a red wizzrobe cloned itself, t129 t4829). */
-    unsigned char shot_type = (unsigned char)RAM(0x0000u);
+    unsigned char shot_type = (unsigned char)F_ram_0000_R;
     if (shot_type >= 0x53u) {
         if (ENEMY_SHOT_COUNT >= 0x04u) return 0u;
         ENEMY_SHOT_COUNT = (unsigned char)(ENEMY_SHOT_COUNT + 1u);
@@ -105,7 +105,7 @@ unsigned int c_shoot_limited(unsigned int slot)
      * Mirrors clear_slot_scratch in enemy_loop.c. */
     ENEMY_TYPE(empty)              = shot_type;
     ENEMY_OBJ_SHOVE_DIR(empty)     = 0u;
-    OBJ(0x00D3u, empty)            = 0u;  /* ObjShoveDistance */
+    F_ram_00D3_O(empty)            = 0u;  /* ObjShoveDistance */
     ENEMY_MOVE_TIMER(empty)        = 0u;  /* ObjTimer ($0028) */
     ENEMY_STATE_TIMER(empty)       = 0u;  /* ObjState ($00AC) */
     ENEMY_HIT_REACTION(empty)      = 0u;  /* ObjInvincibilityTimer ($04F0) */

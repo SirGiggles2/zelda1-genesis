@@ -4,10 +4,10 @@
 /* Wallmaster scratch aliases reused by enrt_update_goriya distance calc.
  * Same definitions as in enemy_walker_runtime.c / enemy_wallmaster_runtime.c.
  */
-#define WALLMASTER_MINOR_MAJOR_MIN     RAM(0x0000)
-#define WALLMASTER_MAJOR_MINOR_MIN     RAM(0x0001)
-#define WALLMASTER_INSTR_AXIS          RAM(0x0002)
-#define WALLMASTER_INSTR_MINOR_MIN     RAM(0x0003)
+#define WALLMASTER_MINOR_MAJOR_MIN     F_ram_0000_R3
+#define WALLMASTER_MAJOR_MINOR_MIN     F_ram_0001_R2
+#define WALLMASTER_INSTR_AXIS          F_ram_0002_R2
+#define WALLMASTER_INSTR_MINOR_MIN     F_ram_0003_R3
 
 /* ---- Plan C: drained from z_07 (walker_alt_dir cluster) --------------- */
 
@@ -43,7 +43,7 @@ void enrt_walker_set_input_dir_and_try_shooting_boomerang(unsigned int slot);
  */
 void enrt_update_common_wanderer(unsigned int turn_rate, unsigned int slot) {
     ENEMY_AIR_SPEED(slot) = (unsigned char)turn_rate;
-    if (OBJ(0x00C0, slot) != 0) {
+    if (F_ram_00C0_O4(slot) != 0) {
         c_obj_shove(slot);
         return;
     }
@@ -73,17 +73,17 @@ __attribute__((always_inline)) void enrt_wanderer_target_player(unsigned int slo
     c_walker_move(slot);
 
     /* If being shoved, return (do not chain into SetInputDir). */
-    if (OBJ(0x00C0, slot) != 0)
+    if (F_ram_00C0_O4(slot) != 0)
         return;
 
     /* If speed = 0 or sub-tile grid offset != 0, fall through to SetInputDir. */
     if (ENEMY_WALK_SPEED(slot) == 0)
         goto set_input_dir;
-    if ((OBJ(NES_OBJ_GRID_OFFSET, slot) & 0x0F) != 0)
+    if ((F_ram_0394_O(slot) & 0x0F) != 0)
         goto set_input_dir;
 
     /* Sub-tile aligned: clear grid offset (the masked low nibble was 0). */
-    OBJ(NES_OBJ_GRID_OFFSET, slot) = 0;
+    F_ram_0394_O(slot) = 0;
 
     /* Compare turn-rate ($041F) to RNG-B ($19): if turn_rate < rng, go check
      * "turn if time" branch. Also if Link state ($00AC) == $FF, go same.
@@ -93,7 +93,7 @@ __attribute__((always_inline)) void enrt_wanderer_target_player(unsigned int slo
         unsigned char rng_b     = ENEMY_RNG_B(slot);
         if (turn_rate < rng_b)
             goto turn_if_time;
-        if (RAM(0x00AC) == 0xFF)
+        if (F_ram_00AC_R3 == 0xFF)
             goto turn_if_time;
     }
 
@@ -170,14 +170,14 @@ void enrt_update_goriya(unsigned int slot) {
      * indexing to keep parity with the asm callers; if it turns out to be
      * an off-by-one bug it should be fixed in the transpiler, not here.
      */
-    if (OBJ(0x0350, slot) != 0x1E) {
+    if (F_CAVE_ROOM_TYPE_O(slot) != 0x1E) {
         if ((ENEMY_STATE_TIMER(slot) & 0x80) != 0)
             return;  /* high bit set: monster is in shoot-delay state */
     }
 
     c_walker_move(slot);
 
-    if (OBJ(0x00C0, slot) != 0)
+    if (F_ram_00C0_O4(slot) != 0)
         return;  /* being shoved */
 
     /* AfterMove: */
@@ -185,12 +185,12 @@ void enrt_update_goriya(unsigned int slot) {
         enrt_walker_set_input_dir_and_try_shooting_boomerang(slot);
         return;
     }
-    if ((OBJ(NES_OBJ_GRID_OFFSET, slot) & 0x0F) != 0) {
+    if ((F_ram_0394_O(slot) & 0x0F) != 0) {
         enrt_walker_set_input_dir_and_try_shooting_boomerang(slot);
         return;
     }
-    OBJ(NES_OBJ_GRID_OFFSET, slot) = 0;
-    if (RAM(0x00AC) == 0xFF) {
+    F_ram_0394_O(slot) = 0;
+    if (F_ram_00AC_R3 == 0xFF) {
         enrt_walker_set_input_dir_and_try_shooting_boomerang(slot);
         return;
     }
@@ -210,7 +210,7 @@ void enrt_update_goriya(unsigned int slot) {
             a = obj_y;  b = link_y;
             vdir <<= 1;  /* 4 -> 8 (UP) */
         }
-        RAM(0x000E) = b;     /* NES STY $0E (subtrahend), T-171 */
+        F_ram_000E_R3 = b;     /* NES STY $0E (subtrahend), T-171 */
         WALLMASTER_INSTR_AXIS = vdir;
         WALLMASTER_MINOR_MAJOR_MIN = (unsigned char)(a - b);  /* |dy| */
     }
@@ -225,7 +225,7 @@ void enrt_update_goriya(unsigned int slot) {
             a = obj_x;  b = link_x;
             hdir <<= 1;  /* 1 -> 2 (LEFT) */
         }
-        RAM(0x000E) = b;
+        F_ram_000E_R3 = b;
         WALLMASTER_INSTR_MINOR_MIN = hdir;
         WALLMASTER_MAJOR_MINOR_MIN = (unsigned char)(a - b);  /* |dx| */
     }
@@ -237,9 +237,9 @@ void enrt_update_goriya(unsigned int slot) {
         ENEMY_PUSH_TIMER(slot) = 0;
 
         /* If chosen distance < $51, set "wants to shoot" and face that way. */
-        if (RAM(0x0000 + idx) < 0x51) {
+        if (F_ram_0000_R4(idx) < 0x51) {
             ENEMY_PUSH_TIMER(slot) = (unsigned char)(ENEMY_PUSH_TIMER(slot) + 1);
-            ENEMY_DIR(slot) = RAM(0x0002 + idx);
+            ENEMY_DIR(slot) = F_ram_0002_R5(idx);
         }
     }
 

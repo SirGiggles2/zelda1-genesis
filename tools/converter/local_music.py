@@ -23,16 +23,19 @@ Exit: 0 written; 1 no usable file or a conversion failed.
 """
 from __future__ import annotations
 
-import os
 import re
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "converter"))
+from platform_tools import ToolNotFoundError  # noqa: E402
+
+sys.path.insert(0, str(ROOT))
+from tools.nesdata import host  # noqa: E402
+
 OUT_C = ROOT / "build" / "local_music" / "local_music.c"
-XGMTOOL = ROOT / "sgdk" / "bin" / "xgmtool.exe"
 
 # (song request, label, name patterns); first match wins, most specific first.
 SONGS = (
@@ -57,13 +60,13 @@ def song_for(name: str) -> tuple[int, str] | None:
 
 
 def xgm_compile(vgm: Path, out: Path) -> None:
-    argv = [str(XGMTOOL), str(vgm), str(out), "-n", "-s"]
-    if os.name != "nt":
-        argv = ["wine"] + argv
-    env = dict(os.environ, WINEDEBUG="-all")
-    r = subprocess.run(argv, capture_output=True, text=True, env=env)
-    if r.returncode or not out.is_file():
-        raise SystemExit(f"ERROR: xgmtool failed on {vgm.name}: {(r.stdout + r.stderr).strip()[-400:]}")
+    # T-419: tools/nesdata/host.py runs native xgmtool, or xgmtool.wasm in the builder page.
+    try:
+        out.write_bytes(host.xgmtool(vgm.read_bytes()))
+    except (ToolNotFoundError, OSError) as exc:
+        raise SystemExit(f"ERROR: cannot run native xgmtool: {exc}") from exc
+    except RuntimeError as exc:
+        raise SystemExit(f"ERROR: xgmtool failed on {vgm.name}: {exc}") from exc
 
 
 def emit_table(picked: dict[int, tuple[str, Path]], out_c: Path,

@@ -87,7 +87,7 @@ unsigned int z07_find_empty_monster_slot(void)
 {
     signed char i;
     for (i = 11; i >= 1; --i) {
-        if (OBJ(NES_OBJ_TYPE, (unsigned char)i) == 0u) {
+        if (F_ram_034F_O2((unsigned char)i) == 0u) {
             ENEMY_NEXT_SHOT_SLOT = (unsigned char)i;
             return (unsigned int)(unsigned char)i;
         }
@@ -263,6 +263,17 @@ static const unsigned char BlueLeeverStateAnimTimes[6] = {
     0x10u, 0x0Bu, 0x01u, 0x05u, 0x01u, 0x0Bu
 };
 
+/* NES source: Z_04.asm:Burrower_AnimateDrawAndCheckCollisions.
+ * Drained C: c_update_burrower / burrower_animate_draw_and_check_collisions.
+ * Coverage: shared world and party collision phase admission.
+ * Stance: EXTEND the existing exact state gate as one owner predicate. */
+unsigned char enemy_burrower_collisions_enabled(unsigned int slot)
+{
+    const unsigned char state = ENEMY_STATE_TIMER(slot);
+    return (unsigned char)(state == 3u ||
+        (ENEMY_TYPE(slot) == 0x11u && (state == 2u || state == 4u)));
+}
+
 void c_update_burrower(unsigned int slot)
 {
     unsigned char state;
@@ -316,19 +327,14 @@ void c_update_burrower(unsigned int slot)
      *   zora: collisions if state in {2, 3, 4}
      */
     {
-        unsigned char do_collisions = 0u;
-        if (type == 0x11u) {
-            if (state == 2u || state == 4u) do_collisions = 1u;
-        }
-        if (!do_collisions && state == 3u) do_collisions = 1u;
-        if (!do_collisions) return;
+        if (!enemy_burrower_collisions_enabled(slot)) return;
 
         link_collision_check_monster_collisions(slot);
         if ((unsigned char)ENEMY_METASTATE(slot) == 0u) return;
         /* Dying — DEC ActiveRedLeeverCount only when type is RedLeever ($10). */
         if (type == 0x10u) {
-            unsigned char rlc = (unsigned char)RAM(0x0510);
-            RAM(0x0510) = (unsigned char)(rlc - 1u);
+            unsigned char rlc = (unsigned char)F_ram_0510_R;
+            F_ram_0510_R = (unsigned char)(rlc - 1u);
         }
     }
 }
@@ -385,9 +391,9 @@ extern void          c_obj_shove(unsigned int slot);
 extern void          c_move_object(unsigned short slot);
 
 /* NES Variables.inc:160 ActiveRedLeeverCount := $510 */
-#define RED_LEEVER_LONG_TIMER         RAM(0x004D)   /* NES $4D */
-#define ACTIVE_RED_LEEVER_COUNT       RAM(0x0510)   /* NES $510 */
-#define OBJECT_FIRST_UNWALKABLE_TILE  RAM(0x034A)   /* NES $34A */
+#define RED_LEEVER_LONG_TIMER         F_ram_004D_R2   /* NES $4D */
+#define ACTIVE_RED_LEEVER_COUNT       F_ram_0510_R   /* NES $510 */
+#define OBJECT_FIRST_UNWALKABLE_TILE  F_ram_034A_R   /* NES $34A */
 #define OBJ_SHOVE_DIR                 0x00C0u       /* OBJ(_, slot) base */
 #define OBJ_TIMER_BASE                0x0028u       /* NES_OBJ_MOVE_TIMER */
 #define OBJ_GRID_OFFSET_BASE          NES_OBJ_GRID_OFFSET  /* ObjGridOffset $394 (T-012: was $470) */
@@ -430,12 +436,7 @@ static void burrower_animate_draw_and_check_collisions(
     draw_object_mirrored(frame_for_draw, slot);
 
     {
-        unsigned char do_collisions = 0u;
-        if (type == 0x11u) {
-            if (state == 2u || state == 4u) do_collisions = 1u;
-        }
-        if (!do_collisions && state == 3u) do_collisions = 1u;
-        if (!do_collisions) return;
+        if (!enemy_burrower_collisions_enabled(slot)) return;
 
         link_collision_check_monster_collisions(slot);
         if ((unsigned char)ENEMY_METASTATE(slot) == 0u) return;
@@ -552,7 +553,7 @@ check_other_states:
         if (state != 3u) goto animate_if_time;
 
         /* State 3 — shove handling. */
-        if ((unsigned char)OBJ(OBJ_SHOVE_DIR, slot) != 0u) {
+        if ((unsigned char)F_ram_00C0_O(slot) != 0u) {
             c_obj_shove(slot);
             red_leever_animate_and_check_collisions(slot);
             return;
@@ -564,7 +565,7 @@ check_other_states:
         }
         /* Tile-still + room-boundary gates. NES writes ObjDir to [$0F]
          * (LINK_MOVING_DIR scratch) before GetCollidingTileMoving. */
-        RAM(NES_LINK_MOVING_DIR) = (unsigned char)ENEMY_DIR(slot);
+        F_ram_000F_R3 = (unsigned char)ENEMY_DIR(slot);
         if (collision_get_colliding_tile_moving(slot)
             >= (unsigned char)OBJECT_FIRST_UNWALKABLE_TILE) {
             red_leever_cycle_state_draw_and_check_collisions(slot);
@@ -577,10 +578,10 @@ check_other_states:
         /* Move + grid-offset truncate + timer = $FF. */
         c_move_object((unsigned short)slot);
         {
-            unsigned char go = (unsigned char)OBJ(OBJ_GRID_OFFSET_BASE, slot);
+            unsigned char go = (unsigned char)F_ram_0394_O2(slot);
             unsigned char masked = (unsigned char)(go & 0x0Fu);
             if (masked == 0u) {
-                OBJ(OBJ_GRID_OFFSET_BASE, slot) = 0u;
+                F_ram_0394_O2(slot) = 0u;
             }
         }
         ENEMY_MOVE_TIMER(slot) = 0xFFu;

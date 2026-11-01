@@ -202,14 +202,24 @@ static uint8_t s_confirm_choice;
 static uint8_t s_new_mode;
 static uint8_t s_file_slot, s_file_row;
 static uint8_t s_sound_row;
+/* Page box spans cols 3..29; text owns cols 6..28. Each cell is written
+ * once with its final glyph, so a live-display update never shows a
+ * blanked row and never overwrites the box's right edge. */
+#define SOUND_TEXT_COLS 23u
+static void sound_line(uint16_t row,const char *text) {
+    char line[SOUND_TEXT_COLS+1u];
+    uint8_t i=0u;
+    while (i<SOUND_TEXT_COLS && text[i]) { line[i]=text[i]; i++; }
+    while (i<SOUND_TEXT_COLS) line[i++]=' ';
+    line[SOUND_TEXT_COLS]=0;
+    fs_render_text(row,6u,line);
+}
 static void sound_redraw(uint8_t full) {
     uint8_t start=(uint8_t)((s_sound_row/7u)*7u),count=audio_sound_test_count();
     if (full) fs_render_page("SOUND TEST");
-    for (uint8_t i=0u;i<7u;i++) fs_render_text(8u+2u*i,6u,"                        ");
-    for (uint8_t i=0u;i<7u && start+i<count;i++)
-        fs_render_text(8u+2u*i,6u,audio_sound_test_name(start+i));
-    fs_render_text(23u,6u,"                        ");
-    fs_render_text(23u,6u,audio_sound_test_source(s_sound_row));
+    for (uint8_t i=0u;i<7u;i++)
+        sound_line(8u+2u*i,start+i<count ? audio_sound_test_name(start+i) : "");
+    sound_line(23u,audio_sound_test_source(s_sound_row));
     fs_render_text(25u,6u,"A PLAY START STOP");
     fs_render_text(27u,6u,"B OR C BACK");
     fs_render_page_cursor(8u+2u*(s_sound_row-start));

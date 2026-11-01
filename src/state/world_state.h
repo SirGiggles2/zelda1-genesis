@@ -44,12 +44,12 @@ typedef struct WorldState {
 #define WEAPON_DRAW_SLOT_B             17u
 
 /* Inline accessors (bridge layer). */
-static inline uint8_t world_link_dir_get(void)        { return RAM(0x0098); }
-static inline void    world_link_dir_set(uint8_t v)   { RAM(0x0098) = v; }
-static inline uint8_t world_cur_room_id_get(void)     { return RAM(0x00EB); }
-static inline void    world_cur_room_id_set(uint8_t v){ RAM(0x00EB) = v; }
-static inline uint8_t world_prev_room_id_get(void)    { return RAM(0x00EC); }
-static inline void    world_prev_room_id_set(uint8_t v){ RAM(0x00EC) = v; }
+static inline uint8_t world_link_dir_get(void)        { return F_ram_0098_R2; }
+static inline void    world_link_dir_set(uint8_t v)   { F_ram_0098_R2 = v; }
+static inline uint8_t world_cur_room_id_get(void)     { return F_ram_00EB_R3; }
+static inline void    world_cur_room_id_set(uint8_t v){ F_ram_00EB_R3 = v; }
+static inline uint8_t world_prev_room_id_get(void)    { return F_PREV_ROOM_ID_R; }
+static inline void    world_prev_room_id_set(uint8_t v){ F_PREV_ROOM_ID_R = v; }
 
 /* ----------------------------------------------------------------------
  * Legacy macro view — kept until Phase 4 close-gate confirms migration.
@@ -61,37 +61,37 @@ static inline void    world_prev_room_id_set(uint8_t v){ RAM(0x00EC) = v; }
 #define WORLD_TMP2                     ZP_TMP2
 #define WORLD_TMP3                     ZP_TMP3
 
-#define LINK_DIR                       RAM(0x0098)
-#define LINK_X                         RAM(NES_OBJ_X)
-#define LINK_Y                         RAM(NES_OBJ_Y)
-#define LINK_ACTION_TIMER              RAM(0x00AC)
-#define CUR_ROOM_ID                    RAM(0x00EB)
-#define PREV_ROOM_ID                   RAM(0x00EC)
+#define LINK_DIR                       F_ram_0098_R2
+#define LINK_X                         F_ram_0070_R3
+#define LINK_Y                         F_ram_0084_R3
+#define LINK_ACTION_TIMER              F_ram_00AC_R3
+#define CUR_ROOM_ID                    F_ram_00EB_R3
+#define PREV_ROOM_ID                   F_PREV_ROOM_ID_R
 
-#define WORLD_FADE_TIMER               RAM(0x0034)
-#define WORLD_FADE_STEP                RAM(0x051C)
-#define WORLD_MAZE_STEP                RAM(0x052F)
-#define WORLD_SECRET_SFX               RAM(0x0602)
-#define SFX_COMBAT                     RAM(0x0604)
+#define WORLD_FADE_TIMER               F_WORLD_FADE_TIMER_R
+#define WORLD_FADE_STEP                F_ram_051C_R2
+#define WORLD_MAZE_STEP                F_WORLD_MAZE_STEP_R
+#define WORLD_SECRET_SFX               F_ram_0602_R2
+#define SFX_COMBAT                     F_ram_0604_R2
 
-#define TRANSFER_BUF_POS               RAM(0x0301)
-#define TRANSFER_BUF_BYTE(off)         RAM(0x0302 + (off))
+#define TRANSFER_BUF_POS               F_ram_0301_R2
+#define TRANSFER_BUF_BYTE(off)         F_ram_0302_R6((off))
 
-#define OBJ_DIR(slot)                  OBJ(0x0098, (slot))
-#define OBJ_X(slot)                    OBJ(NES_OBJ_X, (slot))
-#define OBJ_Y(slot)                    OBJ(NES_OBJ_Y, (slot))
-#define OBJ_GRID_OFFSET(slot)          OBJ(NES_OBJ_GRID_OFFSET, (slot))
-#define OBJ_POS_FRAC(slot)             OBJ(NES_OBJ_POS_FRAC, (slot))
-#define OBJ_QSPD_FRAC(slot)            OBJ(NES_OBJ_QSPD_FRAC, (slot))
-#define OBJ_STATUS_FLAGS(slot)         OBJ(0x04BF, (slot))
+#define OBJ_DIR(slot)                  F_ram_0098_O3((slot))
+#define OBJ_X(slot)                    F_ram_0070_O2((slot))
+#define OBJ_Y(slot)                    F_ram_0084_O2((slot))
+#define OBJ_GRID_OFFSET(slot)          F_ram_0394_O((slot))
+#define OBJ_POS_FRAC(slot)             F_ram_03A8_O((slot))
+#define OBJ_QSPD_FRAC(slot)            F_ram_03BC_O((slot))
+#define OBJ_STATUS_FLAGS(slot)         F_ram_04BF_O((slot))
 /* Canonical owner: object_state.h (same cell, NES ObjState $AC+slot). */
 #ifndef OBJ_STATE
-#define OBJ_STATE(slot)                OBJ(0x00AC, (slot))
+#define OBJ_STATE(slot)                F_ram_00AC_O2((slot))
 #endif
-#define OBJ_ANIM_TIMER(slot)           OBJ(0x03D0, (slot))
-#define OBJ_MOVE_TIMER(slot)           OBJ(0x0028, (slot))
+#define OBJ_ANIM_TIMER(slot)           F_ram_03D0_O2((slot))
+#define OBJ_MOVE_TIMER(slot)           F_ram_0028_O2((slot))
 
-#define CANDLE_LIT_FLAG                RAM(0x0513)
+#define CANDLE_LIT_FLAG                F_ram_0513_R
 /* WEAPON_DRAW_SLOT_A and WEAPON_DRAW_SLOT_B moved above with the typed view. */
 
 #endif

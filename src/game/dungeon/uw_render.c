@@ -63,13 +63,13 @@ static unsigned char dither_flags(unsigned char room)
 {
     unsigned char a,b,mask=0u,t,ctx;
     if (room>=128u) return 0u;
-    ctx=(unsigned char)((nes_ram[0x0010u]&0x0Fu) | ((s_uw_quest&0x03u)<<4) |
+    ctx=(unsigned char)((F_ram_0010&0x0Fu) | ((s_uw_quest&0x03u)<<4) |
                         ((s_uw_map_id==ROOMROM_MAP_REDUX ? 1u:0u)<<6) |
                         ((g_profile_remix ? 1u:0u)<<7));
     if (room==s_dither_key_room && ctx==s_dither_key_ctx) return s_dither_mask;
     if (dither_enabled()) {
         /* Installed level block is authoritative, including scroll prefetch. */
-        a=nes_ram[0x687Eu+room]; b=nes_ram[0x68FEu+room];
+        a=F_ram_687E_X4(room); b=F_ram_68FE_X3(room);
         t=(b>>2)&7u; if (t==2u || t==3u) mask|=1u;
         t=(b>>5)&7u; if (t==2u || t==3u) mask|=2u;
         t=(a>>2)&7u; if (t==2u || t==3u) mask|=4u;
@@ -83,7 +83,7 @@ static unsigned char dither_flags(unsigned char room)
 
 unsigned char roomrom_uw_room_render_false_wall_mask(unsigned char room_id)
 {
-    if (!nes_ram[0x10u] || nes_ram[0x12u]==9u) return 0u;
+    if (!F_ram_0010_N || F_ram_0012_N==9u) return 0u;
     return dither_flags(room_id);
 }
 
@@ -109,7 +109,7 @@ static unsigned short dither_word(unsigned char mask,unsigned char col,unsigned 
     if (raw>=0xDCu && raw<=0xDFu) pattern=(unsigned char)(raw-0xDCu);
     else if (raw==0xF5u) pattern=4u;
     else return word;
-    return (unsigned short)((nes_ram[0x12u]==7u && (nes_ram[0x98u]&12u)?0u:0x8000u) |
+    return (unsigned short)((F_ram_0012_N==7u && (F_ram_0098_N&12u)?0u:0x8000u) |
         (UW_DITHER_TILE_BASE+(pal&3u)*5u+pattern));
 }
 
@@ -175,7 +175,7 @@ static void play_area_set(unsigned char col, unsigned char row,
                           unsigned char raw)
 {
     if (col >= 32u || row >= 22u) return;
-    nes_ram[NES_PLAY_AREA_BASE + (unsigned short)col * NES_TILE_COL_STRIDE + row] = raw;
+    F_NES_PLAY_AREA_BASE_6530_X((unsigned short)col * NES_TILE_COL_STRIDE, row) = raw;
 }
 
 static void set_collision_metatile(unsigned char col,
@@ -600,7 +600,7 @@ static void write_tile_raw(unsigned char col, unsigned char row,
     if (!s_uw_tables_built) uw_tables_build();   /* s_uw_word = tile_word */
     plane_write(dst, wrapped_plane_row((unsigned short)(s_live_row_base + row +
                                                         ROOMROM_ROOM_FIRST_ROW)),
-                dither_word(dither_flags(nes_ram[0xEBu]),col,row,raw_tile,pal,
+                dither_word(dither_flags(F_ram_00EB_N2),col,row,raw_tile,pal,
                     (unsigned short)(s_uw_word[pal & 0x03u][raw_tile] | edge_priority(col))));
     s_target_plane = saved;
 }
@@ -631,8 +631,8 @@ static unsigned char attr_palette_for(const unsigned char *attr,
  * row ($21+) only in its top half. T-171: the captured g_uw_room_attr
  * differs from this in 4 of 331 rooms (L7 $2A Aquamentus: inner $FF,
  * NES $AA, blocks drawn blue); computing it is NES-exact for all. */
-#define UW_LBA_A(room) nes_ram[0x687Eu + (room)]
-#define UW_LBA_B(room) nes_ram[0x68FEu + (room)]
+#define UW_LBA_A(room) F_ram_687E_X2((room))
+#define UW_LBA_B(room) F_ram_68FE_X((room))
 static unsigned char s_lba_attr[2][64];
 static unsigned char s_lba_attr_room[2] = { 0xFFu, 0xFFu };
 static unsigned char s_lba_attr_lvl[2];         /* CurLevel | quest << 4 */
@@ -643,7 +643,7 @@ static const unsigned char *uw_room_attr(unsigned char room_id)
     static const unsigned char k_sel[4] = { 0x00u, 0x55u, 0xAAu, 0xFFu };
     unsigned char i, y, outer, inner;
     unsigned char *pa;
-    const unsigned char lvl = (unsigned char)(nes_ram[0x0010u] | (s_uw_quest << 4));
+    const unsigned char lvl = (unsigned char)(F_ram_0010 | (s_uw_quest << 4));
     room_id = (unsigned char)(room_id & 0x7Fu);
     for (i = 0u; i < 2u; ++i)
         if (s_lba_attr_room[i] == room_id && s_lba_attr_lvl[i] == lvl) return s_lba_attr[i];
@@ -787,7 +787,7 @@ static void uw_metacol_classes(const unsigned char *nt, unsigned char room_id,un
     unsigned char *w0 = s_uw_tile_walkable[src_p0];
     unsigned char *w1 = s_uw_tile_walkable[src_p1];
     unsigned char *pa0 = (unsigned char *)(unsigned long)
-        &nes_ram[NES_PLAY_AREA_BASE + (unsigned short)src_p0 * NES_TILE_COL_STRIDE];
+        &nes_ram[NES_PLAY_AREA_BASE + (unsigned short)src_p0 * NES_TILE_COL_STRIDE]; /* native_ram bulk:src/game/dungeon/uw_render.c:790 */
     unsigned char *pa1 = pa0 + NES_TILE_COL_STRIDE;
     unsigned char *mt = s_uw_walkable[src_col & 0x0Fu];
     unsigned char row,mask=dither_flags(room_id);
@@ -846,7 +846,7 @@ static void blit_blob_one_metacol_at(int idx, unsigned char room_id,
     const unsigned short *c1 = col1;
     unsigned char cstride = 1u;
     if (!s_uw_tables_built) uw_tables_build();
-    if (!(nes_ram[0x12u]==7u && dither_enabled()) &&
+    if (!(F_ram_0012_N==7u && dither_enabled()) &&
         s_uwp_buf && (room_id & 0x7Fu) == s_uwp_room && idx == s_uwp_idx &&
         src_col < s_uwp_cols && uw_attr_sel((unsigned char)(room_id & 0x7Fu)) == s_uwp_sel) {
         c0 = s_uwp_buf + src_p0;                 /* prepared on mode-3 Sub2-7 */
@@ -1048,7 +1048,7 @@ void roomrom_uw_room_render_set_live_door_priority(unsigned char slot_x,
             unsigned char raw = (unsigned char)((tile - ROOMROM_BG_TILE_BASE) & 0x00FFu);
             /* Scroll staging starts in mode6, while Link is still walking.
              * Retain mesh occlusion until the mode7 camera handoff. */
-            if (!enabled && nes_ram[0x12u]==6u && tile>=UW_DITHER_TILE_BASE &&
+            if (!enabled && F_ram_0012_N==6u && tile>=UW_DITHER_TILE_BASE &&
                 tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT) continue;
             if (!uw_is_door_tile(raw) && !(tile>=UW_DITHER_TILE_BASE && tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT))
                 continue;
@@ -1067,7 +1067,7 @@ void roomrom_uw_room_render_set_live_door_priority(unsigned char slot_x,
             unsigned short word = plane_read_live_word(plane_col, plane_row);
             unsigned short tile = (unsigned short)(word & 0x07FFu);
             unsigned char raw = (unsigned char)((tile - ROOMROM_BG_TILE_BASE) & 0x00FFu);
-            if (!enabled && nes_ram[0x12u]==6u && tile>=UW_DITHER_TILE_BASE &&
+            if (!enabled && F_ram_0012_N==6u && tile>=UW_DITHER_TILE_BASE &&
                 tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT) continue;
             if (!uw_is_door_tile(raw) && !(tile>=UW_DITHER_TILE_BASE && tile<UW_DITHER_TILE_BASE+UW_DITHER_TILE_COUNT))
                 continue;
@@ -1117,12 +1117,12 @@ void roomrom_uw_room_render_refresh_square(unsigned char col, unsigned char row)
             const unsigned char r = (unsigned char)(row + dr);
             if (c >= 32u || r >= 22u) continue;
             s_uw_tile_walkable[c][r] = uw_walkable_tile_id(
-                nes_ram[NES_PLAY_AREA_BASE + (unsigned short)c * NES_TILE_COL_STRIDE + r]);
+                F_NES_PLAY_AREA_BASE_6530_X((unsigned short)c * NES_TILE_COL_STRIDE, r));
         }
     }
     if (col < 32u && row < 22u)
         set_walkable_metatile_only((unsigned char)(col >> 1), (unsigned char)(row >> 1),
-            uw_walkable_tile_id(nes_ram[NES_PLAY_AREA_BASE +
+            uw_walkable_tile_id(nes_ram[NES_PLAY_AREA_BASE + /* native_ram bulk:dyn_addr */
                                         (unsigned short)col * NES_TILE_COL_STRIDE + row]));
 }
 

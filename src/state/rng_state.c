@@ -24,26 +24,26 @@ void rng_seed(unsigned short seed)
      * 'seed' argument retained for caller compat but ignored. */
     (void)seed;
     for (i = 0; i < RNG_RANDOM_LEN; i++) {
-        RAM(RNG_RANDOM_BASE + i) = (i == 0u) ? 0x40u : 0x00u;
+        F_ram_0018_R5(i) = (i == 0u) ? 0x40u : 0x00u;
     }
     /* Same store: CurEdgeSpawnCell ($525), where FindNextEdgeSpawnCell
      * first looks (T-012: left 0, the first edge monster spawned off
      * the top of the room). */
-    RAM(0x0525u) = 0x40u;
+    F_ram_0525_R = 0x40u;
 }
 
 static void rng_scramble(void)
 {
     /* Reproduce @ScrambleRandom tap+ROR-chain exactly. */
-    unsigned char b0 = RAM(RNG_RANDOM_BASE + 0) & 0x02;
-    unsigned char b1 = RAM(RNG_RANDOM_BASE + 1) & 0x02;
+    unsigned char b0 = F_ram_0018_R2 & 0x02;
+    unsigned char b1 = F_ram_0019_R3 & 0x02;
     unsigned char carry_in = (b0 ^ b1) ? 1 : 0;
     unsigned char i;
     for (i = 0; i < RNG_RANDOM_LEN; i++) {
-        unsigned char v = RAM(RNG_RANDOM_BASE + i);
+        unsigned char v = F_ram_0018_R5(i);
         unsigned char new_carry = v & 0x01;
         v = (unsigned char)((v >> 1) | (carry_in ? 0x80 : 0x00));
-        RAM(RNG_RANDOM_BASE + i) = v;
+        F_ram_0018_R5(i) = v;
         carry_in = new_carry;
     }
 }
@@ -51,12 +51,12 @@ static void rng_scramble(void)
 unsigned short rng_next(void)
 {
     rng_scramble();
-    return (unsigned short)(((unsigned short)RAM(RNG_RANDOM_BASE + 1) << 8)
-                            | (unsigned short)RAM(RNG_RANDOM_BASE + 0));
+    return (unsigned short)(((unsigned short)F_ram_0019_R3 << 8)
+                            | (unsigned short)F_ram_0018_R2);
 }
 
 unsigned short rng_peek(void)
 {
-    return (unsigned short)(((unsigned short)RAM(RNG_RANDOM_BASE + 1) << 8)
-                            | (unsigned short)RAM(RNG_RANDOM_BASE + 0));
+    return (unsigned short)(((unsigned short)F_ram_0019_R3 << 8)
+                            | (unsigned short)F_ram_0018_R2);
 }

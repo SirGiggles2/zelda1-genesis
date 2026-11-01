@@ -44,19 +44,19 @@ static unsigned short item_flags_base(void)
 unsigned char roomrom_uw_item_taken(unsigned char room_id)
 {
     unsigned short ptr = item_flags_base();
-    return (ptr && room_id < 128u && (RAM(ptr + room_id) & 0x10u)) ? 1u : 0u;
+    return (ptr && room_id < 128u && (RAM(ptr + room_id) & 0x10u)) ? 1u : 0u; /* native_ram bulk:dyn_ptr_table */
 }
 
 void roomrom_uw_item_set_taken(unsigned char room_id)
 {
     unsigned short ptr = item_flags_base();
-    if (ptr && room_id < 128u) RAM(ptr + room_id) |= 0x10u;
+    if (ptr && room_id < 128u) RAM(ptr + room_id) |= 0x10u; /* native_ram bulk:dyn_ptr_table */
 }
 
 void roomrom_uw_item_clear_taken(void)
 {
     unsigned short i;
-    for (i = 0x06FFu; i < 0x07FFu; ++i) RAM(i) &= 0xEFu;
+    for (i = 0x06FFu; i < 0x07FFu; ++i) RAM(i) &= 0xEFu; /* native_ram bulk:dyn_range */
     s_triforce_pickup_active = 0u;
 }
 
@@ -69,19 +69,19 @@ unsigned char roomrom_uw_item_try_pickup(unsigned char level,
                                          unsigned char link_x,
                                          unsigned char link_y)
 {
-    unsigned char item_id = RAM(0x00ABu);
+    unsigned char item_id = F_BOSS_ROOM_ITEM_ID_R;
     if (level < 1u || level > 9u || room_id >= 128u || !item_flags_base()) return 0u;
     if (roomrom_uw_item_taken(room_id)) return 0u;
     /* Publish the settled native player position at the pickup boundary.
      * The drained routine checks halt/lifetime, uses slot 19's live X/Y,
      * deactivates it, and marks the room before awarding the item. */
-    RAM(0x0070u) = link_x;
-    RAM(0x0084u) = link_y;
+    F_ram_0070_R = link_x;
+    F_ram_0084_R = link_y;
     cave_try_take_room_item();
     if (!roomrom_uw_item_taken(room_id)) return 0u;
     if (item_id == UW_ITEM_ID_TRIFORCE) {
         s_triforce_pickup_active = 1u;
-        g_inventory.triforce = RAM(0x0671u);
+        g_inventory.triforce = F_ram_0671_R2;
     }
     inventory_hud_mark_dirty();
     return 1u;

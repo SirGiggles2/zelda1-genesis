@@ -66,3 +66,13 @@ void colrt_check_monster_arrow_or_rod_collision(unsigned int monster_slot,
 {
     collision_check_monster_arrow_or_rod_collision(monster_slot, weapon_slot);
 }
+
+/* NES source: Z_04.asm:Ganon_CheckCollisions and scene/death gates.
+ * Drained C: enemy_ganon_runtime.c:enrt_ganon_check_party_collisions.
+ * Coverage: PARTIAL loaded extra-player body/sword/arrow contexts.
+ * Stance: EXTEND the existing drain without a second enemy update. */
+extern void enrt_ganon_check_party_collisions(unsigned int slot, unsigned char weapons);
+void enemy_ganon_check_party_collisions(unsigned int slot, unsigned char weapons)
+{
+    enrt_ganon_check_party_collisions(slot, weapons);
+}

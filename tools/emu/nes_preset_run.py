@@ -29,6 +29,16 @@ KEYS = {"U": "Up", "D": "Down", "L": "Left", "R": "Right", "A": "A", "B": "B",
         "S": "Start", "s": "Select"}
 
 
+
+def _field_off(name: str) -> int:
+    """Image offset of a field name (tools/native_ram/fields.json); these headless runners
+    only have the image, so every field is image-backed."""
+    global _FIELD_OFFS
+    if "_FIELD_OFFS" not in globals():
+        d = json.loads((ROOT / "tools" / "native_ram" / "fields.json").read_text(encoding="utf-8"))
+        _FIELD_OFFS = {c["name"]: int(k, 16) for k, c in d["cells"].items()}
+    return _FIELD_OFFS[str(name)]
+
 class NesSession:
     def __init__(self, rom: Path):
         self.n = Nes(Path(rom).read_bytes())
@@ -104,7 +114,8 @@ class NesSession:
         lua = LuaRuntime(unpack_returned_tuples=True)
         fn = lua.eval("function(rd, wr, log, sys, gen_b_item, gen_link_pos)\n" + body + "\nend")
         fn(lambda a: self.nes8(int(a)), lambda a, v: self.write_nes(int(a), int(v)),
-           lambda m: print("stage:", m), "NES", lambda v: None, lambda x, y, d: None)
+           lambda m: print("stage:", m), "NES", lambda v: None, lambda x, y, d: None,
+           lambda n, v: self.write_nes(_field_off(n), int(v)), lambda n: self.nes8(_field_off(n)))
 
     # BizHawk NesHawk domain equivalents.
     def oam(self) -> bytes:

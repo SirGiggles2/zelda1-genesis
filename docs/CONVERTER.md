@@ -1,51 +1,79 @@
-# Zelda Genesis Converter
+# Zelda Genesis Builder
 
-Builds the Genesis ROM on your own PC from files you supply. The package
-contains no Nintendo game data and no Zelda Redux data.
+For normal use, get the app for your operating system from
+[Downloads](https://github.com/SirGiggles2/zelda1-genesis/releases), extract it,
+and open **Zelda Genesis Builder**. Choose your original Zelda NES ROM, click
+**Build Genesis ROM**, and download the finished game. Python and the native
+compiler are included. No Wine is used.
 
-## You need
+Your ROM stays local. The only game file the app downloads is the supported
+Zelda Redux patch, from its original repository. The patch is checked against
+its expected SHA-256 and cached for later builds. Advanced lets you supply the
+same IPS patch or its archive yourself.
 
-1. **The Legend of Zelda (USA) PRG0** NES ROM in iNES format (`.nes`).
-   It must be exactly this dump: the converter checks its SHA-256
-   (`8f72dc2e…0440ac`).
-2. **Zelda Redux v3.3.3**, the patch file `Zelda1_Redux.ips` from the Redux
-   repository's v3.3.3 tag (SHA-256 `97703146…ea171`):
-   https://raw.githubusercontent.com/ShadowOne333/The-Legend-of-Zelda-Redux/v3.3.3/patches/Zelda1_Redux.ips
-   - Other Redux versions are rejected, because they don't match the data
-     this port was made from.
-3. **Python 3.11 or newer** for Windows (https://www.python.org/downloads/), with
-   "Add python.exe to PATH" ticked during setup.
+## Supported input
 
-## Convert
+The original input is **The Legend of Zelda (USA), PRG0**, in iNES format:
+131,088 bytes, SHA-256
+`8f72dc2e98572eb4ba7c3a902bca5f69c448fc4391837e5f8f0d4556280440ac`.
 
-1. Drag the NES ROM and the Redux download together onto `Converter.bat`.
-   Alternatively, double-click `Converter.bat` and use **Browse...**.
-2. On first use, press **Install requirements**. This installs numpy,
-   scipy and py65 once and needs internet access.
-3. Press **Convert**. The window shows each step. The Genesis ROM is
-   saved next to your NES ROM as `Zelda.md`, unless you choose
-   another place.
+Redux uses `Zelda1_Redux.ips` from the **v3.3.3** tag:
+[download the patch](https://raw.githubusercontent.com/ShadowOne333/The-Legend-of-Zelda-Redux/v3.3.3/patches/Zelda1_Redux.ips).
+Its SHA-256 is `97703146e386c07c440493aaaa3259b97f9128adb78f0718a4fee727094ea171`.
+Other revisions are rejected before conversion.
 
-Your input files are only read, never changed.
+## Working on the source
 
-## Command line
+Clone with submodules so the pinned SGDK source and libraries are present:
 
-```
-python tools/converter/build.py "<zelda.nes>" --redux-patch "<Redux zip or .ips>" --output "<out.md>"
+```sh
+git clone --recurse-submodules https://github.com/SirGiggles2/zelda1-genesis
+cd zelda1-genesis
 ```
 
-`--redux "<Zelda Redux.nes>"` accepts an already patched Redux ROM
-instead of the patch.
+Use Python 3.11 or newer. `Converter.bat` on Windows, `Converter.command` on
+macOS, and `Converter.sh` on Linux open the same local browser interface.
+The source launcher installs missing Python dependencies into an isolated
+`build/builder-venv`; it does not change your system Python packages.
 
-Linux: the same command works. The bundled SGDK toolchain is Windows
-software and runs under Wine (`wine` must be on PATH). Install the Python requirements with
-`python3 -m pip install -r tools/converter/requirements.txt`.
+On Windows the pinned SGDK compiler is used. On Linux and macOS the native
+compiler and xgmtool must be present in `toolchains/native/bin` or supplied
+through `ZELDA_TOOLCHAIN_BIN`. The target is **m68k-elf**, not a host compiler
+or the Linux m68k ABI. Node is also needed to reproduce the saved music mixes.
 
-## Problems
+To prepare native release tools (requires a host C/C++ compiler and Make on
+Linux/macOS, plus internet access):
 
-- **"unsupported NES ROM":** this is a different dump or revision. You
-  need The Legend of Zelda (USA) PRG0.
-- **"does not turn this ROM into the supported Zelda Redux":** this is
-  the wrong Redux version. Use v3.3.3.
-- **Missing toolchain or SGDK files:** the package is incomplete. Extract
-  it again in full.
+```sh
+python tools/converter/prepare_native_tools.py
+python -m pip install -r tools/converter/requirements.txt
+python tools/converter/build.py --check-toolchain
+```
+
+Or run the converter directly:
+
+```sh
+python tools/converter/build.py "/path/to/zelda.nes" --redux-patch "/path/to/Zelda1_Redux.ips" --output "/path/to/Zelda.md"
+```
+
+`--redux "/path/to/Zelda Redux.nes"` accepts the authenticated, already
+patched Redux ROM instead. Input files are never changed.
+
+## App releases
+
+The Native builder apps workflow builds separate Windows x64, Linux x64,
+Intel Mac, and Apple Silicon Mac packages. Each contains the sanitized source,
+the pinned SGDK libraries, native tools, and Python dependencies. The workflow
+checks native compilation, XGM conversion, the local API, and packaged Python
+child scripts. No NES ROM or extracted music is uploaded for these checks.
+
+Release tooling lives in `tools/converter/prepare_native_tools.py`,
+`package_app.py`, `native_smoke.py`, and `archive_app.py`. Full game conversion
+must also be checked locally with the supported ROM before publication.
+
+## Music
+
+The builder recreates the revised Zelda mixes from the supplied ROM and
+`data/music/builder_mix.json`. That file stores instruments and mix settings,
+not the game's notes or extracted VGM files. Inglebard's and Cyberdeous's
+arrangements remain available through the existing game music options.

@@ -73,37 +73,37 @@ static const unsigned char k_secondary_squares_ow[64] = {
  *   16-pixel-wide play-area columns. */
 void dyn_tile_write_square_ow(void)
 {
-    const unsigned char square_index = (unsigned char)RAM(0x000Du);
+    const unsigned char square_index = (unsigned char)F_ram_000D_R;
     const unsigned short ptr =
-        (unsigned short)(((unsigned short)RAM(0x0001u) << 8) |
-                         (unsigned short)RAM(0x0000u));
+        (unsigned short)(((unsigned short)F_ram_0001_R << 8) |
+                         (unsigned short)F_ram_0000_R);
     if (square_index >= 0x10u) {
         /* Type-1: 4 contiguous CHR tiles starting at primary. */
-        const unsigned char tile0 = (unsigned char)RAM(0x0005u);
-        nes_ram[ptr + 0x00u] = (uint8_t)(tile0 + 0u);
-        nes_ram[ptr + 0x01u] = (uint8_t)(tile0 + 1u);
-        nes_ram[ptr + 0x16u] = (uint8_t)(tile0 + 2u);
-        nes_ram[ptr + 0x17u] = (uint8_t)(tile0 + 3u);
+        const unsigned char tile0 = (unsigned char)F_ram_0005_R;
+        F_ram_0000_X(ptr) = (uint8_t)(tile0 + 0u);
+        F_ram_0001_X(ptr) = (uint8_t)(tile0 + 1u);
+        F_ram_0016_X(ptr) = (uint8_t)(tile0 + 2u);
+        F_ram_0017_X(ptr) = (uint8_t)(tile0 + 3u);
         return;
     }
     /* Type-3: square_index * 4 indexes the secondary 4-tile record. */
     const unsigned char base = (unsigned char)((square_index & 0x0Fu) << 2);
-    nes_ram[ptr + 0x00u] = k_secondary_squares_ow[base + 0u];
-    nes_ram[ptr + 0x01u] = k_secondary_squares_ow[base + 1u];
-    nes_ram[ptr + 0x16u] = k_secondary_squares_ow[base + 2u];
-    nes_ram[ptr + 0x17u] = k_secondary_squares_ow[base + 3u];
+    F_ram_0000_X(ptr) = k_secondary_squares_ow[base + 0u];
+    F_ram_0001_X(ptr) = k_secondary_squares_ow[base + 1u];
+    F_ram_0016_X(ptr) = k_secondary_squares_ow[base + 2u];
+    F_ram_0017_X(ptr) = k_secondary_squares_ow[base + 3u];
 }
 
 void dyn_tile_change_play_map_square_ow(unsigned int slot)
 {
     /* X = ObjX & $F0, then >> 2 = column-address byte-pair index. */
-    const unsigned char obj_x = (unsigned char)RAM(NES_OBJ_X + slot);
+    const unsigned char obj_x = (unsigned char)F_ram_0070_R5(slot);
     const unsigned char col_idx = (unsigned char)((obj_x & 0xF0u) >> 2);
     /* Stash column-address pointer into [$00:$01]. */
-    RAM(0x0000u) = k_play_area_column_addrs[col_idx];
-    RAM(0x0001u) = k_play_area_column_addrs[col_idx + 1u];
+    F_ram_0000_R = k_play_area_column_addrs[col_idx];
+    F_ram_0001_R = k_play_area_column_addrs[col_idx + 1u];
     /* (ObjY & $F0) - $40 then >> 3 = row offset within column. */
-    const unsigned char obj_y = (unsigned char)RAM(NES_OBJ_Y + slot);
+    const unsigned char obj_y = (unsigned char)F_ram_0084_R5(slot);
     const unsigned char row_off =
         (unsigned char)(((unsigned char)((obj_y & 0xF0u) - 0x40u)) >> 3);
     /* AddToInt16At0 folds A into [$00:$01]. NES asm does not touch
@@ -113,7 +113,7 @@ void dyn_tile_change_play_map_square_ow(unsigned int slot)
     /* Default: type-1 square with primary in [05]. Square index $10+
      * doesn't matter, only that it's >= $10. */
     unsigned char square_index = 0x10u;
-    const unsigned char primary = (unsigned char)RAM(0x0005u);
+    const unsigned char primary = (unsigned char)F_ram_0005_R;
 
     /* NES source: Redux visible_secrets.asm:$ABED / ChangePlayMapSquareOW.
      * Drained C: this native dynamic-square publisher.
@@ -143,7 +143,7 @@ void dyn_tile_change_play_map_square_ow(unsigned int slot)
         }
     }
     /* Stage square_index in [$0D] for WriteSquareOW + invoke. */
-    RAM(0x000Du) = square_index;
+    F_ram_000D_R = square_index;
     dyn_tile_write_square_ow();
 }
 
@@ -151,10 +151,10 @@ void dyn_tile_change_tile_obj_tiles(unsigned int tile, unsigned int slot)
 {
     /* [05] holds the first tile. */
     const unsigned char first_tile = (unsigned char)tile;
-    RAM(0x0005u) = first_tile;
+    F_ram_0005_R = first_tile;
     /* [03] = ObjX, [02] = ObjY (NES MapScreenPosToPpuAddr inputs). */
-    RAM(0x0003u) = (unsigned char)RAM(NES_OBJ_X + slot);
-    RAM(0x0002u) = (unsigned char)RAM(NES_OBJ_Y + slot);
+    F_ram_0003_R = (unsigned char)F_ram_0070_R5(slot);
+    F_ram_0002_R = (unsigned char)F_ram_0084_R5(slot);
     core_map_screen_pos_to_ppu_addr();
     /* DynTileBufLen at $0301; records start at $0302. Two 5-byte
      * records + 1-byte end marker = 11 bytes. After write,
@@ -162,11 +162,11 @@ void dyn_tile_change_tile_obj_tiles(unsigned int tile, unsigned int slot)
      * next call's first record byte). */
     const unsigned char buf_off = (unsigned char)ROOM_TILE_XFER_BUF_IDX;
     /* High byte of PPU address into both records' byte 0. */
-    const unsigned char ppu_hi = (unsigned char)RAM(0x0000u);
+    const unsigned char ppu_hi = (unsigned char)F_ram_0000_R;
     ROOM_TILE_XFER_BUF((unsigned short)buf_off + 0u) = ppu_hi;
     ROOM_TILE_XFER_BUF((unsigned short)buf_off + 5u) = ppu_hi;
     /* Low byte of PPU address: record 1 = ppu_lo, record 2 = ppu_lo+1. */
-    const unsigned char ppu_lo = (unsigned char)RAM(0x0001u);
+    const unsigned char ppu_lo = (unsigned char)F_ram_0001_R;
     ROOM_TILE_XFER_BUF((unsigned short)buf_off + 1u) = ppu_lo;
     ROOM_TILE_XFER_BUF((unsigned short)buf_off + 6u) = (uint8_t)(ppu_lo + 1u);
     /* First tile twice in each record (bytes 3,4 and 8,9). */
@@ -202,8 +202,8 @@ void dyn_tile_change_tile_obj_tiles(unsigned int tile, unsigned int slot)
      * Variables.inc: ReturnToBank4 := $00F7. On Genesis this flag is
      * still tracked (some legacy paths set it) but bank-switching is
      * a no-op. We only need to clear the flag for behavioral parity. */
-    if ((unsigned char)RAM(0x00F7u) != 0u) {
+    if ((unsigned char)F_ram_00F7_R != 0u) {
         /* SwitchBank #$04 no-op. */
     }
-    RAM(0x00F7u) = 0u;
+    F_ram_00F7_R = 0u;
 }

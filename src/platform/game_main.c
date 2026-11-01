@@ -6,6 +6,8 @@
 #include "audio_abi.h"
 #include "intro_phase.h"
 #include "render_abi.h"
+#include "../sgdk_adapter/frame_pipeline.h"
+#include "controller_abi.h"
 #include "engine_runtime.h"
 #include "engine_state.h"   /* roomrom_main_set_quest */
 
@@ -239,9 +241,30 @@ static void clear_remix_only_tiles(void)
     }
 }
 
+#include "../state/game_ram_reserve.h"
+#include "../state/player_ram.h"
 extern u32 _bend;
 #define NES_MIRROR_LO 0xFF8000ul
-#define NES_MIRROR_HI 0xFF8800ul
+/* T-368 C4: the wall covers the NES image and the native block (game_ram_reserve.h). */
+#define NES_MIRROR_HI GR_END_ABS
+/* T-368 C4: zero [NES_MIRROR_LO+GR_OFF, GR_END_ABS) with movem.l (32 B per 72 cycles).
+ * A byte/word memset of this 8 KB cost ~1 frame at boot and moved the first armed
+ * frame 422 -> 423 (measured: ab_capture meta arm_abs_frame). */
+_Static_assert(GR_RESERVED != 0u && (GR_RESERVED % 32u) == 0u, "movem.l loop clears 32-byte chunks");
+_Static_assert(((0xFF8000ul + GR_OFF) % 4u) == 0u, "native block must start long-aligned");
+static void zero_native_block(void)
+{
+    u32 *p = (u32 *)GR_END_ABS;
+    u32 *lo = (u32 *)(0xFF8000ul + GR_OFF);
+    __asm__ volatile(
+        "moveq #0,%%d0\n\t" "moveq #0,%%d1\n\t" "moveq #0,%%d2\n\t" "moveq #0,%%d3\n\t"
+        "moveq #0,%%d4\n\t" "moveq #0,%%d5\n\t" "moveq #0,%%d6\n\t" "moveq #0,%%d7\n"
+        "1:\tmovem.l %%d0-%%d7,-(%0)\n\tcmpa.l %1,%0\n\tbne 1b"
+        : "+&a"(p)
+        : "a"(lo)
+        : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "memory", "cc");
+}
+
 static void heap_wall_nes_mirror(void)
 {
     const u32 heap = (((u32)&_bend) + 1ul) & ~1ul & 0xFFFFFFul;  /* MEM_init's heap */
@@ -259,17 +282,26 @@ static void heap_wall_nes_mirror(void)
         *(volatile u16 *)top = 0u;
         MEM_pack();
         DMA_initEx(queue_size, capacity, buffer_size);
-        ok = (((u32)dmaQueues & 0xFFFFFFul) >= NES_MIRROR_HI
-              || ((u32)dmaQueues & 0xFFFFFFul) + (u32)queue_size * sizeof(DMAOpInfo) <= reserved)
+        ok = ((u32)dmaQueues & 0xFFFFFFul) >= GR_END_ABS
+             && ((u32)dmaQueues & 0xFFFFFFul) + (u32)queue_size * sizeof(DMAOpInfo) <= 0xFFE000ul
              && (dmaDataBuffer == NULL
-                 || ((u32)dmaDataBuffer & 0xFFFFFFul) >= NES_MIRROR_HI
-                 || ((u32)dmaDataBuffer & 0xFFFFFFul) + buffer_size <= reserved);
+                 || ((((u32)dmaDataBuffer & 0xFFFFFFul) >= GR_END_ABS)
+                     && (((u32)dmaDataBuffer & 0xFFFFFFul) + buffer_size <= 0xFFE000ul)));
     }
     /* The font buffer sat wherever .bss ends and could spill into NES RAM
      * before main (the pad test: [$FF74FC, $FF80FE) left font bytes in
      * ObjX). _start_entry cleared all RAM before it; clear the 2 KB NES
      * RAM again, as it was at power-on. */
     memset((void *)NES_MIRROR_LO, 0, 0x800u);
+    /* T-368 C4: the native block is zeroed only now: the wall is up and the DMA
+     * queue/buffer were reallocated above it, so nothing lives in it.
+     * When ok is 0 nothing is zeroed and the probe flag reports the failure. */
+    if (ok) {
+        zero_native_block();
+        player_ram_init_inert();
+        /* T-393: heap blocks land above the wall; never without it. */
+        (void)frame_pipeline_init();
+    }
     /* Probe-visible result (masked stack-page cell NES $01F8): 1 = the
      * heap is walled around NES RAM and the DMA queue/buffer are outside. */
     *(volatile unsigned char *)0xFF81F8ul = ok;
@@ -281,9 +313,8 @@ int debug_main_after_a4(bool hardReset)
 
     heap_wall_nes_mirror();
 
-    /* T-125: pad 2 only ever needs the NES buttons (NES controller 2 has
-     * A/B/Start/Select/D-pad); the 6-button read runs every VBlank. */
-    JOY_setSupport(PORT_2, JOY_SUPPORT_3BTN);
+    /* T-377: configure detected adapters before title/File Select polling. */
+    controller_party_init();
 
     /* Phase 10.3 audio link, VBlank tick slice: register music_tick
      * as VBlank callback so the audio driver advances notes once per
@@ -410,6 +441,7 @@ int debug_main_after_a4(bool hardReset)
              * runs. Genesis: the same validation, then its File Select. */
             if (RAM(0x0012u) == 0x00u && RAM(0x0013u) == 0x01u)
             {
+                frame_pipeline_wait();   /* T-393: no V-Int publish under the FS */
                 game_profile_clear();
                 s_state = COMBINED_STATE_FS;
                 s_prev_joy = 0u;

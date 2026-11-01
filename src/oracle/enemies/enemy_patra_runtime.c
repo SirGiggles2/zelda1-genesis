@@ -71,10 +71,10 @@ static unsigned short patra_shift_multiply(unsigned char a_in,
      * as the NES does (T-171). */
     const unsigned short product = (unsigned short)((unsigned short)a_in *
                                    ((unsigned short)mult_in >> (8u - y_bits)));
-    RAM(0x0000u) = (unsigned char)(mult_in << y_bits);
-    RAM(0x0001u) = a_in;
-    RAM(0x0002u) = (unsigned char)product;
-    RAM(0x0003u) = (unsigned char)(product >> 8);
+    F_ram_0000_R = (unsigned char)(mult_in << y_bits);
+    F_ram_0001_R = a_in;
+    F_ram_0002_R = (unsigned char)product;
+    F_ram_0003_R = (unsigned char)(product >> 8);
     return product;
 }
 
@@ -85,8 +85,8 @@ static void patra_decrease_object_angle(unsigned char low,
     unsigned short angle = (unsigned short)
         (((unsigned short)ENEMY_OBJ_ANGLE_WHOLE(slot) << 8) |
          ENEMY_OBJ_ANGLE_FRAC(slot));
-    RAM(0x000Au) = low;                 /* NES [0A]/[0B] amount */
-    RAM(0x000Bu) = high;
+    F_ZP_TMPA_R = low;                 /* NES [0A]/[0B] amount */
+    F_ZP_TMPB_R = high;
     angle -= (unsigned short)(((unsigned short)high << 8) | low);
     ENEMY_OBJ_ANGLE_FRAC(slot) = (unsigned char)angle;
     ENEMY_OBJ_ANGLE_WHOLE(slot) = (unsigned char)((angle >> 8) & 0x1Fu);
@@ -104,8 +104,8 @@ __attribute__((always_inline)) static inline unsigned char patra_rotate_object_l
     unsigned short product;
     unsigned short position;
 
-    RAM(0x0006u) = cosine_bits;         /* NES STA $06 / STY $05 */
-    RAM(0x0005u) = sine_bits;
+    F_ram_0006_R = cosine_bits;         /* NES STA $06 / STY $05 */
+    F_ram_0005_R = sine_bits;
 
     /* NES ASL/ROL product + ADC/SBC fractions are 16-bit wrap arithmetic.
      * Pack each axis once; a native word add preserves carry/borrow. */
@@ -247,7 +247,7 @@ void enrt_update_patra_child(unsigned int slot)
     ENEMY_X(slot) = ENEMY_X(1);
     {
         unsigned char radius = (ENEMY_TYPE(slot) == 0x25u) ? 0x2Cu : 0x18u;
-        RAM(0x0000u) = radius;          /* NES STA $00 (T-171) */
+        F_ram_0000_R = radius;          /* NES STA $00 (T-171) */
         ENEMY_Y(slot) = (unsigned char)(ENEMY_Y(1) - radius);
     }
 }

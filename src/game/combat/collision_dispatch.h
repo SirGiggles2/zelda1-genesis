@@ -33,6 +33,12 @@ unsigned char collision_get_collidable_tile_still(unsigned int slot);
  * NES GetCollidingTileMoving; leaves the column address in [00:01]. */
 unsigned char collision_get_colliding_tile_moving(unsigned int slot);
 
+/* Explicit player coordinates/input; shared terrain remains a declared world
+ * bridge. publish_legacy retains $00/$01/$49E for ladder/speed consumers.
+ * Both modes retain scratch $04; player position/direction cells stay untouched. */
+unsigned char collision_get_player_moving_tile(unsigned char x, unsigned char y,
+    unsigned char direction_bits, unsigned char publish_legacy);
+
 /* Redux CheckTiles/CheckHitTiles: secret $54..$5F tiles are solid.
  * Leaves the original collided tile and RAM scratch values intact. */
 unsigned char collision_moving_tile_is_obstacle(unsigned char tile);
@@ -83,6 +89,8 @@ void collision_check_monster_shot_collision(unsigned int monster_slot,
  * NES CheckMonsterArrowOrRodCollision (collision_runtime.c:168-181). */
 void collision_check_monster_arrow_or_rod_collision(unsigned int monster_slot,
                                                     unsigned int weapon_slot);
+void collision_check_monster_arrow_or_rod_single(unsigned int monster_slot,
+                                                unsigned int weapon_slot);
 
 /* Boomerang/food shot collision (axis hitbox setup).
  * NES CheckMonsterBoomerangOrFoodCollision (collision_runtime.c:183-191). */
@@ -99,6 +107,11 @@ void collision_check_monster_sword_shot_or_magic_shot_collision(
  * NES CheckMonsterBombOrFireCollision (collision_runtime.c:213-235). */
 void collision_check_monster_bomb_or_fire_collision(
     unsigned int monster_slot, unsigned int weapon_slot);
+
+/* T-418: Bubbles normally run only body contact. Check the upgraded wand
+ * through the same exact beam/rod hitboxes; return 1 on a lethal contact. */
+unsigned char collision_check_upgraded_wand_bubble(unsigned int monster_slot,
+                                                   unsigned char melee_only);
 
 #ifdef __cplusplus
 }

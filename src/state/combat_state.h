@@ -23,44 +23,44 @@
 #define COMBAT_THRESHOLD_Y              ZP_TMPE
 #define COMBAT_PART_INDEX               ZP_TMPF
 
-#define LINK_ACTION_TIMER               RAM(0x00AC)
-#define LINK_DIR                        RAM(0x0098)
-#define LINK_DAMAGE_DISABLE_FLAG        RAM(0x0512)
-#define LINK_STUN_TIMER                 RAM(0x04F0)
-#define LINK_RING_LEVEL                 RAM(0x0662)
-#define LINK_HEARTS                     RAM(0x066F)
-#define LINK_PARTIAL_HEART              RAM(0x0670)
-#define LINK_SHIELD_BLOCK_FLAG          RAM(0x0676)
+#define LINK_ACTION_TIMER               F_ram_00AC_R3
+#define LINK_DIR                        F_ram_0098_R2
+#define LINK_DAMAGE_DISABLE_FLAG        F_ram_0512_R2
+#define LINK_STUN_TIMER                 F_ram_04F0_R2
+#define LINK_RING_LEVEL                 F_ram_0662_R
+#define LINK_HEARTS                     F_ram_066F_R2
+#define LINK_PARTIAL_HEART              F_ram_0670_R2
+#define LINK_SHIELD_BLOCK_FLAG          F_ram_0676_R2
 
-#define ROOM_KILL_COUNT                 RAM(0x0627)
-#define ROOM_CHAIN_KILL_COUNT           RAM(0x0050)
-#define ROOM_CHAIN_KILL_BONUS           RAM(0x0051)
-#define ROOM_MONSTER_COLLISION_COUNT    RAM(0x034B)
-#define SFX_COMBAT                      RAM(0x0604)
+#define ROOM_KILL_COUNT                 F_ram_0627_R
+#define ROOM_CHAIN_KILL_COUNT           F_ram_0050_R
+#define ROOM_CHAIN_KILL_BONUS           F_ram_0051_R
+#define ROOM_MONSTER_COLLISION_COUNT    F_ROOM_MONSTER_COLLISION_COUNT_R
+#define SFX_COMBAT                      F_ram_0604_R2
 
 /* Canonical owner: object_state.h (same cell, NES ObjState $AC+slot). */
 #ifndef OBJ_STATE
-#define OBJ_STATE(slot)                 OBJ(0x00AC, (slot))
+#define OBJ_STATE(slot)                 F_ram_00AC_O2((slot))
 #endif
-#define OBJ_DIR(slot)                   OBJ(0x0098, (slot))
-#define OBJ_X(slot)                     OBJ(NES_OBJ_X, (slot))
-#define OBJ_Y(slot)                     OBJ(NES_OBJ_Y, (slot))
-#define OBJ_GRID_OFFSET(slot)           OBJ(NES_OBJ_GRID_OFFSET, (slot))
-#define OBJ_ANIM_TIMER(slot)            OBJ(0x03D0, (slot))
+#define OBJ_DIR(slot)                   F_ram_0098_O3((slot))
+#define OBJ_X(slot)                     F_ram_0070_O2((slot))
+#define OBJ_Y(slot)                     F_ram_0084_O2((slot))
+#define OBJ_GRID_OFFSET(slot)           F_ram_0394_O((slot))
+#define OBJ_ANIM_TIMER(slot)            F_ram_03D0_O2((slot))
 
-#define MON_TYPE(slot)                  OBJ(NES_OBJ_TYPE, (slot))
-#define MON_STATUS_FLAGS(slot)          OBJ(0x04BF, (slot))
-#define MON_INVINCIBILITY(slot)         OBJ(0x04B2, (slot))
-#define MON_HIT_REACTION(slot)          OBJ(0x04F0, (slot))
-#define MON_METASTATE(slot)             OBJ(0x0405, (slot))
-#define MON_STUN_TIMER(slot)            OBJ(0x003D, (slot))
-#define MON_SHOVE_DIR(slot)             OBJ(0x00C0, (slot))
-#define MON_SHOVE_TIMER(slot)           OBJ(0x00D3, (slot))
-#define MON_HP(slot)                    OBJ(0x0485, (slot))
-#define MON_SUBSTATE(slot)              OBJ(0x046B, (slot))
-#define MON_BOUNCE_TURNS(slot)          OBJ(0x042C, (slot))
+#define MON_TYPE(slot)                  F_ram_034F_O2((slot))
+#define MON_STATUS_FLAGS(slot)          F_ram_04BF_O((slot))
+#define MON_INVINCIBILITY(slot)         F_ram_04B2_O2((slot))
+#define MON_HIT_REACTION(slot)          F_ram_04F0_O3((slot))
+#define MON_METASTATE(slot)             F_NES_OBJ_METASTATE_BASE_O((slot))
+#define MON_STUN_TIMER(slot)            F_NES_OBJ_STUN_TIMER_O3((slot))
+#define MON_SHOVE_DIR(slot)             F_ram_00C0_O4((slot))
+#define MON_SHOVE_TIMER(slot)           F_ram_00D3_O3((slot))
+#define MON_HP(slot)                    F_ram_0485_O2((slot))
+#define MON_SUBSTATE(slot)              F_ram_046B_O2((slot))
+#define MON_BOUNCE_TURNS(slot)          F_ram_042C_O2((slot))
 
-#define ITEM_SWORD_LEVEL                RAM(0x0657)
-#define ITEM_ARROW_OR_ROD_LEVEL         RAM(0x0659)
+#define ITEM_SWORD_LEVEL                F_ram_0657_R
+#define ITEM_ARROW_OR_ROD_LEVEL         F_ram_0659_R2
 
 #endif

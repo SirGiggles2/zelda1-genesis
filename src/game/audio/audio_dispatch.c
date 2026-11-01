@@ -138,7 +138,7 @@ static unsigned char resolve_song(unsigned char gm, unsigned char scene)
 
 void audio_dispatch_tick(unsigned char scene, unsigned char room_id)
 {
-    unsigned char gm = nes_ram[0x0012u];
+    unsigned char gm = F_ram_0012;
     (void)room_id;  /* reserved for future cave/boss room keying */
 
     if (gm == s_last_gm && scene == s_last_scene) {

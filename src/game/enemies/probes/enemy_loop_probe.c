@@ -298,7 +298,7 @@ static void publish_shot_scan(volatile unsigned char *base)
 {
     base[0] = 0x53u;                                          /* 'S' */
     base[1] = 0x48u;                                          /* 'H' */
-    base[2] = (unsigned char)RAM(0x034Cu);                    /* ActiveMonsterShots */
+    base[2] = (unsigned char)F_ENEMY_SHOT_COUNT_R;                    /* ActiveMonsterShots */
 
     unsigned int found = 0u;
     for (unsigned int slot = 1u; slot < 16u && found < 8u; slot++) {

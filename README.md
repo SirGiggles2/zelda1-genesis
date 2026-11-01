@@ -1,117 +1,85 @@
-# zelda1-genesis
+# Zelda for Sega Genesis / Mega Drive
 
-A port of **The Legend of Zelda** (NES, 1986) to the **Sega Genesis / Mega
-Drive**. It plays like the NES original, and it has Zelda Redux built in as an
-option you can switch on in the game.
+This is a port of the original NES **The Legend of Zelda** to the Sega Genesis.
+It includes Original and Redux modes, both quests, and local multiplayer for up
+to four players. It's still a work in progress: there are bugs to find, and busy
+multiplayer rooms can slow down.
 
-This repository doesn't contain the game. It contains a converter: you give it
-your own copy of the NES ROM, and it builds the Genesis ROM on your computer.
+We can't share the game itself, so you make it yourself from your own copy of
+the NES game. It only takes a minute, and nothing gets installed.
 
-## What you need
+## Make your ROM
 
-- **Windows 10 or 11.** Linux works too, see [below](#linux).
-- **Python 3.11 or newer** from https://www.python.org/downloads/. During setup,
-  tick **"Add python.exe to PATH"**.
-- **Git** from https://git-scm.com/downloads, to download this repository.
-- **Your NES ROM:** *The Legend of Zelda (USA)*, revision PRG0, as a `.nes`
-  file. It has to be this exact version. The converter checks its fingerprint
-  (SHA-256 `8f72dc2e98572eb4ba7c3a902bca5f69c448fc4391837e5f8f0d4556280440ac`)
-  and tells you if it's a different one.
-- **The Zelda Redux v3.3.3 patch,** `Zelda1_Redux.ips`. Use this exact file
-  (the download on the Redux release page is a different file and is
-  rejected):
-  https://raw.githubusercontent.com/ShadowOne333/The-Legend-of-Zelda-Redux/v3.3.3/patches/Zelda1_Redux.ips
+You need two files:
 
-## Step 1: download this repository
+- **Your Zelda NES ROM.** It has to be the USA version (the first release,
+  called "PRG0"). The file ends in `.nes`.
+- **The Zelda Redux patch.** Get
+  [Zelda1_Redux.ips](https://raw.githubusercontent.com/ShadowOne333/The-Legend-of-Zelda-Redux/v3.3.3/patches/Zelda1_Redux.ips)
+  (version 3.3.3). The Redux `.zip` from their releases page works too.
 
-Open **PowerShell**, go to the folder you want to use, and run:
+Then:
 
-```powershell
-git clone --recurse-submodules https://github.com/SirGiggles2/zelda1-genesis
+1. Go to [Releases](https://github.com/SirGiggles2/zelda1-genesis/releases) and
+   download **Zelda-Genesis-Builder.html**. It's one file.
+2. Double-click it. It opens in your web browser.
+3. Drag both files onto the page (or click the box and pick them).
+4. Click **Build**.
+5. About a minute later, your browser saves **Zelda Genesis.md**. That's your game.
+
+Play it in a Genesis emulator or on a Genesis flash cart.
+
+A few things worth knowing:
+
+- **The first time needs internet.** The page downloads a small helper (about
+  20 MB) the first time. After that it's saved by your browser.
+- **Your files stay on your computer.** Nothing gets uploaded anywhere. Your ROM
+  and the patch aren't changed.
+- **It works on Windows, Mac and Linux**, in any up-to-date browser. So far
+  we've tested it in Microsoft Edge on Windows. If another browser gives you
+  trouble, please tell us.
+- **Every copy is the same.** The page checks that your game matches the
+  official release exactly. If it doesn't, it won't save it.
+
+## If it doesn't work
+
+- **"This is not the USA PRG0 ROM."** Your ROM is a different version (like
+  Europe, Japan or PRG1) or it's already been patched. You need the plain USA
+  PRG0 one.
+- **"This is not the Zelda Redux v3.3.3 patch."** Use the patch linked above.
+  Other Redux versions won't work.
+- **"Connect to the internet once…"** The page couldn't download its helper.
+  Check your connection and click Build again.
+- **Anything else:** open **Build details** at the bottom of the page, copy what
+  it says, and post it in a
+  [bug report](https://github.com/SirGiggles2/zelda1-genesis/issues). Say which
+  computer and browser you used. Please don't attach your ROM.
+
+## For developers
+
+Making a new release of the builder is one command:
+
+```
+python tools/release/make_builder.py --rom "roms/Legend of Zelda, The (USA).nes" --redux "roms/Zelda Redux.nes"
 ```
 
-This creates a `zelda1-genesis` folder. The `--recurse-submodules` part matters:
-it also downloads SGDK, the Genesis toolkit the converter builds with. The green
-"Download ZIP" button on GitHub leaves SGDK out, so use the command above.
-
-## Step 2: convert
-
-**The easy way:** open the `zelda1-genesis` folder and drag your NES ROM and the
-Redux patch together onto **`Converter.bat`**. In the window that opens:
-
-1. Press **Install requirements**. You only need to do this the first time; it
-   needs an internet connection.
-2. Press **Convert**. It takes a few minutes and shows each step.
-
-Your Genesis ROM is saved next to your NES ROM as `Zelda.md` (you can pick
-another name or folder before converting). Load it in a Genesis emulator; it
-is tested in Genesis Plus GX and BizHawk. Your NES ROM and the patch are only
-read, never changed.
-
-**From the command line instead**, inside the `zelda1-genesis` folder:
-
-```powershell
-python -m pip install -r tools\converter\requirements.txt
-python tools\converter\build.py "C:\path\to\zelda.nes" --redux-patch "C:\path\to\Zelda1_Redux.ips" --output "C:\path\to\Zelda.md"
-```
-
-## If something goes wrong
-
-- **"unsupported ROM":** your NES ROM isn't the USA PRG0 version.
-- **"does not turn this ROM into the supported Zelda Redux":** you have a
-  different Redux version. Download v3.3.3.
-- **"Zelda Redux is required":** you only gave it the NES ROM. Add the patch.
-- **Missing SGDK or toolchain files:** the repository was downloaded without
-  `--recurse-submodules`. Inside the folder, run
-  `git submodule update --init`, then try again.
-- **`python` isn't recognized:** reinstall Python and tick "Add python.exe to
-  PATH".
-
-## Linux
-
-The same command line works. The SGDK toolchain is a Windows program, so it
-runs under Wine; install Wine and make sure `wine` is on your PATH.
-
-## How it works
-
-The converter (`tools/converter/build.py`) checks both inputs, applies the Redux
-patch to a copy of your ROM, and pulls everything the port needs out of the two
-ROMs: graphics, rooms, music, text and the game's own tables. The title, item,
-level 9, Ganon, Triforce, Zelda rescue and ending songs are converted from your
-NES ROM to Genesis FM/PSG music on your computer. Then it compiles
-the Genesis ROM with SGDK. In our tests the same inputs have always produced
-exactly the same ROM, byte for byte, so you can compare your build with
-anyone else's.
-
-More detail is in [docs/CONVERTER.md](docs/CONVERTER.md). The release checks
-(`tools/converter/from_scratch_gate.py`, `package_closure.py`, `make_package.py`,
-`rom_bytes_scan.py`) confirm that conversion works from a clean copy, gives the
-same ROM every time, and that no game data is in this repository.
-
-## Source layout
-
-- `engine/`: game runtime, generated asset inputs and asset generators.
-- `src/platform/`: Genesis startup and the game entry point.
-- `tools/converter/`: ROM validation, extraction, converter window and release checks.
-- `tools/build/build_rom.py`: SGDK compilation, also launched by `Build.bat`.
-- `builds/Zelda.md`: locally built game; converter saves your chosen output separately.
-
-At the title, press Start for File Select. The old quest and tile-grid shortcuts
-are removed. ABC+Start still freezes the game and captures a diagnostic dump.
+It rebuilds the game from the ROMs, takes out everything that came from
+Nintendo, packs the page, and checks that nothing from the ROMs is left in it.
+Upload the `Zelda-Genesis-Builder.html` it makes in `builds/release/`.
 
 ## Credits
 
-This port stands on a lot of other people's work. Thank you, all of you.
+
+Thanks to everyone whose work helped make this possible.
 
 **Music**
 
-- **Inglebard** — the Genesis/Mega Drive covers of the Overworld and
-  Underworld themes that play in this port, made in DefleMask.
-
-  **Cyberdeous** — the duo graciously made their own version of the Underworld
-  theme. Select **Cyberdeous** in Options > Music (Inglebard stays the default).
-
-All the other songs are extracted and converted from your NES ROM and Redux patch. I personally edited them by hand. But tbh inglebard and Cyberdeous music is waaaaay better. 
+- **Inglebard** made the Genesis Overworld and Underworld arrangements in DefleMask.
+- **Cyberdeous** made the alternate Underworld arrangement. Both artists' music
+  was made without AI, and their arrangements remain available in the game.
+- The other tracks are converted from your NES ROM and Redux patch. Their
+  instruments and mixes were edited by SirGiggles in Music Studio. The builder
+  now uses the revised mixes, including Title, Overworld, Level 9 and Ending.
 
 **The original game**
 
@@ -152,28 +120,22 @@ All the other songs are extracted and converted from your NES ROM and Redux patc
 
 **This port**
 
-- **SirGiggles** — Dude who slammed his fists at the keyboard till Claude did what he wanted, and playtested it to DEATH.
+- **SirGiggles** — Project direction, music edits, and a lot of playtesting.
 - **Anthropic's Claude** and **OpenAI's Codex** — most of the code (see below).
 
-## AI disclosure
+## About the code
 
-This project was built mostly by AI coding agents, Anthropic's Claude and
-OpenAI's Codex, directed and play-tested by the maintainer. That includes most
-of the game code, the converter, the tests and this README. The port was checked
-against the original NES game with automated byte-for-byte comparisons rather
-than taken on trust, but treat it as you would any hobby project. Bug reports
-are welcome.  
-
-Some music was CONVERTED from the NES and Redux data but tweaked by hand by me. 
-
-INGLEBARD and CYBERDEOUS' music was made WITHOUT AI
+Most of the programming was done with Anthropic's Claude and OpenAI's Codex,
+with direction and playtesting by SirGiggles. Automated comparisons against the
+NES game help catch mistakes, but they don't replace playing it. Bug reports
+and feedback are welcome.
 
 ## Legal
 
-*The Legend of Zelda* is Nintendo's. This project is not affiliated with or
-endorsed by Nintendo, and it includes no Nintendo ROM, graphics, music or level
-data. You need your own legally obtained copy of the game. Zelda Redux is
-ShadowOne333's work and is not included either.
+The Legend of Zelda belongs to Nintendo. This is an unofficial fan project and
+isn't affiliated with Nintendo. No game ROM is included; you need your own
+legally obtained copy. Zelda Redux is ShadowOne333's work; you download the
+patch from their page yourself.
 
-This project's own code is under the MIT license ([LICENSE](LICENSE)).
-Third-party parts and their terms are listed in [NOTICE](NOTICE).
+The project's own code uses the [MIT license](LICENSE). Third-party credits and
+license terms are in [NOTICE](NOTICE).

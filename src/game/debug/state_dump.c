@@ -28,6 +28,7 @@
 #include <genesis.h>
 #include "state_dump.h"
 #include "engine_runtime.h"
+#include "../../sgdk_adapter/frame_pipeline.h"
 
 extern const unsigned char g_state_dump_font[64 * 8];
 
@@ -559,6 +560,7 @@ static void __attribute__((noreturn)) freeze(unsigned char ctx)
     unsigned short i;
     unsigned char ok = 1u;
 
+    frame_pipeline_wait();   /* T-393: dump the published frame, not one stale */
     __asm__ volatile ("move.w #0x2700,%%sr" ::: "memory");
     __asm__ volatile ("move.l %%sp,%0" : "=d"(sp));
 

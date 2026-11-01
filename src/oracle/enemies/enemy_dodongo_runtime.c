@@ -158,8 +158,8 @@ unsigned int enrt_dodongo_is_bomb_in_range(unsigned int limit_idx) {
     /* axis=1 first (Y), then axis=0 (X) — matches 6502 LDY #1 / dey loop.
      * Scratch layout: RAM[0],[1] = monster X/Y; RAM[2],[3] = bomb X/Y. */
     for (axis = 1; axis >= 0; axis--) {
-        unsigned char monster = RAM(0x0000 + axis);
-        unsigned char bomb    = RAM(0x0002 + axis);
+        unsigned char monster = F_ram_0000_R4(axis);
+        unsigned char bomb    = F_ram_0002_R5(axis);
         signed char  dist     = (signed char)(monster - bomb);
 
         if ((signed char)dist >= (signed char)pos_limit)
@@ -168,7 +168,7 @@ unsigned int enrt_dodongo_is_bomb_in_range(unsigned int limit_idx) {
             continue;
 
         /* In-range on this axis. */
-        RAM(0x0004 + axis) = (unsigned char)dist;
+        F_ram_0004_R4(axis) = (unsigned char)dist;
         mask = (unsigned char)(mask >> 1);
         COMBAT_SHOVE_DIR = mask;
     }
@@ -227,7 +227,10 @@ void enrt_dodongo_try_eat_bomb(unsigned int slot) {
     /* Bomb is in range of the mouth — advance to bloated state. */
     ENEMY_STATE_TIMER(slot)++;
     /* Deactivate first bomb slot (16) and reset bloated substate. */
-    OBJ(0x00AC, 16) = 0;
+    /* NES source: TryEatBomb deactivates slot16. Drained C: this branch.
+     * Coverage: shared native lifecycle owner; Stance: EXTEND the existing
+     * reset boundary, which publishes once and preserves the bomb timer. */
+    z07_reset_obj_state(16u);
     ENEMY_TURN_TIMER(slot) = 0;
 }
 
@@ -268,14 +271,14 @@ void enrt_dodongo_check_bomb_hit(unsigned int slot) {
         ENEMY_GLEEOK_NECK_X_PTR_HI = (unsigned char)t;
 
         /* First bomb slot is fixed at $10 (16). */
-        t = (unsigned int)(unsigned char)OBJ(NES_OBJ_X, 16) + 8u + c;
+        t = (unsigned int)(unsigned char)F_ram_0070_O2(16) + 8u + c;
         c = t >> 8;
         ENEMY_GLEEOK_NECK_Y_PTR_LO = (unsigned char)t;
-        t = (unsigned int)(unsigned char)OBJ(NES_OBJ_Y, 16) + 8u + c;
+        t = (unsigned int)(unsigned char)F_ram_0084_O2(16) + 8u + c;
         ENEMY_GLEEOK_NECK_Y_PTR_HI = (unsigned char)t;
     }
 
-    bomb_state = OBJ(0x00AC, 16);
+    bomb_state = F_ram_00AC_O2(16);
     if (bomb_state == 0)
         return;
 
@@ -385,7 +388,7 @@ prepare_to_draw:
     /* NES: Y stays in [01], [00] = ObjX + $10 (the draw reads [00]; the
      * old ObjX shift left [00] as the left-half draw had it, T-171). */
     saved_x = ENEMY_X(slot);
-    RAM(0x0000u) = (unsigned char)(saved_x + 0x10u);
+    F_ram_0000_R = (unsigned char)(saved_x + 0x10u);
     enrt_anim_set_sprite_desc_level_palette_row();
     if (saved_frame_index >= 0x14)
         frame_img = DodongoFrameImagesBloated[saved_frame_index - 0x14];

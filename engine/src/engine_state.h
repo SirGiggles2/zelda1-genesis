@@ -125,6 +125,11 @@ unsigned char roomrom_main_current_input_dir(void);
 /* Read this-frame mode (MODE_WALK / MODE_TELEPORT). Used by Task 5.7
  * push-block state machine to bypass during TELEPORT. */
 unsigned char roomrom_main_current_mode(void);
+/* Existing party-context boundary for the dock's single world tick. */
+void roomrom_main_dock_update_player(unsigned int slot, unsigned char player);
+unsigned char roomrom_main_whirlwind_try_extra_contact(unsigned int slot);
+void roomrom_main_whirlwind_party_state(unsigned char released);
+void roomrom_main_gleeok_party_collisions(unsigned int slot);
 
 #define ROOMROM_MAIN_MODE_WALK     0u
 #define ROOMROM_MAIN_MODE_TELEPORT 1u

@@ -38,6 +38,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.nesdata.pieces import write_piece  # noqa: E402
+
 # Canonical NES ROM SHA256.
 NES_ROM_SHA256 = "8f72dc2e98572eb4ba7c3a902bca5f69c448fc4391837e5f8f0d4556280440ac"
 
@@ -670,6 +673,7 @@ def main() -> None:
     song_script_blocks, drive_audio_addr = extract_song_scripts(prg_data, song_blocks)
     pcm_samples = extract_pcm_samples(prg_data, z07_blocks)
     music_blob, music_blob_nes_base = extract_music_blob(prg_data, song_script_blocks)
+    write_piece("music_blob", music_blob)  # T-419: linked as .nesdata MusicBlob
 
     os.makedirs(out_dir, exist_ok=True)
 

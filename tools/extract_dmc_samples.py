@@ -47,7 +47,11 @@ from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
-from scipy.signal import resample_poly
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# T-419: numpy-only copy of scipy.signal.resample_poly; identical output bytes on
+# every sample (tools/nesdata/test_resample.py), so the browser builder skips scipy.
+from tools.nesdata.resample import resample_poly  # noqa: E402
 
 # Measured empirically via bizhawk_audio_probe.lua with music active:
 # ~8751 HBlank interrupts per second reach the DMC streamer (YM ym_write

@@ -43,6 +43,14 @@ REPO_EXTRA = (
     "tools/converter/test_nes_music_runtime.py",
     "tools/converter/test_uw_music_contract.py",
     "tools/converter/test_package_closure.py",
+    "tools/converter/platform_tools.py", "tools/converter/test_platform_tools.py",
+    "tools/converter/test_web_builder.py", "tools/converter/test_studio_music.py",
+    "tools/converter/package_workspace.py", "tools/converter/test_package_workspace.py",
+    "tools/converter/package_app.py", "tools/converter/prepare_native_tools.py",
+    "tools/converter/native_smoke.py", "tools/converter/archive_app.py",
+    "tools/converter/test_native_setup.py",
+    # T-419: .github/workflows/build-builder.yml (per-OS app packages) is no longer
+    # published; releases ship the one-file builder from tools/release/make_builder.py.
     "tools/emu/gpgx.py", "tools/emu/build_gpgx.sh", "tools/emu/preset_run.py",
     "tools/emu/nes_preset_run.py", "tools/emu/scenario.py",
     "tools/lockstep/presets.py", "tools/lockstep/gate.py",
@@ -55,11 +63,51 @@ _SNAPSHOT: dict[str, bytes] | None = None
 SGDK_URL = "https://github.com/Stephane-D/SGDK"
 
 
+def one_file_builder_files() -> list[str]:
+    """T-419: the .nesdata pipeline and the one-file ROM maker (tracked files only),
+    plus the build inputs it added. The extraction sources it needs are exactly
+    make_builder.py's traced bundle, already covered by the package manifest + these."""
+    listed = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--", "tools/nesdata", "tools/release"],
+                            capture_output=True, check=True).stdout.decode("utf-8").split("\0")
+    return sorted(f for f in listed if f) + ["tools/build/debug.ld", "src/nesdata/nesdata_layout.h",
+                                             "src/game/world/ow_subpal3_table.h"]
+
+
+def compiled_inputs() -> list[str]:
+    """T-419: every tracked file the last Debug build compiled or included (its -MMD
+    depfiles and compile commands). Keeps the export complete as game code grows,
+    without the Linux-only package_closure.py trace. Game-derived files are filtered
+    by is_banned() like everything else."""
+    out_dir = ROOT / "build" / "rom_project" / "out"
+    if not any(out_dir.glob("*.d")):
+        raise SystemExit("ERROR: run Build.bat first (export reads its dependency files)")
+    tracked = set(subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"], capture_output=True,
+                                 check=True).stdout.decode("utf-8").split("\0"))
+    found = set()
+    root = ROOT.resolve()
+    for f in list(out_dir.glob("*.d")) + list(out_dir.glob("*.cmd")):
+        text = f.read_text(encoding="utf-8", errors="replace").replace("\\\n", " ")
+        for token in text.replace("\\ ", "\0").split():
+            token = token.replace("\0", " ").rstrip(":")
+            p = Path(token)
+            for cand in ((p,) if p.is_absolute() else (ROOT / "build" / "rom_project" / p, ROOT / p)):
+                try:
+                    rel = cand.resolve().relative_to(root).as_posix()
+                except (ValueError, OSError):
+                    continue
+                if rel in tracked:
+                    found.add(rel)
+                    break
+    return sorted(f for f in found if not f.startswith("sgdk/") and not is_banned(f)[0])
+
+
 def repo_files() -> dict[str, Path]:
     """target path -> source file."""
     out = {f: ROOT / f for f in make_package.package_files(require_sgdk=False)
            if not f.startswith("sgdk/")}
     out.update({f: ROOT / f for f in REPO_EXTRA})
+    out.update({f: ROOT / f for f in one_file_builder_files()})
+    out.update({f: ROOT / f for f in compiled_inputs()})
     out.update({dst: ROOT / src if (ROOT / src).is_file() else ROOT / dst
                 for dst, src in ROOT_FILES.items()})
     if not public_layout.is_public(ROOT):

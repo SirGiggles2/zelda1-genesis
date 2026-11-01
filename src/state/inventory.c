@@ -77,7 +77,7 @@ unsigned char inventory_hud_consume_dirty(void)
 /* T-172: every field below lives in $0654..$067F; when those 44 bytes are
  * unchanged since the last sync there is nothing to pull (this ran every
  * frame, ~180 instructions). */
-#define INV_SHADOW_LONGS 11u
+#define INV_SHADOW_LONGS 11u /* native_ram bulk:inventory_shadow */
 static unsigned long s_inv_shadow[INV_SHADOW_LONGS];
 static unsigned char s_inv_shadow_valid;
 
@@ -87,11 +87,11 @@ static unsigned char s_inv_shadow_valid;
  * Stance: EXTEND read-only legacy UI mirror of the native ledger. */
 unsigned short inventory_rupees_current(void)
 {
-    const unsigned char decimal = nes_ram[0x067Au];
+    const unsigned char decimal = F_ram_067A;
     return game_profile_is_remix() ?
-        (unsigned short)(nes_ram[0x067Bu] * 100u +
+        (unsigned short)(F_ram_067B * 100u +
                         (decimal >> 4) * 10u + (decimal & 15u)) :
-        (unsigned short)nes_ram[0x066Du];
+        (unsigned short)F_ram_066D;
 }
 
 void inventory_sync_from_native(void)
@@ -100,7 +100,7 @@ void inventory_sync_from_native(void)
     unsigned char items = 0u;
     {
         const unsigned long *cells =
-            (const unsigned long *)(unsigned long)&nes_ram[0x0654u];
+            (const unsigned long *)(unsigned long)&nes_ram[0x0654u]; /* native_ram bulk:src/state/inventory.c:103 */
         unsigned char i;
         unsigned char same = s_inv_shadow_valid;
         for (i = 0u; i < INV_SHADOW_LONGS; ++i) {
@@ -110,52 +110,52 @@ void inventory_sync_from_native(void)
         if (same) return;
         s_inv_shadow_valid = 1u;
     }
-#define PULL_FIELD(field, address) do { \
-    if (g_inventory.field != nes_ram[address]) changed = 1u; \
-    g_inventory.field = nes_ram[address]; \
+#define PULL_FIELD(field, cell) do { \
+    if (g_inventory.field != cell) changed = 1u; \
+    g_inventory.field = cell; \
 } while (0)
-    PULL_FIELD(bombs, 0x0658u);
-    PULL_FIELD(arrow, 0x0659u);
-    PULL_FIELD(bow, 0x065Au);
-    PULL_FIELD(candle, 0x065Bu);
-    PULL_FIELD(food, 0x065Du);
-    PULL_FIELD(potion, 0x065Eu);
-    PULL_FIELD(raft, 0x0660u);
-    PULL_FIELD(book, 0x0661u);
-    PULL_FIELD(ring, 0x0662u);
-    PULL_FIELD(ladder, 0x0663u);
-    PULL_FIELD(magic_key, 0x0664u);
-    PULL_FIELD(bracelet, 0x0665u);
-    PULL_FIELD(letter, 0x0666u);
-    PULL_FIELD(compass_q1, 0x0667u);
-    PULL_FIELD(map_q1, 0x0668u);
-    PULL_FIELD(compass_l9, 0x0669u);
-    PULL_FIELD(map_l9, 0x066Au);
-    PULL_FIELD(clock, 0x066Cu);
+    PULL_FIELD(bombs, F_ram_0658);
+    PULL_FIELD(arrow, F_ram_0659);
+    PULL_FIELD(bow, F_ram_065A);
+    PULL_FIELD(candle, F_ram_065B);
+    PULL_FIELD(food, F_NES_INV_FOOD);
+    PULL_FIELD(potion, F_NES_INV_POTION);
+    PULL_FIELD(raft, F_ram_0660);
+    PULL_FIELD(book, F_NES_INV_BOOK);
+    PULL_FIELD(ring, F_ram_0662);
+    PULL_FIELD(ladder, F_ram_0663);
+    PULL_FIELD(magic_key, F_ram_0664);
+    PULL_FIELD(bracelet, F_ram_0665);
+    PULL_FIELD(letter, F_ram_0666);
+    PULL_FIELD(compass_q1, F_ram_0667);
+    PULL_FIELD(map_q1, F_ram_0668);
+    PULL_FIELD(compass_l9, F_ram_0669);
+    PULL_FIELD(map_l9, F_ram_066A);
+    PULL_FIELD(clock, F_ram_066C);
     {
         const unsigned short value = inventory_rupees_current();
         if (g_inventory.rupees != value) changed = 1u;
         g_inventory.rupees = value;
     }
-    PULL_FIELD(keys, 0x066Eu);
-    PULL_FIELD(heart_values, 0x066Fu);
-    PULL_FIELD(heart_partial, 0x0670u);
-    PULL_FIELD(triforce, 0x0671u);
-    PULL_FIELD(boomerang_wood, 0x0674u);
-    PULL_FIELD(boomerang_magic, 0x0675u);
-    PULL_FIELD(magic_shield, 0x0676u);
-    PULL_FIELD(max_bombs, 0x067Cu);
-    PULL_FIELD(rupees_to_add, 0x067Du);
-    PULL_FIELD(rupees_to_sub, 0x067Eu);
+    PULL_FIELD(keys, F_ram_066E);
+    PULL_FIELD(heart_values, F_ram_066F);
+    PULL_FIELD(heart_partial, F_ram_0670);
+    PULL_FIELD(triforce, F_ram_0671);
+    PULL_FIELD(boomerang_wood, F_NES_INV_BOOMERANG);
+    PULL_FIELD(boomerang_magic, F_ram_0675);
+    PULL_FIELD(magic_shield, F_ram_0676);
+    PULL_FIELD(max_bombs, F_ram_067C);
+    PULL_FIELD(rupees_to_add, F_NES_RUPEES_TO_ADD);
+    PULL_FIELD(rupees_to_sub, F_ram_067E);
 #undef PULL_FIELD
-    if (nes_ram[0x065Au]) items |= ITEMS_BIT_BOW;
-    if (nes_ram[0x065Fu]) items |= ITEMS_BIT_WAND;
-    if (nes_ram[0x0674u] || nes_ram[0x0675u]) items |= ITEMS_BIT_BOOMERANG;
-    if (nes_ram[0x065Cu]) items |= ITEMS_BIT_FLUTE;
-    if (nes_ram[0x065Du]) items |= ITEMS_BIT_BAIT;
-    if (nes_ram[0x0666u]) items |= ITEMS_BIT_LETTER;
-    if (nes_ram[0x065Eu]) items |= ITEMS_BIT_POTION_T1;
-    if (nes_ram[0x065Eu] >= 2u) items |= ITEMS_BIT_POTION_T2;
+    if (F_ram_065A) items |= ITEMS_BIT_BOW;
+    if (F_NES_INV_WAND) items |= ITEMS_BIT_WAND;
+    if (F_NES_INV_BOOMERANG || F_ram_0675) items |= ITEMS_BIT_BOOMERANG;
+    if (F_NES_INV_RECORDER) items |= ITEMS_BIT_FLUTE;
+    if (F_NES_INV_FOOD) items |= ITEMS_BIT_BAIT;
+    if (F_ram_0666) items |= ITEMS_BIT_LETTER;
+    if (F_NES_INV_POTION) items |= ITEMS_BIT_POTION_T1;
+    if (F_NES_INV_POTION >= 2u) items |= ITEMS_BIT_POTION_T2;
     if (items != g_inventory.items) changed = 1u;
     g_inventory.items = items;
     if (changed) inventory_hud_mark_dirty();
@@ -182,7 +182,7 @@ void inventory_rupee_tick(unsigned char frame_counter)
      * on even frames, formats the status bar (hearts, counts) for the
      * next NMI. The Genesis HUD draws it then (T-172: t171_manhandla_sword
      * t1061, a pending record delayed the hearts to t1063). */
-    if (nes_ram[0x0014u] == 0u && !transfer_buf_dyn_busy()) {
+    if (F_ram_0014 == 0u && !transfer_buf_dyn_busy()) {
         hud_tick_native_rupees(frame_counter);
         if (!(frame_counter & 1u)) {
             if (game_profile_is_remix()) hud_format_status_bar_text();
@@ -190,23 +190,23 @@ void inventory_rupee_tick(unsigned char frame_counter)
         }
     }
     g_inventory.rupees = inventory_rupees_current();
-    g_inventory.rupees_to_add = nes_ram[0x067Du];
-    g_inventory.rupees_to_sub = nes_ram[0x067Eu];
+    g_inventory.rupees_to_add = F_NES_RUPEES_TO_ADD;
+    g_inventory.rupees_to_sub = F_ram_067E;
     if (previous != g_inventory.rupees) inventory_hud_mark_dirty();
 }
 
 void inventory_rupee_credit(unsigned char count)
 {
-    unsigned short total = (unsigned short)(nes_ram[0x067Du] + count);
-    nes_ram[0x067Du] = (total > 0xFFu) ? 0xFFu : (unsigned char)total;
-    g_inventory.rupees_to_add = nes_ram[0x067Du];
+    unsigned short total = (unsigned short)(F_NES_RUPEES_TO_ADD + count);
+    F_NES_RUPEES_TO_ADD = (total > 0xFFu) ? 0xFFu : (unsigned char)total;
+    g_inventory.rupees_to_add = F_NES_RUPEES_TO_ADD;
 }
 
 void inventory_rupee_debit(unsigned char count)
 {
-    unsigned short total = (unsigned short)(nes_ram[0x067Eu] + count);
-    nes_ram[0x067Eu] = (total > 0xFFu) ? 0xFFu : (unsigned char)total;
-    g_inventory.rupees_to_sub = nes_ram[0x067Eu];
+    unsigned short total = (unsigned short)(F_ram_067E + count);
+    F_ram_067E = (total > 0xFFu) ? 0xFFu : (unsigned char)total;
+    g_inventory.rupees_to_sub = F_ram_067E;
 }
 
 /* Plan v5b T2.7 — NES @TakeHeartContainer parity + native scale-up anim.

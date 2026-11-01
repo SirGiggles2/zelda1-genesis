@@ -12,6 +12,7 @@
 #include "../game/options/options_runtime.h"
 #include "game_profile.h"
 #include "inventory.h"
+#include "loadout.h"
 
 extern void sram_options_io_read_at(unsigned int offset, unsigned char *buf, unsigned int size);
 extern void sram_options_io_write_at(unsigned int offset, const unsigned char *buf, unsigned int size);
@@ -27,10 +28,16 @@ extern unsigned char options_persistence_load_or_default(void);
  * bytes (40 items,384 world flags,death count), 16-bit additive checksum.
  * Version2 MD files add independently checked exploration records at
  * +924/+944 in the unused tail. Original stays version1. Existing quest
- * offsets and the Original NES block never move. Markers are written last. */
+ * offsets and the Original NES block never move. Remix B/C records occupy
+ * +964/+969: marker, quest tag, B, C, xor check. Companion records at
+ * +974/+983: C7 marker, quest tag, three ordered B/C pairs, CRC-8/ATM
+ * bound to the accepted primary pair. Bytes +992..+1023 remain unused.
+ * Markers are written last; invalidate companions before primary writes. */
 #define MD_BASE(s) (0x900u + 0x400u * (s))
 #define MD_QUEST(s,q) (MD_BASE(s) + 64u + 432u * (q))
 #define MD_DISCOVERY(s,q) (MD_BASE(s) + 924u + 20u * (q))
+#define MD_LOADOUT(s,q) (MD_BASE(s) + 964u + 5u * (q))
+#define MD_PARTY_LOADOUT(s,q) (MD_BASE(s) + 974u + 9u * (q))
 static unsigned char s_discovery[16];
 /* T-172: changes whenever the discovery set may change (HUD map gate). */
 static unsigned char s_discovery_gen;
@@ -39,6 +46,78 @@ static unsigned char ext_read(unsigned short a) {
 }
 static void ext_write(unsigned short a,unsigned char v) {
     sram_options_io_write_at(a,&v,1u);
+}
+/* NES source: Z_02.asm:UpdateMode1Menu_Sub1 resets SelectedItemSlot; NES has no C slot.
+ * Drained C: save_file_a_load/save_game_save_current and per-quest extension.
+ * Coverage: PARTIAL (Remix per-file/quest selection; Original remains NES).
+ * Stance: EXTEND the existing save boundary with validated native values. */
+static unsigned char loadout_values_valid(unsigned char b,unsigned char c) {
+    unsigned char physical_b=(b==0x0Fu) ? 7u : b;
+    if (b==3u || (b>8u && b!=0x0Fu)) return 0u;
+    if (c==3u || (c>8u && c!=0x0Fu && c!=LOADOUT_SLOT_NONE)) return 0u;
+    return c==LOADOUT_SLOT_NONE || (c==0x0Fu ? 7u : c)!=physical_b;
+}
+static void loadout_store(unsigned char slot,unsigned char q) {
+    unsigned short a=MD_LOADOUT(slot,q);
+    unsigned char b=F_ram_0656_R,c=loadout_c_slot(),tag=(unsigned char)(0x30u+q);
+    if (!loadout_values_valid(b,c)) { b=0u;c=LOADOUT_SLOT_NONE; }
+    ext_write(a,0u);
+    ext_write(a+1u,tag);ext_write(a+2u,b);ext_write(a+3u,c);
+    ext_write(a+4u,(unsigned char)(0x5Au^tag^b^c));
+    ext_write(a,0xC5u);
+}
+static unsigned char loadout_restore(unsigned char slot,unsigned char q) {
+    unsigned short a=MD_LOADOUT(slot,q);
+    unsigned char tag=(unsigned char)(0x30u+q),b=0u,c=LOADOUT_SLOT_NONE,valid=0u;
+    if (ext_read(a)==0xC5u && ext_read(a+1u)==tag) {
+        unsigned char stored_b=ext_read(a+2u),stored_c=ext_read(a+3u);
+        if (ext_read(a+4u)==(unsigned char)(0x5Au^tag^stored_b^stored_c) &&
+            loadout_values_valid(stored_b,stored_c)) {
+            b=stored_b;c=stored_c;valid=1u;
+        }
+    }
+    F_ram_0656_R=b;
+    g_inventory.selected_b_item=b;
+    loadout_set_c_slot(c);
+    return valid;
+}
+/* NES source: SelectedItemSlot; drained C: loadout_store/loadout_restore.
+ * Coverage: extra-player per-file/quest selection; legacy primary retained.
+ * Stance: EXTEND with independently checked, marker-last records. */
+/* CRC-8/ATM binds ordered companion pairs to their accepted primary pair.
+ * C6 was the pre-integration XOR format; treat it as a missing record. */
+static unsigned char party_crc(unsigned char crc,unsigned char v) {
+    unsigned char bit;
+    crc^=v;
+    for(bit=0u;bit<8u;bit++)
+        crc=(unsigned char)((crc&0x80u) ? (crc<<1)^0x07u : crc<<1);
+    return crc;
+}
+static unsigned char party_crc_start(unsigned char tag) {
+    return party_crc(party_crc(party_crc(0xA6u,tag),F_ram_0656_R),loadout_c_slot());
+}
+static void party_loadout_store(unsigned char slot,unsigned char q) {
+    unsigned short a=MD_PARTY_LOADOUT(slot,q);
+    unsigned char i,tag=(unsigned char)(0x40u+q),sum=party_crc_start(tag);
+    ext_write(a,0u);ext_write(a+1u,tag);
+    for(i=1u;i<4u;i++) {
+        unsigned char b=loadout_party_b(i),c=loadout_party_c(i);
+        if(!loadout_values_valid(b,c)){b=0u;c=LOADOUT_SLOT_NONE;}
+        ext_write((unsigned short)(a+2u+(i-1u)*2u),b);
+        ext_write((unsigned short)(a+3u+(i-1u)*2u),c);
+        sum=party_crc(party_crc(sum,b),c);
+    }
+    ext_write(a+8u,sum);ext_write(a,0xC7u);
+}
+static void party_loadout_restore(unsigned char slot,unsigned char q) {
+    unsigned short a=MD_PARTY_LOADOUT(slot,q);
+    unsigned char i,tag=(unsigned char)(0x40u+q),sum=party_crc_start(tag),v[6];
+    loadout_party_reset(F_ram_0656_R,loadout_c_slot());
+    if(ext_read(a)!=0xC7u || ext_read(a+1u)!=tag)return;
+    for(i=0u;i<6u;i++){v[i]=ext_read((unsigned short)(a+2u+i));sum=party_crc(sum,v[i]);}
+    if(ext_read(a+8u)!=sum)return;
+    for(i=0u;i<3u;i++)if(!loadout_values_valid(v[2u*i],v[2u*i+1u]))return;
+    for(i=1u;i<4u;i++)(void)loadout_party_set(i,v[2u*(i-1u)],v[2u*(i-1u)+1u]);
 }
 static unsigned char header_valid(unsigned char slot) {
     unsigned char b[8], x=0u;
@@ -78,9 +157,9 @@ unsigned char save_game_gauntlet_available(unsigned char slot) {
     return (flags&3u)==3u || (flags&8u)!=0u;
 }
 static unsigned char quest_byte(unsigned char slot,unsigned short i) {
-    if (i<40u) return nes_ram[NES_FILEA_ITEMS(slot)+i];
-    if (i<424u) return nes_ram[NES_FILEA_FLAGS(slot)+i-40u];
-    return nes_ram[NES_FILEA_DEATHS(slot)];
+    if (i<40u) return F_ram_601A_X(slot, i);
+    if (i<424u) return F_ram_6092_X(slot, i-40u);
+    return F_ram_6518_X(slot);
 }
 static void quest_store(unsigned char slot,unsigned char q) {
     unsigned short a=MD_QUEST(slot,q),sum=0u;
@@ -133,7 +212,7 @@ unsigned char save_game_room_discovered(unsigned char room) {
 void save_game_discover_room(unsigned char room) {
     const GameProfile *profile=game_profile_current();
     unsigned char col,bit;
-    if (!game_profile_is_remix() || RAM(0x0010u)!=0u || room>=128u) return;
+    if (!game_profile_is_remix() || F_ram_0010_R!=0u || room>=128u) return;
     col=room&15u;bit=(unsigned char)(1u<<(room>>4));
     if (s_discovery[col]&bit) return;
     s_discovery[col]|=bit;
@@ -173,9 +252,9 @@ static void migrate_md_file(unsigned char slot) {
     unsigned char flags=ext_read(MD_BASE(slot)+4u);
     if (save_game_slot_mode(slot)!=SAVE_MODE_MD_REMIX || ext_read(MD_BASE(slot)+2u)!=1u) return;
     /* FileA is authoritative for the currently selected quest. */
-    for (unsigned char i=0u;i<40u;i++) items[i]=nes_ram[NES_FILEA_ITEMS(slot)+i];
+    for (unsigned char i=0u;i<40u;i++) items[i]=F_ram_601A_X(slot, i);
     migrate_resources(items);
-    for (unsigned char i=0u;i<40u;i++) nes_ram[NES_FILEA_ITEMS(slot)+i]=items[i];
+    for (unsigned char i=0u;i<40u;i++) F_ram_601A_X(slot, i)=items[i];
     save_file_a_commit(slot);quest_store(slot,current);
     {
         unsigned char q=(unsigned char)(current^1u);
@@ -197,21 +276,21 @@ static void quest_restore(unsigned char slot,unsigned char q) {
     unsigned short a=MD_QUEST(slot,q);
     unsigned char valid=quest_valid(slot,q);
     for (unsigned short i=0u;i<40u;i++)
-        nes_ram[NES_FILEA_ITEMS(slot)+i]=valid ? ext_read(a+1u+i) :
+        F_ram_601A_X(slot, i)=valid ? ext_read(a+1u+i) :
             i==0x18u ? 0x22u : i==0x19u ? 0xFFu :
             i==0x25u ? (save_game_slot_mode(slot) ? 10u : 8u) : 0u;
     for (unsigned short i=0u;i<384u;i++)
-        nes_ram[NES_FILEA_FLAGS(slot)+i]=valid ? ext_read(a+41u+i) : 0u;
-    nes_ram[NES_FILEA_DEATHS(slot)]=valid ? ext_read(a+425u) : 0u;
-    nes_ram[NES_FILEA_QUEST(slot)]=RAM(NES_SLOTINFO_QUEST+slot)=q;
-    RAM(NES_SLOTINFO_DEATHS+slot)=nes_ram[NES_FILEA_DEATHS(slot)];
+        F_ram_6092_X(slot, i)=valid ? ext_read(a+41u+i) : 0u;
+    F_ram_6518_X(slot)=valid ? ext_read(a+425u) : 0u;
+    F_ram_651B_X(slot)=F_ram_062D_R5(slot)=q;
+    F_ram_0630_R3(slot)=F_ram_6518_X(slot);
     /* Z_02.asm @LoopHeart (as save_serializer.c boot): slot info shows
      * full hearts, (containers & $F0) | containers >> 4. */
     {
-        const unsigned char hi=(unsigned char)(nes_ram[NES_FILEA_ITEMS(slot)+0x18u]&0xF0u);
-        RAM(NES_SLOTINFO_HEARTS+2u*slot)=(unsigned char)(hi|(hi>>4));
+        const unsigned char hi=(unsigned char)(F_ram_6032_X(slot)&0xF0u);
+        F_NES_SLOTINFO_HEARTS_0650_R(2u*slot)=(unsigned char)(hi|(hi>>4));
     }
-    RAM(NES_SLOTINFO_HEARTS+2u*slot+1u)=nes_ram[NES_FILEA_ITEMS(slot)+0x19u];
+    F_NES_SLOTINFO_HEARTS_0651_R(2u*slot)=F_ram_6033_X(slot);
     save_file_a_commit(slot);
 }
 unsigned char save_game_slot_mode(unsigned char slot) {
@@ -251,7 +330,7 @@ unsigned char save_game_select_quest(unsigned char slot,unsigned char q) {
     if (!save_game_quest_available(slot,q)) return 0u;
     quest_store(slot,save_game_slot_quest(slot));
     quest_restore(slot,q);
-    sram_nes_save_block_store(&nes_ram[NES_SAVE_BLOCK_BASE],NES_SAVE_BLOCK_BYTES);
+    sram_nes_save_block_store(&nes_ram[NES_SAVE_BLOCK_BASE],NES_SAVE_BLOCK_BYTES); /* native_ram bulk:src/state/save_game.c:254 */
     return 1u;
 }
 unsigned char save_game_quest_stat(unsigned char slot,unsigned char q,unsigned char stat) {
@@ -273,12 +352,12 @@ extern void sram_nes_save_block_store(const volatile unsigned char *src, unsigne
 
 static void persist(void)
 {
-    sram_nes_save_block_store(&nes_ram[NES_SAVE_BLOCK_BASE], NES_SAVE_BLOCK_BYTES);
+    sram_nes_save_block_store(&nes_ram[NES_SAVE_BLOCK_BASE], NES_SAVE_BLOCK_BYTES); /* native_ram bulk:src/state/save_game.c:276 */
 }
 
 void save_game_boot(void)
 {
-    sram_nes_save_block_load(&nes_ram[NES_SAVE_BLOCK_BASE], NES_SAVE_BLOCK_BYTES);
+    sram_nes_save_block_load(&nes_ram[NES_SAVE_BLOCK_BASE], NES_SAVE_BLOCK_BYTES); /* native_ram bulk:src/state/save_game.c:281 */
     save_files_boot_validate();
     (void)options_persistence_load_or_default();
     for (unsigned char s=0u;s<3u;s++) {
@@ -295,7 +374,7 @@ void save_game_boot(void)
     }
     /* Z_07.asm InitializeGameOrMode: "Mark Save RAM initialized" ($6001 =
      * $5A; its $7FFF = $A5 partner lies outside the persisted block). */
-    nes_ram[0x6001u] = 0x5Au;
+    F_ram_6001 = 0x5Au;
     /* The NES formats in battery RAM directly; keep the cart equal to
      * what was validated so a formatted blank slot stays formatted. */
     persist();
@@ -304,13 +383,13 @@ void save_game_boot(void)
 unsigned char save_game_slot_active(unsigned char slot)
 {
     if (slot >= SAVE_SLOT_COUNT) return 0u;
-    return RAM(NES_SLOTINFO_ACTIVE + slot) ? 1u : 0u;
+    return F_NES_SLOTINFO_ACTIVE_0633_R(slot) ? 1u : 0u;
 }
 
 unsigned char save_game_slot_quest(unsigned char slot)
 {
     if (slot >= SAVE_SLOT_COUNT) return 0u;
-    return RAM(NES_SLOTINFO_QUEST + slot);
+    return F_ram_062D_R6(slot);
 }
 
 unsigned char save_game_load_slot(unsigned char slot)
@@ -318,13 +397,27 @@ unsigned char save_game_load_slot(unsigned char slot)
     if (!save_game_slot_active(slot)) return 0u;
     save_game_options_load(slot);
     save_file_a_load(slot);
+    if (save_game_slot_mode(slot)==SAVE_MODE_MD_REMIX) {
+        if(loadout_restore(slot,save_game_slot_quest(slot) ? 1u : 0u))
+            party_loadout_restore(slot,save_game_slot_quest(slot) ? 1u : 0u);
+        else loadout_party_reset(0u,LOADOUT_SLOT_NONE);
+    } else {
+        loadout_set_c_slot(LOADOUT_SLOT_NONE);
+        loadout_party_reset(F_ram_0656_R,LOADOUT_SLOT_NONE);
+    }
     return 1u;
 }
 
 unsigned char save_game_save_current(void)
 {
-    if (!save_file_a_save(RAM(NES_CUR_SAVE_SLOT))) return 0u;
-    quest_store(RAM(NES_CUR_SAVE_SLOT),save_game_slot_quest(RAM(NES_CUR_SAVE_SLOT)));
+    if (!save_file_a_save(F_ram_0016_R3)) return 0u;
+    quest_store(F_ram_0016_R3,save_game_slot_quest(F_ram_0016_R3));
+    if (save_game_slot_mode(F_ram_0016_R3)==SAVE_MODE_MD_REMIX) {
+        /* A cut during primary publication must not resurrect older companions. */
+        ext_write(MD_PARTY_LOADOUT(F_ram_0016_R3,save_game_slot_quest(F_ram_0016_R3) ? 1u : 0u),0u);
+        loadout_store(F_ram_0016_R3,save_game_slot_quest(F_ram_0016_R3) ? 1u : 0u);
+        party_loadout_store(F_ram_0016_R3,save_game_slot_quest(F_ram_0016_R3) ? 1u : 0u);
+    }
     persist();
     return 1u;
 }
@@ -337,7 +430,7 @@ unsigned char save_game_register_mode(unsigned char slot, const unsigned char *n
 
     if (slot >= SAVE_SLOT_COUNT || mode>1u || save_game_slot_active(slot)) return 0u;
     for (i = 0u; i < SAVE_NAME_BYTES; ++i) {
-        RAM(NES_SLOTINFO_NAMES + 8u * slot + i) = name[i];
+        F_NES_SLOTINFO_NAMES_R2(8u * slot, i) = name[i];
         if (name[i] != 0x24u) blank = 0u;
     }
     if (blank) return 0u;
@@ -346,22 +439,22 @@ unsigned char save_game_register_mode(unsigned char slot, const unsigned char *n
     /* File B init in UpdateModeERegister, then CopyFileBToFileA. */
     save_file_a_format(slot);
     for (i = 0u; i < SAVE_NAME_BYTES; ++i)
-        nes_ram[NES_FILEA_NAME(slot) + i] = name[i];
-    nes_ram[NES_FILEA_ITEMS(slot) + 0x18u] = 0x22u;   /* HeartValues */
-    nes_ram[NES_FILEA_ITEMS(slot) + 0x19u] = 0xFFu;   /* HeartPartial */
+        F_NES_FILEA_NAME_6002_X(slot, i) = name[i];
+    F_ram_6032_X2(slot) = 0x22u;   /* HeartValues */
+    F_ram_6033_X2(slot) = 0xFFu;   /* HeartPartial */
     /* NES source: Redux bombs.asm bank2:$9F4B/$AF83.
      * Drained C: save_game_register_mode / quest_restore native records.
      * Coverage: PARTIAL(new records; historical migration remains).
      * Stance: EXTEND per-file default without altering Original bytes. */
-    nes_ram[NES_FILEA_ITEMS(slot) + 0x25u] = mode ? 10u : 8u;
-    nes_ram[NES_FILEA_ACTIVE(slot)] = 1u;
-    nes_ram[NES_FILEA_QUEST(slot)] = zelda;
+    F_ram_603F_X(slot) = mode ? 10u : 8u;
+    F_ram_6512_X(slot) = 1u;
+    F_ram_651B_X(slot) = zelda;
     save_file_a_commit(slot);
-    RAM(NES_SLOTINFO_ACTIVE + slot) = 1u;
-    RAM(NES_SLOTINFO_QUEST + slot) = zelda;
-    RAM(NES_SLOTINFO_DEATHS + slot) = 0u;
-    RAM(NES_SLOTINFO_HEARTS + 2u * slot) = 0x22u;
-    RAM(NES_SLOTINFO_HEARTS + 2u * slot + 1u) = 0xFFu;
+    F_NES_SLOTINFO_ACTIVE_0633_R(slot) = 1u;
+    F_ram_062D_R6(slot) = zelda;
+    F_ram_0630_R4(slot) = 0u;
+    F_NES_SLOTINFO_HEARTS_0650_R2(2u * slot) = 0x22u;
+    F_NES_SLOTINFO_HEARTS_0651_R2(2u * slot) = 0xFFu;
     for (unsigned short n=0u;n<1024u;n++) ext_write(MD_BASE(slot)+n,0u);
     options_runtime_init(); save_game_options_store(slot);
     quest_store(slot,zelda);
@@ -380,8 +473,8 @@ unsigned char save_game_rename(unsigned char slot, const unsigned char *name)
         if (name[i] != 0x24u) blank = 0u;
     if (blank) return 0u;
     for (i = 0u; i < SAVE_NAME_BYTES; ++i) {
-        nes_ram[NES_FILEA_NAME(slot) + i] = name[i];
-        RAM(NES_SLOTINFO_NAMES + 8u * slot + i) = name[i];
+        F_NES_FILEA_NAME_6002_X(slot, i) = name[i];
+        F_NES_SLOTINFO_NAMES_R2(8u * slot, i) = name[i];
     }
     save_file_a_commit(slot);
     name_unlocks_store(slot);
@@ -392,7 +485,7 @@ unsigned char save_game_register(unsigned char slot,const unsigned char *name) {
     return save_game_register_mode(slot,name,SAVE_MODE_ORIGINAL);
 }
 void save_game_complete_quest(void) {
-    unsigned char s=RAM(NES_CUR_SAVE_SLOT),q;
+    unsigned char s=F_ram_0016_R3,q;
     if (!save_game_slot_active(s)) return;
     q=save_game_slot_quest(s);
     (void)save_game_save_current();
@@ -407,9 +500,9 @@ void save_game_erase(unsigned char slot)
     save_file_a_format(slot);
     for (unsigned short n=0u;n<1024u;n++) ext_write(MD_BASE(slot)+n,0u);
     for (i = 0u; i < SAVE_NAME_BYTES; ++i)
-        RAM(NES_SLOTINFO_NAMES + 8u * slot + i) = 0x24u;
-    RAM(NES_SLOTINFO_HEARTS + 2u * slot) = 0u;
-    RAM(NES_SLOTINFO_HEARTS + 2u * slot + 1u) = 0u;
+        F_NES_SLOTINFO_NAMES_R2(8u * slot, i) = 0x24u;
+    F_NES_SLOTINFO_HEARTS_0650_R2(2u * slot) = 0u;
+    F_NES_SLOTINFO_HEARTS_0651_R2(2u * slot) = 0u;
     persist();
 }
 
@@ -420,23 +513,23 @@ unsigned char save_game_copy(unsigned char src, unsigned char dst)
     if (!save_game_slot_active(src)) return 0u;
     for (i=0u;i<1024u;i++) ext_write(MD_BASE(dst)+i,ext_read(MD_BASE(src)+i));
     for (i = 0u; i < SAVE_NAME_BYTES; ++i)
-        nes_ram[NES_FILEA_NAME(dst) + i] = nes_ram[NES_FILEA_NAME(src) + i];
+        F_NES_FILEA_NAME_6002_X(dst, i) = F_NES_FILEA_NAME_6002_X(src, i);
     for (i = 0u; i < SAVE_ITEMS_BYTES; ++i)
-        nes_ram[NES_FILEA_ITEMS(dst) + i] = nes_ram[NES_FILEA_ITEMS(src) + i];
+        F_ram_601A_X2(dst, i) = F_ram_601A_X2(src, i);
     for (i = 0u; i < SAVE_WORLD_FLAGS_BYTES; ++i)
-        nes_ram[NES_FILEA_FLAGS(dst) + i] = nes_ram[NES_FILEA_FLAGS(src) + i];
-    nes_ram[NES_FILEA_ACTIVE(dst)]  = nes_ram[NES_FILEA_ACTIVE(src)];
-    nes_ram[NES_FILEA_UNKNOWN(dst)] = nes_ram[NES_FILEA_UNKNOWN(src)];
-    nes_ram[NES_FILEA_DEATHS(dst)]  = nes_ram[NES_FILEA_DEATHS(src)];
-    nes_ram[NES_FILEA_QUEST(dst)]   = nes_ram[NES_FILEA_QUEST(src)];
+        F_ram_6092_X2(dst, i) = F_ram_6092_X2(src, i);
+    F_ram_6512_X(dst)  = F_ram_6512_X(src);
+    F_ram_6515_X(dst) = F_ram_6515_X(src);
+    F_ram_6518_X(dst)  = F_ram_6518_X(src);
+    F_ram_651B_X(dst)   = F_ram_651B_X(src);
     save_file_a_commit(dst);
     for (i = 0u; i < SAVE_NAME_BYTES; ++i)
-        RAM(NES_SLOTINFO_NAMES + 8u * dst + i) = RAM(NES_SLOTINFO_NAMES + 8u * src + i);
-    RAM(NES_SLOTINFO_ACTIVE + dst) = RAM(NES_SLOTINFO_ACTIVE + src);
-    RAM(NES_SLOTINFO_QUEST + dst)  = RAM(NES_SLOTINFO_QUEST + src);
-    RAM(NES_SLOTINFO_DEATHS + dst) = RAM(NES_SLOTINFO_DEATHS + src);
-    RAM(NES_SLOTINFO_HEARTS + 2u * dst)      = RAM(NES_SLOTINFO_HEARTS + 2u * src);
-    RAM(NES_SLOTINFO_HEARTS + 2u * dst + 1u) = RAM(NES_SLOTINFO_HEARTS + 2u * src + 1u);
+        F_NES_SLOTINFO_NAMES_R2(8u * dst, i) = F_NES_SLOTINFO_NAMES_R2(8u * src, i);
+    F_NES_SLOTINFO_ACTIVE_0633_R(dst) = F_NES_SLOTINFO_ACTIVE_0633_R(src);
+    F_ram_062D_R6(dst)  = F_ram_062D_R6(src);
+    F_ram_0630_R4(dst) = F_ram_0630_R4(src);
+    F_NES_SLOTINFO_HEARTS_0650_R2(2u * dst)      = F_NES_SLOTINFO_HEARTS_0650_R2(2u * src);
+    F_NES_SLOTINFO_HEARTS_0651_R2(2u * dst) = F_NES_SLOTINFO_HEARTS_0651_R2(2u * src);
     persist();
     return 1u;
 }
@@ -444,22 +537,22 @@ unsigned char save_game_copy(unsigned char src, unsigned char dst)
 const volatile unsigned char *save_game_slot_name(unsigned char slot)
 {
     if (slot >= SAVE_SLOT_COUNT) slot = 0u;
-    return &nes_ram[NES_SLOTINFO_NAMES + 8u * slot];
+    return &F_NES_SLOTINFO_NAMES_X(8u * slot); /* native_ram bulk:dyn_addr */
 }
 
 unsigned char save_game_slot_hearts(unsigned char slot)
 {
-    return (slot < SAVE_SLOT_COUNT) ? RAM(NES_SLOTINFO_HEARTS + 2u * slot) : 0u;
+    return (slot < SAVE_SLOT_COUNT) ? F_NES_SLOTINFO_HEARTS_0650_R2(2u * slot) : 0u;
 }
 
 unsigned char save_game_slot_heart_partial(unsigned char slot)
 {
-    return (slot < SAVE_SLOT_COUNT) ? RAM(NES_SLOTINFO_HEARTS + 2u * slot + 1u) : 0u;
+    return (slot < SAVE_SLOT_COUNT) ? F_NES_SLOTINFO_HEARTS_0651_R2(2u * slot) : 0u;
 }
 
 unsigned char save_game_slot_deaths(unsigned char slot)
 {
-    return (slot < SAVE_SLOT_COUNT) ? RAM(NES_SLOTINFO_DEATHS + slot) : 0u;
+    return (slot < SAVE_SLOT_COUNT) ? F_ram_0630_R4(slot) : 0u;
 }
 
 /* File Select occupancy (overrides the weak default in fs_render.c). */

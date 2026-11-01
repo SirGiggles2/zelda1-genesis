@@ -28,7 +28,7 @@
 
 #define RNG_RANDOM_BASE   0x0018
 #define RNG_RANDOM_LEN    13
-#define PROBE_RNG_SEED    ((volatile unsigned char *)&RAM(RNG_RANDOM_BASE))
+#define PROBE_RNG_SEED    ((volatile unsigned char *)&RAM(RNG_RANDOM_BASE)) /* native_ram bulk:dyn_addr */
 
 /* Distribute the 16-bit seed across Random[0..12]. Any nonzero pattern
  * works — NES BootROM writes the seed via @ScrambleRandom warmup. */

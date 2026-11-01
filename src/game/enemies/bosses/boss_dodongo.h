@@ -22,5 +22,8 @@
  */
 
 void boss_dodongo_update(unsigned int slot);
+void boss_dodongo_check_party_body(unsigned int slot, unsigned char player);
+void boss_dodongo_check_party_collisions(unsigned int slot, unsigned char player,
+                                        unsigned char context);
 
 #endif /* GAME_ENEMIES_BOSSES_BOSS_DODONGO_H */

@@ -28,20 +28,20 @@
 static void find_and_create_push_block_object(unsigned char room_id)
 {
     unsigned char col;
-    OBJ(0x00ACu, 11u) = 0u;      /* ObjState+11 */
-    OBJ(0x0098u, 11u) = 0u;      /* ObjDir+11 */
+    F_ram_00AC_O(11u) = 0u;      /* ObjState+11 */
+    F_ram_0098_O(11u) = 0u;      /* ObjDir+11 */
     if (((unsigned char)DUNGEON_LBA_D(room_id) & 0x3Fu) == 0x21u) {
-        OBJ(0x0070u, 11u) = 0x40u;
-        OBJ(0x0084u, 11u) = 0x80u;
+        F_ram_0070_O(11u) = 0x40u;
+        F_ram_0084_O(11u) = 0x80u;
     } else {
         for (col = 4u; col < 0x1Au; col = (unsigned char)(col + 2u)) {
-            if ((unsigned char)RAM(NES_PLAY_AREA_BASE + (unsigned short)col * NES_TILE_COL_STRIDE + 10u) == 0xB0u)
+            if ((unsigned char)F_NES_PLAY_AREA_BASE_653A_R((unsigned short)col * NES_TILE_COL_STRIDE) == 0xB0u)
                 break;
         }
-        OBJ(0x0070u, 11u) = (unsigned char)(col * 8u);
-        OBJ(0x0084u, 11u) = 0x90u;
+        F_ram_0070_O(11u) = (unsigned char)(col * 8u);
+        F_ram_0084_O(11u) = 0x90u;
     }
-    OBJ(0x034Fu, 11u) = 0x68u;   /* Block object type */
+    F_ram_034F_O(11u) = 0x68u;   /* Block object type */
 }
 
 /* NES source: Z_05.asm:CreateRoomObjects @Deactivate through @StoreLocation.

@@ -29,5 +29,7 @@ void uw_map_build(unsigned char level, unsigned char out[8][16]);
 /* Current installed LevelInfo fields; level 1..9, otherwise zero. */
 unsigned char uw_map_rotation(unsigned char level);       /* low nibble */
 unsigned char uw_map_triforce_room(unsigned char level);  /* $6BAE */
+/* World-flag bit $20 (visited) of room in the installed level (T-257). */
+unsigned char uw_map_room_visited(unsigned char room);
 
 #endif /* UW_MAP_BUILDER_H */

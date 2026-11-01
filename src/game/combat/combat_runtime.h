@@ -28,8 +28,19 @@
  */
 
 #include "../../src/game/world/render/sprite_render.h"
+#include "../../state/player_records.h"
 
 void roomrom_combat_init(void);
+/* Transitional Link-context adapter; native sword owner is explicit. */
+void roomrom_combat_try_player_swing(unsigned char player);
+void roomrom_combat_update_player_sword(unsigned char player);
+/* Explicit stationary extra actor: AnimateLinkBase then sword lifecycle/draw.
+ * Caller admits neutral movement, supplies the exact NES facing bit, and advances
+ * the beam afterwards. First input-edge handling remains in the ordinary path. */
+void roomrom_combat_continue_stationary_player(unsigned char player,
+    PlayerState *actor, unsigned char nes_dir);
+/* Collision-only publication: never advances a sword or player. */
+void roomrom_combat_publish_player_sword(unsigned char player);
 void roomrom_combat_try_swing(link_face_t face, short link_x, short link_y);
 void roomrom_combat_update(short link_x, short link_y, link_face_t face);
 unsigned char roomrom_combat_link_locked(void);
@@ -68,5 +79,6 @@ void roomrom_combat_end_move_and_animate(void);
 /* AnimateLinkBase alone (Link_EndMoveAndDraw callers: halted Link). */
 void roomrom_combat_animate_link_base(void);
 void roomrom_combat_update_rod(void);
+void roomrom_combat_update_rod_for_player(unsigned char player);
 
 #endif

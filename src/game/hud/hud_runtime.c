@@ -26,6 +26,13 @@ _Static_assert(REDUX_DISCOVERY_TILE_BASE >= ROOMROM_COMPASS_TILE_BASE + ROOMROM_
 _Static_assert(REDUX_LIFE_DASH_TILE >= REDUX_DISCOVERY_TILE_BASE + 32u &&
                REDUX_LIFE_DASH_TILE + 1u <= ROOMROM_LINK_LIFT_TILE_BASE,
                "Redux LIFE glyph must fit after discovery map and before lift");
+/* Remix green HUD rupee (user 2026-10-29): the $F7 icon remapped onto the
+ * PAL3 green-rupee entries 13..15 (world/render/green_rupee.h). Original
+ * keeps the NES sub-pal 1 atlas tile. */
+#define REMIX_GREEN_RUPEE_HUD_TILE 1353u
+_Static_assert(REMIX_GREEN_RUPEE_HUD_TILE >= REDUX_LIFE_DASH_TILE + 1u &&
+               REMIX_GREEN_RUPEE_HUD_TILE + 1u <= ROOMROM_LINK_LIFT_TILE_BASE,
+               "Remix HUD rupee must fit after LIFE glyph and before lift");
 extern const unsigned char core_redux_automap_chr[1024];
 static unsigned char s_discovery_quadrants[32];
 /* T-172: discovery generation the OW map quadrants were last built from. */
@@ -214,6 +221,8 @@ static unsigned short hud_word(unsigned char raw_tile, unsigned char pal)
 {
     if (raw_tile == 0x2Fu && pal == 1u && game_profile_is_remix())
         return (unsigned short)(0x8000u | REDUX_LIFE_DASH_TILE);
+    if (raw_tile == 0xF7u && game_profile_is_remix())
+        return (unsigned short)(0x8000u | 0x6000u | REMIX_GREEN_RUPEE_HUD_TILE);
     /* Phase J (2026-05-18): sparse atlas LUT lookup. HUD tiles are
      * force-included in gen_bg_sparse.py per §36.1 MF2 (HUD rows not
      * covered by room nametable audit). Sentinel 0xFFFF (combo not
@@ -261,6 +270,17 @@ static void hud_window_word(unsigned short col, unsigned short row, unsigned sho
     }
     HUD_DIRTY();
     render_set_window_word(col, row, word);
+}
+
+/* T-261: boss name + combined bar in HUD row 6, which the status bar
+ * leaves blank in every layout (live window dump, Remix boss rooms).
+ * Used only when an encounter's sprites do not fit the 64-entry SAT.
+ * The pause layout shows six rows from the bottom; row 6 is off screen
+ * there, so it is left alone. */
+void roomrom_hud_boss_strip_word(unsigned char col, unsigned short word)
+{
+    if (s_hud_bottom || col >= ROOMROM_ROOM_COLS) return;
+    hud_window_word(col, (unsigned short)(HUD_WIN_ROW_BASE + 6u), word);
 }
 
 static void draw_hud_tile(unsigned char col, unsigned char row,
@@ -371,8 +391,14 @@ static void clear_hud_b(void)
 static unsigned char s_hud_built = 0u;
 static unsigned char s_hud_level_cached = 0xFFu;   /* CurLevel $10 at build */
 
+/* T-261: bumped when window contents are wiped or moved, so the boss strip
+ * knows to redraw (the per-word epoch changes on every HUD update). */
+unsigned char g_hud_clear_gen;
+unsigned char roomrom_hud_clear_gen(void) { return g_hud_clear_gen; }
+
 static void clear_hud_window(void)
 {
+    ++g_hud_clear_gen;
     s_hud_force = 1u; HUD_DIRTY();
     s_hud_built = 0u;
     render_clear_window_rect(0, (unsigned short)HUD_WIN_ROW_BASE,
@@ -513,8 +539,8 @@ static void draw_hearts_row(unsigned char col, unsigned char row,
                             unsigned char hud_id)
 {
     unsigned char i;
-    const unsigned char hearts = RAM(0x066Fu);
-    const unsigned char partial = RAM(0x0670u);
+    const unsigned char hearts = F_ram_066F_R;
+    const unsigned char partial = F_ram_0670_R;
     /* NES source: Z_01 FormatHeartsInTextBuf; drain: hud_heart_tile.
      * Coverage: FULL Original row inputs; Stance: EXTEND draw cache.
      * T-172 busy ladder profile: 338 instructions for an unchanged row.
@@ -576,8 +602,8 @@ static void draw_hearts_row(unsigned char col, unsigned char row,
  * Stance: EXTEND existing Window renderer and incremental cache owner. */
 static void draw_status_counts_redux(void)
 {
-    const unsigned char decimal = RAM(0x067Au);
-    const unsigned char hundreds = RAM(0x067Bu);
+    const unsigned char decimal = F_ram_067A_R;
+    const unsigned char hundreds = F_ram_067B_R;
     const unsigned short rupees = (unsigned short)(hundreds * 100u +
         (decimal >> 4) * 10u + (decimal & 15u));
     /* The source keeps a tens zero below ten (x09), except zero is x0_. */
@@ -587,16 +613,16 @@ static void draw_status_counts_redux(void)
         draw_hud_tile(13u, 2u, (unsigned char)(decimal >> 4), 0u);
         draw_hud_tile(14u, 2u, rupees ? (decimal & 15u) : HUD_TILE_SPACE, 0u);
     }
-    if (RAM(0x0664u)) {
+    if (F_ram_0664_R) {
         if (s_hud_force || s_count_drawn[1] != 0x0FFFu) {
             s_count_drawn[1] = 0x0FFFu;
             draw_hud_tile(12u, 3u, 0x62u, 0u);
             draw_hud_tile(13u, 3u, 0x64u, 0u);
             draw_hud_tile(14u, 3u, HUD_TILE_SPACE, 0u);
         }
-    } else draw_count_cell(RAM(0x066Eu), 12u, 3u, 0u);
-    draw_count_cell(RAM(0x0677u), 12u, 4u, 0u);
-    draw_count_cell(RAM(0x0658u), 12u, 5u, 0u);
+    } else draw_count_cell(F_ram_066E_R2, 12u, 3u, 0u);
+    draw_count_cell(F_ram_0677_R, 12u, 4u, 0u);
+    draw_count_cell(F_ram_0658_R2, 12u, 5u, 0u);
 }
 
 /* Original HUD count strip mirrors NES rows 3/5/6 = HUD rows 2/4/5. The
@@ -615,8 +641,8 @@ static void draw_status_counts_original(void)
         }
         return;
     }
-    draw_count_cell(RAM(0x066Du),                12u, 2u, 0u);
-    if (RAM(0x0664u)) {
+    draw_count_cell(F_ram_066D_R2,                12u, 2u, 0u);
+    if (F_ram_0664_R) {
         /* Magic key "XA": cache it as an out-of-range count value. */
         if (s_hud_force || s_count_drawn[2] != 0x0FFFu) {
             s_count_drawn[2] = 0x0FFFu;
@@ -625,9 +651,9 @@ static void draw_status_counts_original(void)
             draw_hud_tile(14u, 4u, HUD_TILE_SPACE, 0u);
         }
     } else {
-        draw_count_cell((unsigned short)RAM(0x066Eu), 12u, 4u, 0u);
+        draw_count_cell((unsigned short)F_ram_066E_R2, 12u, 4u, 0u);
     }
-    draw_count_cell((unsigned short)RAM(0x0658u), 12u, 5u, 0u);
+    draw_count_cell((unsigned short)F_ram_0658_R2, 12u, 5u, 0u);
 }
 
 /* NES source: Z_05.asm:InitMode3_Sub6/Sub7; Z_06 LevelNumberTransferBuf.
@@ -653,16 +679,16 @@ static void draw_original_dungeon_map(void)
         if (owned) s_dungeon_map_owned = 0xFEu;      /* redraw now */
     }
     if (owned == s_dungeon_map_owned) return;
-    if (owned && s_dungeon_map_owned == 0u && RAM(0x0012u) == 0x05u)
+    if (owned && s_dungeon_map_owned == 0u && F_ram_0012_R == 0x05u)
         return;                                       /* wait for $44 */
     s_dungeon_map_owned = owned;
     for (row = 2u; row < 6u; ++row)
         for (col = 2u; col < 10u; ++col)
             draw_hud_tile(col, row, HUD_TILE_SPACE, 0u);
-    if (owned) apply_transfer_macro(&nes_ram[0x6BCDu], 0);
+    if (owned) apply_transfer_macro(&nes_ram[0x6BCDu], 0); /* native_ram bulk:src/game/hud/hud_runtime.c:662 */
     for (col = 0u; col < 6u; ++col)
         draw_hud_tile((unsigned char)(2u + col), 1u, label[col], 0u);
-    draw_hud_tile(8u, 1u, RAM(0x6BB1u), 0u);
+    draw_hud_tile(8u, 1u, F_ram_6BB1_R3, 0u);
 }
 
 /* NES Z_01.asm:UpdatePositionMarker places tile $3E at four-pixel OW and
@@ -675,12 +701,12 @@ static short original_marker_x(unsigned char room, unsigned char is_uw)
         /* T-360: the map now starts at column 2, not column 22. $6BAC is the
          * Redux dot offset for the old right-side map (0xA0 OW, per-level UW);
          * shift the same 160 px as the map. Rooms outside the new box hide. */
-        short v = (short)(x + RAM(0x6BACu) +
+        short v = (short)(x + F_NES_SRAM_BASE_6BAC_R +
                    ((room & 0x0Fu) << (is_uw ? 3u : 2u)));
         v = (short)(v - 0xA0);
         return (v < 0) ? (short)-32 : v;
     }
-    x = (short)(x + (short)(signed char)RAM(0x6BACu));
+    x = (short)(x + (short)(signed char)F_NES_SRAM_BASE_6BAC_R);
     x = (short)(x + (short)((room & 0x0Fu) << (is_uw ? 3u : 2u)));
     return x;
 }
@@ -701,12 +727,12 @@ void roomrom_hud_refresh_marker(unsigned char room_id,
     /* UpdatePlayerPositionMarker returns while WhirlwindTeleportingState
      * != 0 (Z_01.asm:4087); the sprites hidden by the room change stay
      * hidden until the drop-off (T-171 t171_flute_whirlwind t346). */
-    if (RAM(0x0522u) != 0u && RAM(0x0012u) != 0x05u) {
+    if (F_ram_0522_R != 0u && F_ram_0012_R != 0x05u) {
         roomrom_sprites_hide_hud_marker(0u);
         roomrom_sprites_hide_hud_marker(1u);
         return;
     }
-    if (RAM(0x0522u) != 0u) return;
+    if (F_ram_0522_R != 0u) return;
     if (s_hud_id_cached == ROOMROM_MAP_REDUX) {
         /* Redux OW marker blinks 16 frames on / 16 off (NES OAM entry 21 over
          * 400 frames, t269 spawn_q1: visible while FrameCounter bit 4 of the draw
@@ -719,7 +745,7 @@ void roomrom_hud_refresh_marker(unsigned char room_id,
     }
     /* Z_01 UpdatePlayerPositionMarker returns in mode9. Cellar layout
      * hides the old marker; its internal room ID is not a dungeon cell. */
-    if (RAM(0x0012u) == 0x09u)
+    if (F_ram_0012_R == 0x09u)
         roomrom_sprites_hide_hud_marker(0u);
     else
         roomrom_sprites_set_hud_marker(0u,
@@ -727,13 +753,13 @@ void roomrom_hud_refresh_marker(unsigned char room_id,
             original_marker_y(room_id), 0u);
 
     if (is_underworld && room_has_compass()) {
-        unsigned char level = (unsigned char)RAM(0x0010u);
-        unsigned char target = (unsigned char)RAM(0x6BAEu);
+        unsigned char level = (unsigned char)F_ram_0010_R;
+        unsigned char target = (unsigned char)F_ram_6BAE_R2;
         unsigned char inactive = 1u;
         /* NES attr $03 normally; an uncollected L1-L8 piece, or the L9
          * target (which has no piece bit), flashes to attr $02. */
         if (((level >= 1u && level <= 8u &&
-              (((unsigned char)RAM(0x0671u) & (1u << (level - 1u))) == 0u)) ||
+              (((unsigned char)F_ram_0671_R2 & (1u << (level - 1u))) == 0u)) ||
              level == 9u) &&
             (frame_counter & 0x1Fu) < 0x10u) inactive = 0u;
         roomrom_sprites_set_hud_marker(1u,
@@ -778,7 +804,7 @@ static unsigned char native_hud_changed(void)
 {
     unsigned char i;
     for (i = 0u; i < NATIVE_HUD_CELLS; ++i)
-        if (s_native_hud_snapshot[i] != RAM(s_native_hud_cells[i])) return 1u;
+        if (s_native_hud_snapshot[i] != RAM(s_native_hud_cells[i])) return 1u; /* native_ram bulk:dyn_addr */
     return 0u;
 }
 
@@ -793,7 +819,7 @@ static void draw_redux_dungeon_map(void)
     unsigned char owned = room_has_map() ? 1u : 0u;
     unsigned char ty, tx;
     static const unsigned char label[8] = {0x0Du,0x1Eu,0x17u,0x10u,0x0Eu,0x18u,0x17u,0x2Fu};
-    unsigned short flags = (unsigned short)(RAM(0x6BAFu) | ((unsigned short)RAM(0x6BB0u) << 8));
+    unsigned short flags = (unsigned short)(F_ram_6BAF_R | ((unsigned short)F_ram_6BB0_R << 8));
     const unsigned char cue = s_map_cue;
     s_ow_map_valid = 0u;   /* shares s_discovery_quadrants */
     if (s_map_cue) s_map_cue = 0u;
@@ -804,8 +830,8 @@ static void draw_redux_dungeon_map(void)
                 s_discovery_quadrants[ty * 8u + tx] = 0xFFu;
             }
         for (tx = 0u; tx < 8u; ++tx) draw_hud_tile((unsigned char)(2u + tx),1u,label[tx],0u);
-        draw_hud_tile(10u,1u,RAM(0x6BB1u),0u);
-        if (owned) apply_transfer_macro(&nes_ram[0x6BCDu], -20);
+        draw_hud_tile(10u,1u,F_ram_6BB1_R3,0u);
+        if (owned) apply_transfer_macro(&nes_ram[0x6BCDu], -20); /* native_ram bulk:src/game/hud/hud_runtime.c:808 */
         s_dungeon_map_owned = owned;
         s_redux_map_valid = 0u;
     }
@@ -826,12 +852,12 @@ static void draw_redux_dungeon_map(void)
          * instead of per cell. Same inputs, tiles and writes as before
          * (heart-change HUD refresh in a Remix dungeon: ~90k master clocks). */
         unsigned char col_x[8], col_mask[8];
-        const unsigned char rot = (unsigned char)(RAM(0x6BACu) >> 3);
-        const unsigned char off = (unsigned char)RAM(0x6BABu);
+        const unsigned char rot = (unsigned char)(F_NES_SRAM_BASE_6BAC_R >> 3);
+        const unsigned char off = (unsigned char)F_LI_ROTATION_R;
         unsigned char *q = s_discovery_quadrants;
         for (tx = 0u; tx < 8u; ++tx) {
             col_x[tx] = (unsigned char)((20u + tx - rot) & 15u);
-            col_mask[tx] = RAM(0x6BBDu + ((col_x[tx] + off) & 15u));
+            col_mask[tx] = F_LI_MASK_R(((col_x[tx] + off) & 15u));
         }
         for (ty = 0u; ty < 4u; ++ty) {
             const unsigned char up_bit = (unsigned char)(0x80u >> (ty * 2u));
@@ -840,8 +866,8 @@ static void draw_redux_dungeon_map(void)
             for (tx = 0u; tx < 8u; ++tx, ++q) {
                 const unsigned short at = (unsigned short)(row_flags + col_x[tx]);
                 const unsigned char mask = col_mask[tx];
-                const unsigned char upper = (unsigned char)((mask & up_bit) && (RAM(at) & 0x20u));
-                const unsigned char lower = (unsigned char)((mask & lo_bit) && (RAM((unsigned short)(at + 16u)) & 0x20u));
+                const unsigned char upper = (unsigned char)((mask & up_bit) && (RAM(at) & 0x20u)); /* native_ram bulk:dyn_addr */
+                const unsigned char lower = (unsigned char)((mask & lo_bit) && (RAM((unsigned short)(at + 16u)) & 0x20u)); /* native_ram bulk:dyn_addr */
                 const unsigned char tile = upper ? (lower ? 0xFFu : 0x67u) : (lower ? 0xFBu : HUD_TILE_SPACE);
                 if (!s_hud_force && *q == tile) continue;
                 *q = tile;
@@ -906,10 +932,17 @@ static void draw_redux_overworld_map(void)
     }
 }
 
+/* T-256: palette the discovery map draws quadrant (tx,ty) with, so the
+ * pause Map page shows the same colours as the status-bar map. */
+unsigned char hud_discovery_map_pal(unsigned char tx, unsigned char ty)
+{
+    return s_hud_pal[(ty & 3u) + 2u][(tx & 7u) + 2u];
+}
+
 static void draw_hud_dynamic(unsigned char hud_id)
 {
     unsigned char i;
-    for (i = 0u; i < NATIVE_HUD_CELLS; ++i) s_native_hud_snapshot[i] = RAM(s_native_hud_cells[i]);
+    for (i = 0u; i < NATIVE_HUD_CELLS; ++i) s_native_hud_snapshot[i] = RAM(s_native_hud_cells[i]); /* native_ram bulk:dyn_addr */
     draw_hud_dynamic_parts(hud_id);
     s_hud_force = 0u;
 }
@@ -947,7 +980,7 @@ void roomrom_hud_draw(unsigned char hud_id, unsigned char room_id,
      * the dynamic cells. */
     if (s_hud_built && hud_id == s_hud_id_cached &&
         is_underworld == s_last_is_uw_cached &&
-        RAM(0x0010u) == s_hud_level_cached) {
+        F_ram_0010_R == s_hud_level_cached) {
         s_last_room_id_cached = room_id;
         draw_hud_dynamic(hud_id);
         (void)inventory_hud_consume_dirty();
@@ -971,6 +1004,20 @@ void roomrom_hud_draw(unsigned char hud_id, unsigned char room_id,
         }
         render_chr_upload((unsigned short)(REDUX_LIFE_DASH_TILE * 32u), dash, 32u);
     }
+    if (game_profile_is_remix()) {
+        /* Displayed sub-pal 1 atlas tile, bias s*4+c rebased to 12+c so
+         * colors 1..3 land on GREEN_RUPEE_PAL_SHADE/BODY/LIGHT. */
+        const unsigned char *src = bg_sparse_chr_redux_ow +
+            (unsigned long)bg_sparse_tile_lut[0xF7u][1] * 32u;
+        unsigned char rupee[32];
+        for (unsigned char i = 0u; i < 32u; ++i) {
+            unsigned char hi = (unsigned char)(src[i] >> 4), lo = (unsigned char)(src[i] & 15u);
+            if (hi) hi = (unsigned char)(12u + (hi & 3u));
+            if (lo) lo = (unsigned char)(12u + (lo & 3u));
+            rupee[i] = (unsigned char)((hi << 4) | lo);
+        }
+        render_chr_upload((unsigned short)(REMIX_GREEN_RUPEE_HUD_TILE * 32u), rupee, 32u);
+    }
     apply_transfer_macro(macro, 0);
     s_dungeon_map_owned = 0xFFu;
     s_hud_force = 1u; HUD_DIRTY();               /* planes were rebuilt: redraw all */
@@ -980,7 +1027,7 @@ void roomrom_hud_draw(unsigned char hud_id, unsigned char room_id,
     draw_hud_dynamic(hud_id);
     (void)inventory_hud_consume_dirty();
     s_hud_built = 1u;
-    s_hud_level_cached = RAM(0x0010u);
+    s_hud_level_cached = F_ram_0010_R;
 }
 
 /* ---- T-092: status-bar item selection (Z_07.asm
@@ -988,8 +1035,8 @@ void roomrom_hud_draw(unsigned char hud_id, unsigned char room_id,
  * FindAndSelectOccupiedItemSlot / Cycle9InDirection). Items[] = $657,
  * indexed by item slot (bow +3, potion +7, letter +$0F, boomerangs +$1D /
  * +$1E); SelectedItemSlot = $656. */
-#define HUD_ITEMS(slot)       RAM((unsigned short)(0x0657u + (slot)))
-#define HUD_SELECTED_SLOT     RAM(0x0656u)
+#define HUD_ITEMS(slot)       F_ram_0657_R3((slot))
+#define HUD_SELECTED_SLOT     F_ram_0656_R2
 
 static unsigned char cycle9(unsigned char y, unsigned char dir)
 {
@@ -1005,7 +1052,7 @@ static unsigned char cycle9(unsigned char y, unsigned char dir)
 static void find_and_select_occupied_item_slot(unsigned char dir, unsigned char y)
 {
     signed char x = 9;
-    RAM(0x00EFu) = dir;
+    F_ROOM_CYCLE_DIR_R2 = dir;
     /* T-125: nothing selectable (the NES loop then runs all 10 steps and
      * settles on slot 0); NES re-runs this every frame with no B item. */
     if ((HUD_ITEMS(0x1Du) | HUD_ITEMS(0x1Eu) | HUD_ITEMS(1u) | HUD_ITEMS(4u) |
@@ -1072,6 +1119,46 @@ static unsigned char inventory_cell_slot(unsigned char cell)
     if (slot == 7u && HUD_ITEMS(7u) == 0u && HUD_ITEMS(0x0Fu) != 0u)
         slot = 0x0Fu;
     return slot;
+}
+
+/* NES source: Z_05.asm:FindAndSelectOccupiedItemSlot / CheckLetter.
+ * Drained C: hud_inventory_item_selectable and inventory_cell_slot above.
+ * Coverage: PARTIAL (Genesis two-slot live cycling has no NES equivalent).
+ * Stance: EXTEND the existing ownership and letter/potion cell rules. */
+static unsigned char next_loadout_item(unsigned char current, unsigned char other)
+{
+    unsigned char cell, start = 7u, step;
+    for (cell = 0u; cell < 8u; ++cell)
+        if (loadout_same_cell(inventory_cell_slot(cell), current)) { start = cell; break; }
+    for (step = 1u; step <= 8u; ++step) {
+        unsigned char candidate = inventory_cell_slot((unsigned char)((start + step) & 7u));
+        if (hud_inventory_item_selectable(candidate) && !loadout_same_cell(candidate, other))
+            return candidate;
+    }
+    return current;
+}
+
+void hud_cycle_loadout(unsigned char cycle_b, unsigned char cycle_c)
+{
+    unsigned char b = HUD_SELECTED_SLOT;
+    unsigned char c = loadout_c_slot();
+    if (cycle_b) { b = next_loadout_item(b, c); HUD_SELECTED_SLOT = b; }
+    if (cycle_c) { c = next_loadout_item(c, b); loadout_set_c_slot(c); }
+}
+
+void hud_cycle_player_loadout(unsigned char player,unsigned char cycle_b,unsigned char cycle_c)
+{
+    unsigned char b,c;
+    if(player>=4u)return;
+    if(!player) {
+        hud_cycle_loadout(cycle_b,cycle_c);
+        (void)loadout_party_set(0u,HUD_SELECTED_SLOT,loadout_c_slot());
+        return;
+    }
+    b=loadout_party_b(player);c=loadout_party_c(player);
+    if(cycle_b)b=next_loadout_item(b,c);
+    if(cycle_c)c=next_loadout_item(c,b);
+    (void)loadout_party_set(player,b,c);
 }
 
 void hud_move_inventory_item(unsigned char direction)
@@ -1163,8 +1250,13 @@ unsigned char hud_status_bar_c_item(unsigned char b_has, unsigned char b_slot,
     (void)b_has;
     if (!game_profile_is_remix()) return 0u;
     c = loadout_c_slot();
-    if (c > 8u || !hud_inventory_item_selectable(c)) return 0u;
-    if (c == b_slot) return 0u;
+    if (c == 0x0Fu && HUD_ITEMS(7u) != 0u) { c = 7u; loadout_set_c_slot(c); }
+    if (c == 7u && HUD_ITEMS(7u) == 0u && HUD_ITEMS(0x0Fu) != 0u) { c = 0x0Fu; loadout_set_c_slot(c); }
+    if (!hud_inventory_item_selectable(c)) return 0u;
+    if (loadout_same_cell(c, HUD_SELECTED_SLOT)) { loadout_set_c_slot(LOADOUT_SLOT_NONE); return 0u; }
+    /* Cell 0 is the boomerang cell, but item 0 is the sword: draw the owned
+     * boomerang like DrawStatusBarBoomerang does for B. */
+    if (c == 0u) c = HUD_ITEMS(0x1Eu) != 0u ? 0x1Eu : 0x1Du;
     *slot_out = c;
     return 1u;
 }
@@ -1203,6 +1295,7 @@ void roomrom_hud_set_bottom_mode(unsigned char bottom)
 {
     if ((s_hud_bottom != 0u) == (bottom != 0u)) return;  /* no-op */
     HUD_DIRTY();
+    ++g_hud_clear_gen;
     /* T-172: the HUD is the same in both places; a complete one moves with
      * one VRAM copy. The full rebuild (window clear + status-bar macro,
      * ~6k instructions) cost the pause-open tick a frame (t013_continue
@@ -1317,6 +1410,11 @@ void roomrom_hud_refresh_dynamic(void)
 void roomrom_hud_refresh_play(void)
 {
     hud_refresh_impl(1u);
+}
+
+unsigned char roomrom_hud_play_pending(void)
+{
+    return s_play_hud_pending;
 }
 
 /* Tick start, after the VBlank process: the play tick's status-bar draw. */

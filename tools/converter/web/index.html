@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Zelda Genesis Builder</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<main>
+  <header><a class="wordmark" href="/">Z<span class="diamond">◆</span>G <span class="wordmark-caption">THE LOCAL ROM BUILDER</span></a><span class="local"><span></span> Runs on your computer</span></header>
+  <section class="intro"><p class="eyebrow">A CLASSIC. A NEW CONSOLE.</p><h1>Your Zelda.<br><em>Now on Genesis.</em></h1><p class="lede">Bring your original NES adventure to Sega Genesis.<br>Choose your ROM. We’ll take care of the rest.</p></section>
+  <section class="converter" aria-label="Build your Genesis ROM">
+    <div class="card-heading"><span class="number">01</span><div><h2>Start with your Zelda ROM</h2><p>The Legend of Zelda · USA · PRG0 · .nes</p></div></div>
+    <label id="dropzone" class="dropzone" for="rom"><span class="upload-icon" aria-hidden="true">↥</span><strong id="rom-name">Drop your .nes file here</strong><span id="rom-help">or click to browse your computer</span><input id="rom" type="file" accept=".nes" aria-describedby="rom-help"></label>
+    <p class="privacy"><span aria-hidden="true">◇</span> Your ROM stays on this computer. It is never uploaded to a website.</p>
+    <details class="advanced"><summary>Advanced <span>Optional Redux patch</span></summary><p>The verified Zelda Redux v3.3.3 patch downloads automatically. If you already have it, choose the patch or its ZIP here.</p><label class="patch-label" for="patch">Choose a Redux patch</label><input id="patch" type="file" accept=".ips,.zip"><span id="patch-name"></span></details>
+    <div class="action-row"><div><strong>One ROM. Both adventures.</strong><p>Original + Redux, with the revised soundtrack.</p></div><button id="build" disabled>Build Genesis ROM <span aria-hidden="true">↗</span></button></div>
+    <section id="progress-panel" class="progress-panel" hidden aria-live="polite"><div class="progress-heading"><strong id="stage">Preparing your builder</strong><span id="percent">0%</span></div><progress id="progress" max="100" value="0"></progress><p id="progress-note">The first build can take several minutes. You can keep using your computer.</p><button id="cancel" class="text-button">Cancel build</button></section>
+    <p id="error" class="error" role="alert" hidden></p>
+    <div id="success" class="success" hidden><span class="success-icon" aria-hidden="true">✓</span><div><strong>Your adventure is ready.</strong><p>Open the .md file in a Genesis emulator or on compatible hardware.</p></div><button id="download">Download ROM ↓</button></div>
+    <details id="details" class="build-details" hidden><summary>Build details</summary><pre id="logs" tabindex="0"></pre><button id="download-log" class="text-button">Save build log</button></details>
+  </section>
+  <footer><span>Made for the adventure. <button id="quit" class="text-button">Quit builder</button></span><span>NES → GENESIS <span class="footer-diamond">◆</span> BUILT LOCALLY</span></footer>
+</main>
+</body></html>

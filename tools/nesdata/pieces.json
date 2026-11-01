@@ -1,0 +1,1418 @@
+{
+ "pieces": [
+  {
+   "name": "levelinfo_start_rooms",
+   "symbol": "levelinfo_start_rooms",
+   "source": "engine/data/levelinfo_start_rooms.c",
+   "size": 54,
+   "align": 2
+  },
+  {
+   "name": "uw_dark_rooms",
+   "symbol": "uw_dark_rooms",
+   "source": "engine/data/uw_dark_rooms.c",
+   "size": 1044,
+   "align": 2
+  },
+  {
+   "name": "uw_dark_room_lookup",
+   "symbol": "uw_dark_room_lookup",
+   "source": "engine/data/uw_dark_rooms.c",
+   "size": 3840,
+   "align": 2
+  },
+  {
+   "name": "uw_item_rooms",
+   "symbol": "uw_item_rooms",
+   "source": "engine/data/uw_item_rooms.c",
+   "size": 7752,
+   "align": 2
+  },
+  {
+   "name": "uw_item_room_lookup",
+   "symbol": "uw_item_room_lookup",
+   "source": "engine/data/uw_item_rooms.c",
+   "size": 7680,
+   "align": 2
+  },
+  {
+   "name": "uw_l1q1_cellar_pairs",
+   "symbol": "uw_l1q1_cellar_pairs",
+   "source": "engine/data/uw_l1q1_cellar_pairs.c",
+   "size": 4,
+   "align": 2
+  },
+  {
+   "name": "uw_cellar_for_source_lookup",
+   "symbol": "uw_cellar_for_source_lookup",
+   "source": "engine/data/uw_l1q1_cellar_pairs.c",
+   "size": 3840,
+   "align": 2
+  },
+  {
+   "name": "uw_cellar_source_for_cellar_lookup",
+   "symbol": "uw_cellar_source_for_cellar_lookup",
+   "source": "engine/data/uw_l1q1_cellar_pairs.c",
+   "size": 3840,
+   "align": 2
+  },
+  {
+   "name": "uw_room_is_cellar_lookup",
+   "symbol": "uw_room_is_cellar_lookup",
+   "source": "engine/data/uw_l1q1_cellar_pairs.c",
+   "size": 3840,
+   "align": 2
+  },
+  {
+   "name": "uw_l1q1_expected_doors",
+   "symbol": "uw_l1q1_expected_doors",
+   "source": "engine/data/uw_l1q1_expected_doors.c",
+   "size": 102,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_boss_uwspboss1257",
+   "symbol": "roomrom_atlas_boss_uwspboss1257",
+   "source": "engine/src/atlas/boss_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_boss_uwspboss1257_subpal3",
+   "symbol": "roomrom_atlas_boss_uwspboss1257_subpal3",
+   "source": "engine/src/atlas/boss_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_boss_uwspboss3468",
+   "symbol": "roomrom_atlas_boss_uwspboss3468",
+   "source": "engine/src/atlas/boss_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_boss_uwspboss3468_subpal3",
+   "symbol": "roomrom_atlas_boss_uwspboss3468_subpal3",
+   "source": "engine/src/atlas/boss_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_boss_uwspboss9",
+   "symbol": "roomrom_atlas_boss_uwspboss9",
+   "source": "engine/src/atlas/boss_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_boss_uwspboss9_subpal3",
+   "symbol": "roomrom_atlas_boss_uwspboss9_subpal3",
+   "source": "engine/src/atlas/boss_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_enemy_uwsp127",
+   "symbol": "roomrom_atlas_enemy_uwsp127",
+   "source": "engine/src/atlas/enemy_chr.c",
+   "size": 1088,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_enemy_uwsp358",
+   "symbol": "roomrom_atlas_enemy_uwsp358",
+   "source": "engine/src/atlas/enemy_chr.c",
+   "size": 1088,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_enemy_uwsp469",
+   "symbol": "roomrom_atlas_enemy_uwsp469",
+   "source": "engine/src/atlas/enemy_chr.c",
+   "size": 1088,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_enemy_owsp",
+   "symbol": "roomrom_atlas_enemy_owsp",
+   "source": "engine/src/atlas/enemy_chr.c",
+   "size": 3648,
+   "align": 2
+  },
+  {
+   "name": "roomrom_atlas_items_x4",
+   "symbol": "roomrom_atlas_items_x4",
+   "source": "engine/src/atlas/items_chr_x4.c",
+   "size": 7040,
+   "align": 4
+  },
+  {
+   "name": "bg_sparse_chr_orig_ow",
+   "symbol": "bg_sparse_chr_orig_ow",
+   "source": "engine/src/bg_sparse_chr.c",
+   "size": 21632,
+   "align": 4
+  },
+  {
+   "name": "bg_sparse_chr_orig_uw",
+   "symbol": "bg_sparse_chr_orig_uw",
+   "source": "engine/src/bg_sparse_chr.c",
+   "size": 21632,
+   "align": 4
+  },
+  {
+   "name": "bg_sparse_chr_redux_ow",
+   "symbol": "bg_sparse_chr_redux_ow",
+   "source": "engine/src/bg_sparse_chr.c",
+   "size": 21632,
+   "align": 4
+  },
+  {
+   "name": "bg_sparse_chr_redux_uw",
+   "symbol": "bg_sparse_chr_redux_uw",
+   "source": "engine/src/bg_sparse_chr.c",
+   "size": 21632,
+   "align": 4
+  },
+  {
+   "name": "bg_sparse_tile_lut",
+   "symbol": "bg_sparse_tile_lut",
+   "source": "engine/src/bg_sparse_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "redux_automap_chr",
+   "symbol": "redux_automap_chr",
+   "source": "engine/src/redux_hud_chr.c",
+   "size": 1024,
+   "align": 2
+  },
+  {
+   "name": "rooms_overworld_redux",
+   "symbol": "rooms_overworld_redux",
+   "source": "engine/src/redux_overworld.c",
+   "size": 4561,
+   "align": 2
+  },
+  {
+   "name": "rooms_overworld_redux_heap_offsets",
+   "symbol": "rooms_overworld_redux_heap_offsets",
+   "source": "engine/src/redux_overworld.c",
+   "size": 32,
+   "align": 2
+  },
+  {
+   "name": "redux_overworld_bg_chr",
+   "symbol": "redux_overworld_bg_chr",
+   "source": "engine/src/redux_overworld_bg.c",
+   "size": 4160,
+   "align": 2
+  },
+  {
+   "name": "redux_overworld_secret_chr",
+   "symbol": "redux_overworld_secret_chr",
+   "source": "engine/src/redux_overworld_bg.c",
+   "size": 384,
+   "align": 2
+  },
+  {
+   "name": "redux_uw_bg_chr",
+   "symbol": "redux_uw_bg_chr",
+   "source": "engine/src/redux_uw_bg.c",
+   "size": 8192,
+   "align": 2
+  },
+  {
+   "name": "uw_collision_grid",
+   "symbol": "uw_collision_grid",
+   "source": "engine/src/uw_collision_data.c",
+   "size": 11264,
+   "align": 2
+  },
+  {
+   "name": "uw_lba_d",
+   "symbol": "uw_lba_d",
+   "source": "engine/src/uw_collision_data.c",
+   "size": 512,
+   "align": 2
+  },
+  {
+   "name": "g_uw_room_lookup",
+   "symbol": "g_uw_room_lookup",
+   "source": "engine/src/uw_room_blob.c",
+   "size": 15360,
+   "align": 2
+  },
+  {
+   "name": "g_uw_room_index",
+   "symbol": "g_uw_room_index",
+   "source": "engine/src/uw_room_blob.c",
+   "size": 3672,
+   "align": 2
+  },
+  {
+   "name": "g_uw_room_nt",
+   "symbol": "g_uw_room_nt",
+   "source": "engine/src/uw_room_blob.c",
+   "size": 646272,
+   "align": 2
+  },
+  {
+   "name": "g_uw_room_attr",
+   "symbol": "g_uw_room_attr",
+   "source": "engine/src/uw_room_blob.c",
+   "size": 58752,
+   "align": 2
+  },
+  {
+   "name": "g_uw_room_palette",
+   "symbol": "g_uw_room_palette",
+   "source": "engine/src/uw_room_blob.c",
+   "size": 29376,
+   "align": 2
+  },
+  {
+   "name": "core_redux_common_chr",
+   "symbol": "core_redux_common_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 7616,
+   "align": 2
+  },
+  {
+   "name": "core_redux_demo_chr",
+   "symbol": "core_redux_demo_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 8768,
+   "align": 2
+  },
+  {
+   "name": "core_redux_enemy_owsp_chr",
+   "symbol": "core_redux_enemy_owsp_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 3648,
+   "align": 2
+  },
+  {
+   "name": "core_redux_enemy_uwsp358_chr",
+   "symbol": "core_redux_enemy_uwsp358_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1088,
+   "align": 2
+  },
+  {
+   "name": "core_redux_enemy_uwsp469_chr",
+   "symbol": "core_redux_enemy_uwsp469_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1088,
+   "align": 2
+  },
+  {
+   "name": "core_redux_enemy_uwsp_base_chr",
+   "symbol": "core_redux_enemy_uwsp_base_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 512,
+   "align": 2
+  },
+  {
+   "name": "core_redux_enemy_uwsp127_chr",
+   "symbol": "core_redux_enemy_uwsp127_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1088,
+   "align": 2
+  },
+  {
+   "name": "core_redux_boss_uwspboss1257_chr",
+   "symbol": "core_redux_boss_uwspboss1257_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "core_redux_boss_uwspboss1257_chr_subpal3",
+   "symbol": "core_redux_boss_uwspboss1257_chr_subpal3",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "core_redux_boss_uwspboss3468_chr",
+   "symbol": "core_redux_boss_uwspboss3468_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "core_redux_boss_uwspboss3468_chr_subpal3",
+   "symbol": "core_redux_boss_uwspboss3468_chr_subpal3",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "core_redux_boss_uwspboss9_chr",
+   "symbol": "core_redux_boss_uwspboss9_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "core_redux_boss_uwspboss9_chr_subpal3",
+   "symbol": "core_redux_boss_uwspboss9_chr_subpal3",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 2048,
+   "align": 2
+  },
+  {
+   "name": "core_redux_items_chr",
+   "symbol": "core_redux_items_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 3520,
+   "align": 2
+  },
+  {
+   "name": "core_redux_inventory_chr",
+   "symbol": "core_redux_inventory_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 512,
+   "align": 2
+  },
+  {
+   "name": "core_redux_bg_ow_chr",
+   "symbol": "core_redux_bg_ow_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 8192,
+   "align": 2
+  },
+  {
+   "name": "core_redux_ow_extra_pairs",
+   "symbol": "core_redux_ow_extra_pairs",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 20,
+   "align": 2
+  },
+  {
+   "name": "core_redux_ow_extra_static_chr",
+   "symbol": "core_redux_ow_extra_static_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 192,
+   "align": 2
+  },
+  {
+   "name": "core_redux_bg_uw_chr",
+   "symbol": "core_redux_bg_uw_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 8192,
+   "align": 2
+  },
+  {
+   "name": "core_redux_door_faces",
+   "symbol": "core_redux_door_faces",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 240,
+   "align": 2
+  },
+  {
+   "name": "core_redux_ow_attributes",
+   "symbol": "core_redux_ow_attributes",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 768,
+   "align": 2
+  },
+  {
+   "name": "core_redux_ow_heart_palette",
+   "symbol": "core_redux_ow_heart_palette",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 4,
+   "align": 2
+  },
+  {
+   "name": "core_redux_water0_chr",
+   "symbol": "core_redux_water0_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1888,
+   "align": 2
+  },
+  {
+   "name": "core_redux_gray_water0_chr",
+   "symbol": "core_redux_gray_water0_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "core_redux_water1_chr",
+   "symbol": "core_redux_water1_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1888,
+   "align": 2
+  },
+  {
+   "name": "core_redux_gray_water1_chr",
+   "symbol": "core_redux_gray_water1_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "core_redux_water2_chr",
+   "symbol": "core_redux_water2_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1888,
+   "align": 2
+  },
+  {
+   "name": "core_redux_gray_water2_chr",
+   "symbol": "core_redux_gray_water2_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "core_redux_water3_chr",
+   "symbol": "core_redux_water3_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1888,
+   "align": 2
+  },
+  {
+   "name": "core_redux_gray_water3_chr",
+   "symbol": "core_redux_gray_water3_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "core_redux_drop_items",
+   "symbol": "core_redux_drop_items",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 40,
+   "align": 2
+  },
+  {
+   "name": "core_redux_automap_chr",
+   "symbol": "core_redux_automap_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1024,
+   "align": 2
+  },
+  {
+   "name": "core_redux_dungeon_hud",
+   "symbol": "core_redux_dungeon_hud",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 864,
+   "align": 2
+  },
+  {
+   "name": "core_redux_text_offsets",
+   "symbol": "core_redux_text_offsets",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 84,
+   "align": 2
+  },
+  {
+   "name": "core_redux_text",
+   "symbol": "core_redux_text",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1708,
+   "align": 2
+  },
+  {
+   "name": "core_redux_text_selectors",
+   "symbol": "core_redux_text_selectors",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 20,
+   "align": 2
+  },
+  {
+   "name": "core_redux_caution_chr",
+   "symbol": "core_redux_caution_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1728,
+   "align": 2
+  },
+  {
+   "name": "core_redux_caution_map",
+   "symbol": "core_redux_caution_map",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 960,
+   "align": 2
+  },
+  {
+   "name": "core_redux_caution_select",
+   "symbol": "core_redux_caution_select",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 48,
+   "align": 2
+  },
+  {
+   "name": "core_redux_caution_params",
+   "symbol": "core_redux_caution_params",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 10,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_story_map",
+   "symbol": "core_redux_intro_story_map",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1920,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_title_map",
+   "symbol": "core_redux_intro_title_map",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1920,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_items_map",
+   "symbol": "core_redux_intro_items_map",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 11264,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_sprite_chr",
+   "symbol": "core_redux_intro_sprite_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 8192,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_misc_chr",
+   "symbol": "core_redux_intro_misc_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 448,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_blink_chr",
+   "symbol": "core_redux_intro_blink_chr",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 256,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_story_palette",
+   "symbol": "core_redux_intro_story_palette",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_title_palette",
+   "symbol": "core_redux_intro_title_palette",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_title_fade",
+   "symbol": "core_redux_intro_title_fade",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 1792,
+   "align": 2
+  },
+  {
+   "name": "core_redux_intro_title_glow",
+   "symbol": "core_redux_intro_title_glow",
+   "source": "build/generated/core_redux_chr.c",
+   "size": 16,
+   "align": 2
+  },
+  {
+   "name": "mp_link_pose_words",
+   "symbol": "mp_link_pose_words",
+   "source": "build/generated/mp_link_poses.c",
+   "size": 22528,
+   "align": 2
+  },
+  {
+   "name": "nes_music_song_01",
+   "symbol": "nes_music_song_01",
+   "source": "build/nes_music/nes_music.c",
+   "size": 20619,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_02",
+   "symbol": "nes_music_song_02",
+   "source": "build/nes_music/nes_music.c",
+   "size": 2328,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_04",
+   "symbol": "nes_music_song_04",
+   "source": "build/nes_music/nes_music.c",
+   "size": 3621,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_06",
+   "symbol": "nes_music_song_06",
+   "source": "build/nes_music/nes_music.c",
+   "size": 2919,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_08",
+   "symbol": "nes_music_song_08",
+   "source": "build/nes_music/nes_music.c",
+   "size": 1272,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_10",
+   "symbol": "nes_music_song_10",
+   "source": "build/nes_music/nes_music.c",
+   "size": 19973,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_20",
+   "symbol": "nes_music_song_20",
+   "source": "build/nes_music/nes_music.c",
+   "size": 9439,
+   "align": 256
+  },
+  {
+   "name": "nes_music_song_80",
+   "symbol": "nes_music_song_80",
+   "source": "build/nes_music/nes_music.c",
+   "size": 41262,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_00",
+   "symbol": "redux_music_song_00",
+   "source": "build/redux_music/redux_music.c",
+   "size": 20619,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_01",
+   "symbol": "redux_music_song_01",
+   "source": "build/redux_music/redux_music.c",
+   "size": 10015,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_02",
+   "symbol": "redux_music_song_02",
+   "source": "build/redux_music/redux_music.c",
+   "size": 12591,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_03",
+   "symbol": "redux_music_song_03",
+   "source": "build/redux_music/redux_music.c",
+   "size": 10015,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_04",
+   "symbol": "redux_music_song_04",
+   "source": "build/redux_music/redux_music.c",
+   "size": 14431,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_05",
+   "symbol": "redux_music_song_05",
+   "source": "build/redux_music/redux_music.c",
+   "size": 9439,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_06",
+   "symbol": "redux_music_song_06",
+   "source": "build/redux_music/redux_music.c",
+   "size": 2333,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_07",
+   "symbol": "redux_music_song_07",
+   "source": "build/redux_music/redux_music.c",
+   "size": 3626,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_08",
+   "symbol": "redux_music_song_08",
+   "source": "build/redux_music/redux_music.c",
+   "size": 2924,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_09",
+   "symbol": "redux_music_song_09",
+   "source": "build/redux_music/redux_music.c",
+   "size": 1277,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_0a",
+   "symbol": "redux_music_song_0a",
+   "source": "build/redux_music/redux_music.c",
+   "size": 19973,
+   "align": 256
+  },
+  {
+   "name": "redux_music_song_0b",
+   "symbol": "redux_music_song_0b",
+   "source": "build/redux_music/redux_music.c",
+   "size": 41262,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_01",
+   "symbol": "sfx_pcm_sfx_01",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 6400,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_02",
+   "symbol": "sfx_pcm_sfx_02",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 10496,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_03",
+   "symbol": "sfx_pcm_sfx_03",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 5632,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_04",
+   "symbol": "sfx_pcm_sfx_04",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 768,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_05",
+   "symbol": "sfx_pcm_sfx_05",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 12800,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_06",
+   "symbol": "sfx_pcm_sfx_06",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 7936,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sfx_07",
+   "symbol": "sfx_pcm_sfx_07",
+   "source": "data/audio/sfx_pcm.c",
+   "size": 15104,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sword",
+   "symbol": "sfx_pcm_sword",
+   "source": "data/audio/sfx_pcm_noise.c",
+   "size": 2560,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_arrow",
+   "symbol": "sfx_pcm_arrow",
+   "source": "data/audio/sfx_pcm_noise.c",
+   "size": 1280,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_flame",
+   "symbol": "sfx_pcm_flame",
+   "source": "data/audio/sfx_pcm_noise.c",
+   "size": 7680,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_bomb",
+   "symbol": "sfx_pcm_bomb",
+   "source": "data/audio/sfx_pcm_noise.c",
+   "size": 5632,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_sea",
+   "symbol": "sfx_pcm_sea",
+   "source": "data/audio/sfx_pcm_noise.c",
+   "size": 48640,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_stairs",
+   "symbol": "sfx_pcm_stairs",
+   "source": "data/audio/sfx_pcm_stairs.c",
+   "size": 13312,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_0",
+   "symbol": "sfx_pcm_tune0_0",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 2560,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_1",
+   "symbol": "sfx_pcm_tune0_1",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 3328,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_2",
+   "symbol": "sfx_pcm_tune0_2",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 5888,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_3",
+   "symbol": "sfx_pcm_tune0_3",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 1792,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_4",
+   "symbol": "sfx_pcm_tune0_4",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 1280,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_5",
+   "symbol": "sfx_pcm_tune0_5",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 1536,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune0_6",
+   "symbol": "sfx_pcm_tune0_6",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 4608,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_0",
+   "symbol": "sfx_pcm_tune1_0",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 7424,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_1",
+   "symbol": "sfx_pcm_tune1_1",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 14336,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_2",
+   "symbol": "sfx_pcm_tune1_2",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 34304,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_3",
+   "symbol": "sfx_pcm_tune1_3",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 10496,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_4",
+   "symbol": "sfx_pcm_tune1_4",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 41472,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_5",
+   "symbol": "sfx_pcm_tune1_5",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 2816,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_6",
+   "symbol": "sfx_pcm_tune1_6",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 149504,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune1_7",
+   "symbol": "sfx_pcm_tune1_7",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 42240,
+   "align": 256
+  },
+  {
+   "name": "sfx_pcm_tune_len",
+   "symbol": "sfx_pcm_tune_len",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 60,
+   "align": 2
+  },
+  {
+   "name": "sfx_pcm_tune_frames",
+   "symbol": "sfx_pcm_tune_frames",
+   "source": "data/audio/sfx_pcm_tunes.c",
+   "size": 30,
+   "align": 2
+  },
+  {
+   "name": "common_chr",
+   "symbol": "common_chr",
+   "source": "data/chr/common.c",
+   "size": 7616,
+   "align": 2
+  },
+  {
+   "name": "demo_chr",
+   "symbol": "demo_chr",
+   "source": "data/chr/demo.c",
+   "size": 8768,
+   "align": 2
+  },
+  {
+   "name": "overworld_bg_chr",
+   "symbol": "overworld_bg_chr",
+   "source": "data/chr/overworld_bg.c",
+   "size": 4160,
+   "align": 2
+  },
+  {
+   "name": "sprites_chr",
+   "symbol": "sprites_chr",
+   "source": "data/chr/sprites.c",
+   "size": 7424,
+   "align": 2
+  },
+  {
+   "name": "underworld_bg_chr",
+   "symbol": "underworld_bg_chr",
+   "source": "data/chr/underworld_bg.c",
+   "size": 4160,
+   "align": 2
+  },
+  {
+   "name": "fs_bg_chr_full",
+   "symbol": "fs_bg_chr_full",
+   "source": "data/fs/fs_bg_chr_full.c",
+   "size": 7744,
+   "align": 2
+  },
+  {
+   "name": "fs_border_chr",
+   "symbol": "fs_border_chr",
+   "source": "data/fs/fs_border_chr.c",
+   "size": 512,
+   "align": 2
+  },
+  {
+   "name": "fs_font_chr",
+   "symbol": "fs_font_chr",
+   "source": "data/fs/fs_font_chr.c",
+   "size": 3200,
+   "align": 2
+  },
+  {
+   "name": "fs_heart_cursor_chr",
+   "symbol": "fs_heart_cursor_chr",
+   "source": "data/fs/fs_heart_cursor_chr.c",
+   "size": 32,
+   "align": 2
+  },
+  {
+   "name": "fs_link_sprite_chr",
+   "symbol": "fs_link_sprite_chr",
+   "source": "data/fs/fs_link_sprite_chr.c",
+   "size": 128,
+   "align": 2
+  },
+  {
+   "name": "fs_palettes",
+   "symbol": "fs_palettes",
+   "source": "data/fs/fs_palette.c",
+   "size": 32,
+   "align": 2
+  },
+  {
+   "name": "fs_static_attr",
+   "symbol": "fs_static_attr",
+   "source": "data/fs/fs_static_attr.c",
+   "size": 64,
+   "align": 2
+  },
+  {
+   "name": "fs_static_tilemap",
+   "symbol": "fs_static_tilemap",
+   "source": "data/fs/fs_static_tilemap.c",
+   "size": 960,
+   "align": 2
+  },
+  {
+   "name": "intro_title_fade_cycles",
+   "symbol": "intro_title_fade_cycles",
+   "source": "data/intro/intro_title_fade.c",
+   "size": 1792,
+   "align": 2
+  },
+  {
+   "name": "intro_title_fade_delays",
+   "symbol": "intro_title_fade_delays",
+   "source": "data/intro/intro_title_fade.c",
+   "size": 28,
+   "align": 2
+  },
+  {
+   "name": "intro_title_glow_colors",
+   "symbol": "intro_title_glow_colors",
+   "source": "data/intro/intro_title_glow.c",
+   "size": 16,
+   "align": 2
+  },
+  {
+   "name": "intro_title_glow_delays",
+   "symbol": "intro_title_glow_delays",
+   "source": "data/intro/intro_title_glow.c",
+   "size": 8,
+   "align": 2
+  },
+  {
+   "name": "misc_palettes",
+   "symbol": "misc_palettes",
+   "source": "data/misc/palettes.c",
+   "size": 1208,
+   "align": 2
+  },
+  {
+   "name": "misc_ui_layout",
+   "symbol": "misc_ui_layout",
+   "source": "data/misc/ui_layout.c",
+   "size": 159,
+   "align": 2
+  },
+  {
+   "name": "rooms_dungeons",
+   "symbol": "rooms_dungeons",
+   "source": "data/rooms/dungeons.c",
+   "size": 7040,
+   "align": 2
+  },
+  {
+   "name": "rooms_overworld",
+   "symbol": "rooms_overworld",
+   "source": "data/rooms/overworld.c",
+   "size": 4114,
+   "align": 2
+  },
+  {
+   "name": "nes_frontend_credits",
+   "symbol": "nes_frontend_credits",
+   "source": "data/text/nes_frontend_credits.c",
+   "size": 460,
+   "align": 2
+  },
+  {
+   "name": "nes_frontend_text",
+   "symbol": "nes_frontend_text",
+   "source": "data/text/nes_frontend_text.c",
+   "size": 217,
+   "align": 2
+  },
+  {
+   "name": "PersonText00",
+   "symbol": "PersonText00",
+   "source": "src/data/person_text_data.c",
+   "size": 43,
+   "align": 2
+  },
+  {
+   "name": "PersonText01",
+   "symbol": "PersonText01",
+   "source": "src/data/person_text_data.c",
+   "size": 42,
+   "align": 2
+  },
+  {
+   "name": "PersonText02",
+   "symbol": "PersonText02",
+   "source": "src/data/person_text_data.c",
+   "size": 24,
+   "align": 2
+  },
+  {
+   "name": "PersonText03",
+   "symbol": "PersonText03",
+   "source": "src/data/person_text_data.c",
+   "size": 42,
+   "align": 2
+  },
+  {
+   "name": "PersonText04",
+   "symbol": "PersonText04",
+   "source": "src/data/person_text_data.c",
+   "size": 34,
+   "align": 2
+  },
+  {
+   "name": "PersonText05",
+   "symbol": "PersonText05",
+   "source": "src/data/person_text_data.c",
+   "size": 40,
+   "align": 2
+  },
+  {
+   "name": "PersonText06",
+   "symbol": "PersonText06",
+   "source": "src/data/person_text_data.c",
+   "size": 37,
+   "align": 2
+  },
+  {
+   "name": "PersonText07",
+   "symbol": "PersonText07",
+   "source": "src/data/person_text_data.c",
+   "size": 39,
+   "align": 2
+  },
+  {
+   "name": "PersonText08",
+   "symbol": "PersonText08",
+   "source": "src/data/person_text_data.c",
+   "size": 30,
+   "align": 2
+  },
+  {
+   "name": "PersonText09",
+   "symbol": "PersonText09",
+   "source": "src/data/person_text_data.c",
+   "size": 23,
+   "align": 2
+  },
+  {
+   "name": "PersonText10",
+   "symbol": "PersonText10",
+   "source": "src/data/person_text_data.c",
+   "size": 36,
+   "align": 2
+  },
+  {
+   "name": "PersonText11",
+   "symbol": "PersonText11",
+   "source": "src/data/person_text_data.c",
+   "size": 38,
+   "align": 2
+  },
+  {
+   "name": "PersonText12",
+   "symbol": "PersonText12",
+   "source": "src/data/person_text_data.c",
+   "size": 52,
+   "align": 2
+  },
+  {
+   "name": "PersonText13",
+   "symbol": "PersonText13",
+   "source": "src/data/person_text_data.c",
+   "size": 21,
+   "align": 2
+  },
+  {
+   "name": "PersonText14",
+   "symbol": "PersonText14",
+   "source": "src/data/person_text_data.c",
+   "size": 23,
+   "align": 2
+  },
+  {
+   "name": "PersonText15",
+   "symbol": "PersonText15",
+   "source": "src/data/person_text_data.c",
+   "size": 37,
+   "align": 2
+  },
+  {
+   "name": "PersonText16",
+   "symbol": "PersonText16",
+   "source": "src/data/person_text_data.c",
+   "size": 23,
+   "align": 2
+  },
+  {
+   "name": "PersonText17",
+   "symbol": "PersonText17",
+   "source": "src/data/person_text_data.c",
+   "size": 36,
+   "align": 2
+  },
+  {
+   "name": "PersonText18",
+   "symbol": "PersonText18",
+   "source": "src/data/person_text_data.c",
+   "size": 21,
+   "align": 2
+  },
+  {
+   "name": "PersonText19",
+   "symbol": "PersonText19",
+   "source": "src/data/person_text_data.c",
+   "size": 40,
+   "align": 2
+  },
+  {
+   "name": "PersonText20",
+   "symbol": "PersonText20",
+   "source": "src/data/person_text_data.c",
+   "size": 24,
+   "align": 2
+  },
+  {
+   "name": "PersonText21",
+   "symbol": "PersonText21",
+   "source": "src/data/person_text_data.c",
+   "size": 64,
+   "align": 2
+  },
+  {
+   "name": "PersonText22",
+   "symbol": "PersonText22",
+   "source": "src/data/person_text_data.c",
+   "size": 35,
+   "align": 2
+  },
+  {
+   "name": "PersonText23",
+   "symbol": "PersonText23",
+   "source": "src/data/person_text_data.c",
+   "size": 44,
+   "align": 2
+  },
+  {
+   "name": "PersonText24",
+   "symbol": "PersonText24",
+   "source": "src/data/person_text_data.c",
+   "size": 42,
+   "align": 2
+  },
+  {
+   "name": "PersonText25",
+   "symbol": "PersonText25",
+   "source": "src/data/person_text_data.c",
+   "size": 42,
+   "align": 2
+  },
+  {
+   "name": "PersonText26",
+   "symbol": "PersonText26",
+   "source": "src/data/person_text_data.c",
+   "size": 44,
+   "align": 2
+  },
+  {
+   "name": "PersonText27",
+   "symbol": "PersonText27",
+   "source": "src/data/person_text_data.c",
+   "size": 35,
+   "align": 2
+  },
+  {
+   "name": "PersonText28",
+   "symbol": "PersonText28",
+   "source": "src/data/person_text_data.c",
+   "size": 46,
+   "align": 2
+  },
+  {
+   "name": "PersonText29",
+   "symbol": "PersonText29",
+   "source": "src/data/person_text_data.c",
+   "size": 35,
+   "align": 2
+  },
+  {
+   "name": "PersonText30",
+   "symbol": "PersonText30",
+   "source": "src/data/person_text_data.c",
+   "size": 40,
+   "align": 2
+  },
+  {
+   "name": "PersonText31",
+   "symbol": "PersonText31",
+   "source": "src/data/person_text_data.c",
+   "size": 43,
+   "align": 2
+  },
+  {
+   "name": "PersonText32",
+   "symbol": "PersonText32",
+   "source": "src/data/person_text_data.c",
+   "size": 43,
+   "align": 2
+  },
+  {
+   "name": "PersonText33",
+   "symbol": "PersonText33",
+   "source": "src/data/person_text_data.c",
+   "size": 24,
+   "align": 2
+  },
+  {
+   "name": "PersonText34",
+   "symbol": "PersonText34",
+   "source": "src/data/person_text_data.c",
+   "size": 45,
+   "align": 2
+  },
+  {
+   "name": "PersonText35",
+   "symbol": "PersonText35",
+   "source": "src/data/person_text_data.c",
+   "size": 21,
+   "align": 2
+  },
+  {
+   "name": "PersonText36",
+   "symbol": "PersonText36",
+   "source": "src/data/person_text_data.c",
+   "size": 22,
+   "align": 2
+  },
+  {
+   "name": "PersonText37",
+   "symbol": "PersonText37",
+   "source": "src/data/person_text_data.c",
+   "size": 36,
+   "align": 2
+  },
+  {
+   "name": "k_ow_bg_palram_per_room",
+   "symbol": "k_ow_bg_palram_per_room",
+   "source": "src/game/world/ow_bg_palram_table.c",
+   "size": 2048,
+   "align": 2
+  }
+ ]
+}

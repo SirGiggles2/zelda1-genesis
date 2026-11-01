@@ -36,7 +36,7 @@ void fs_handoff_to_transpiled(uint8_t slot) {
 
     /* Seed CurSaveSlot ($0016) directly here -- m68k SysV byte-arg ABI is
      * unreliable, so the trampoline takes no args and reads from RAM. */
-    nes_ram[0x0016] = slot;
+    F_ram_0016_N = slot;
 
     /* T-100: the real NES save block is validated at title Start
      * (save_game_boot). The former fake markers / IsSaveSlotActive[0]=1

@@ -1,0 +1,259 @@
+{
+ "files": {
+  "engine/data/levelinfo_start_rooms.c": [
+   "levelinfo_start_rooms"
+  ],
+  "engine/data/levelinfo_start_rooms.h": [
+   "game_world_dungeon_roundtrip_probe",
+   "levelinfo_start_rooms",
+   "metadata_probe",
+   "world_transition"
+  ],
+  "engine/data/uw_dark_rooms.c": [
+   "uw_dark_rooms"
+  ],
+  "engine/data/uw_dark_rooms.h": [
+   "dungeon_dark_meta",
+   "uw_dark_rooms"
+  ],
+  "engine/data/uw_item_rooms.c": [
+   "uw_item_rooms"
+  ],
+  "engine/data/uw_item_rooms.h": [
+   "dungeon_item_room_meta",
+   "roomrom_main",
+   "uw_item_rooms"
+  ],
+  "engine/data/uw_l1q1_cellar_pairs.c": [
+   "uw_l1q1_cellar_pairs"
+  ],
+  "engine/data/uw_l1q1_cellar_pairs.h": [
+   "metadata_probe",
+   "uw_l1q1_cellar_pairs"
+  ],
+  "engine/data/uw_l1q1_expected_doors.c": [
+   "uw_l1q1_expected_doors"
+  ],
+  "engine/data/uw_l1q1_expected_doors.h": [
+   "uw_l1q1_expected_doors"
+  ],
+  "engine/src/atlas/atlas_dispatch.h": [
+   "hud_runtime",
+   "world_sprite_render"
+  ],
+  "engine/src/atlas/boss_chr.c": [
+   "atlas_boss_chr"
+  ],
+  "engine/src/atlas/boss_chr.h": [
+   "atlas_boss_chr",
+   "atlas_level_chr_swap",
+   "debug_tilegrid"
+  ],
+  "engine/src/atlas/enemy_chr.c": [
+   "atlas_enemy_chr"
+  ],
+  "engine/src/atlas/enemy_chr.h": [
+   "atlas_enemy_chr",
+   "atlas_level_chr_swap",
+   "debug_tilegrid"
+  ],
+  "engine/src/atlas/hud_chr.h": [
+   "hud_runtime"
+  ],
+  "engine/src/atlas/items_chr.h": [
+   "world_sprite_render"
+  ],
+  "engine/src/atlas/items_chr_x4.c": [
+   "atlas_items_chr_x4"
+  ],
+  "engine/src/atlas/items_chr_x4.h": [
+   "atlas_items_chr_x4",
+   "atlas_level_chr_swap",
+   "atlas_scene_vram_contracts",
+   "debug_tilegrid",
+   "dungeon_uw_render",
+   "enemy_render",
+   "hud_boss_overlay_draw",
+   "hud_runtime",
+   "inventory_render",
+   "pause_map",
+   "roomrom_main",
+   "world_ending_render",
+   "world_ow_render",
+   "world_scene_load",
+   "world_sprite_render",
+   "world_transfer_buf_drain"
+  ],
+  "engine/src/atlas/roomrom_scene_vram_contracts.c": [
+   "atlas_scene_vram_contracts"
+  ],
+  "engine/src/atlas/roomrom_scene_vram_contracts.h": [
+   "atlas_level_chr_swap",
+   "atlas_scene_vram_contracts",
+   "enemy_render",
+   "roomrom_main",
+   "world_scene_load"
+  ],
+  "engine/src/bg_sparse_chr.c": [
+   "bg_sparse_chr"
+  ],
+  "engine/src/bg_sparse_chr.h": [
+   "bg_sparse_chr",
+   "debug_tilegrid",
+   "dungeon_uw_render",
+   "hud_runtime",
+   "inventory_render",
+   "world_ow_render",
+   "world_transfer_buf_drain"
+  ],
+  "engine/src/redux_hud_chr.c": [
+   "redux_hud_chr"
+  ],
+  "engine/src/redux_overworld.c": [
+   "redux_overworld"
+  ],
+  "engine/src/redux_overworld_bg.c": [
+   "redux_overworld_bg"
+  ],
+  "engine/src/redux_uw_bg.c": [
+   "redux_uw_bg"
+  ],
+  "engine/src/uw_collision_data.c": [
+   "uw_collision_data"
+  ],
+  "engine/src/uw_collision_data.h": [
+   "dungeon_uw_render",
+   "uw_collision_data"
+  ],
+  "engine/src/uw_room_blob.c": [
+   "uw_room_blob"
+  ],
+  "build/generated/core_redux_chr.c": [
+   "core_redux_chr"
+  ],
+  "build/generated/mp_link_poses.c": [
+   "mp_link_poses"
+  ],
+  "build/nes_music/nes_music.c": [
+   "nes_music"
+  ],
+  "build/nes_music/nes_music.h": [
+   "audio_adapter",
+   "nes_music"
+  ],
+  "build/redux_music/redux_music.c": [
+   "redux_music"
+  ],
+  "build/redux_music/redux_music.h": [
+   "audio_adapter",
+   "redux_music"
+  ],
+  "data/audio/sfx_pcm.c": [
+   "sfx_pcm"
+  ],
+  "data/audio/sfx_pcm.h": [
+   "audio_adapter",
+   "sfx_pcm",
+   "sfx_pcm_noise",
+   "sfx_pcm_stairs",
+   "sfx_pcm_tunes"
+  ],
+  "data/audio/sfx_pcm_noise.c": [
+   "sfx_pcm_noise"
+  ],
+  "data/audio/sfx_pcm_noise.h": [
+   "audio_adapter",
+   "sfx_pcm_noise"
+  ],
+  "data/audio/sfx_pcm_stairs.c": [
+   "sfx_pcm_stairs"
+  ],
+  "data/audio/sfx_pcm_stairs.h": [
+   "audio_adapter",
+   "sfx_pcm_stairs"
+  ],
+  "data/audio/sfx_pcm_tunes.c": [
+   "sfx_pcm_tunes"
+  ],
+  "data/audio/sfx_pcm_tunes.h": [
+   "audio_adapter",
+   "sfx_pcm_tunes"
+  ],
+  "data/chr/common.c": [
+   "common"
+  ],
+  "data/chr/demo.c": [
+   "demo_chr"
+  ],
+  "data/chr/overworld_bg.c": [
+   "overworld_bg"
+  ],
+  "data/chr/sprites.c": [
+   "sprites"
+  ],
+  "data/chr/underworld_bg.c": [
+   "underworld_bg"
+  ],
+  "data/fs/fs_bg_chr_full.c": [
+   "fs_bg_chr_full"
+  ],
+  "data/fs/fs_border_chr.c": [
+   "fs_border_chr"
+  ],
+  "data/fs/fs_font_chr.c": [
+   "fs_font_chr"
+  ],
+  "data/fs/fs_heart_cursor_chr.c": [
+   "fs_heart_cursor_chr"
+  ],
+  "data/fs/fs_link_sprite_chr.c": [
+   "fs_link_sprite_chr"
+  ],
+  "data/fs/fs_palette.c": [
+   "fs_palette"
+  ],
+  "data/fs/fs_static_attr.c": [
+   "fs_static_attr"
+  ],
+  "data/fs/fs_static_tilemap.c": [
+   "fs_static_tilemap"
+  ],
+  "data/intro/intro_title_fade.c": [
+   "intro_title_fade"
+  ],
+  "data/intro/intro_title_glow.c": [
+   "intro_title_glow"
+  ],
+  "data/misc/gray_table.c": [
+   "gray_table"
+  ],
+  "data/misc/palettes.c": [
+   "palettes"
+  ],
+  "data/misc/ui_layout.c": [
+   "ui_layout"
+  ],
+  "data/rooms/dungeons.c": [
+   "dungeons"
+  ],
+  "data/rooms/overworld.c": [
+   "overworld"
+  ],
+  "data/text/nes_frontend_credits.c": [
+   "nes_frontend_credits"
+  ],
+  "data/text/nes_frontend_text.c": [
+   "nes_frontend_text"
+  ],
+  "src/data/person_text_data.c": [
+   "person_text_data"
+  ],
+  "src/data/person_text_data.h": [
+   "cave_dispatch",
+   "person_text_data"
+  ],
+  "src/game/world/ow_bg_palram_table.c": [
+   "world_ow_bg_palram_table"
+  ]
+ }
+}

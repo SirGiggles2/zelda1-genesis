@@ -4,6 +4,7 @@
 #include "sprite_dispatch.h"                /* sprite_animate_object_walking */
 #include "../room/room_dispatch.h"          /* room_go_to_next_mode_from_play */
 #include "../../../engine/src/engine_state.h"  /* roomrom_main_link_* */
+#include "../../state/player_state.h"
 
 /* See dock.h for the NES source map (T-056). */
 #define OBJ_X               0x0070u
@@ -20,49 +21,76 @@
 /* Z_04.asm RaftDirections (state 1 down, state 2 up). */
 static const unsigned char k_raft_dirs[2] = { 0x04u, 0x08u };
 
+/* NES source: UpdateDock's exact-coordinate boarding and single carry tick.
+ * Drained C: existing world_update_dock body, retained below.
+ * Coverage: PARTIAL any-player boarding/carried actor and team transition.
+ * Stance: EXTEND owner adapter; no additional raft update. */
 void world_update_dock(unsigned int slot)
+{
+    unsigned char player;
+    if (g_player_count <= 1u) {
+        world_update_dock_for_loaded_player(slot);
+        return;
+    }
+    player = G_OBJECT_PLAYER_REFS[slot].status_player;
+    if (F_ram_00AC_X(slot) == 0u) {
+        const short x = F_ram_00EB_N == 0x55u ? 0x80 : 0x60;
+        for (player = 0u; player < g_player_count; ++player)
+            if (PLAYER(player).x == x &&
+                (PLAYER(player).y == 0x3D || PLAYER(player).y == 0x7D)) break;
+        G_OBJECT_PLAYER_REFS[slot].status_player =
+            player < g_player_count ? player : PLAYER_REF_NONE;
+        if (player >= g_player_count) return;
+    } else if (player >= g_player_count) player = 0u;
+    if (player == 0u) world_update_dock_for_loaded_player(slot);
+    else roomrom_main_dock_update_player(slot, player);
+    if (F_ram_00AC_X(slot) == 0u)
+        G_OBJECT_PLAYER_REFS[slot].status_player = PLAYER_REF_NONE;
+}
+
+void world_update_dock_for_loaded_player(unsigned int slot)
 {
     const unsigned char x = (unsigned char)slot;
     unsigned char st, leave = 0u;
 
-    if (nes_ram[INV_RAFT] == 0u) return;
-    st = nes_ram[OBJ_STATE + x];
+    if (F_ram_0660_N == 0u) return;
+    st = F_ram_00AC_X(x);
     if (st == 0u) {
-        const unsigned char dock_x = (nes_ram[ROOM_ID] == 0x55u) ? 0x80u : 0x60u;
+        const unsigned char dock_x = (F_ram_00EB_N == 0x55u) ? 0x80u : 0x60u;
         unsigned char y = 1u;
-        const unsigned char ly = nes_ram[OBJ_Y];
-        if (dock_x != nes_ram[OBJ_X]) return;
-        nes_ram[OBJ_X + x] = dock_x;
+        const unsigned char ly = F_ram_0084_N;
+        if (dock_x != F_ram_0070_N) return;
+        F_ram_0070_X(x) = dock_x;
         if (ly != 0x3Du) {
             y = 2u;
             if (ly != 0x7Du) return;
         }
-        nes_ram[OBJ_STATE + x] = y;
-        nes_ram[OBJ_Y + x] = (unsigned char)(ly + 6u);
-        nes_ram[TUNE1_REQUEST] = 0x04u;          /* PlaySecretFoundTune */
-        nes_ram[OBJ_STATE] = 0x40u;              /* halt Link */
-        nes_ram[OBJ_DIR] = k_raft_dirs[y - 1u];
+        F_ram_00AC_X(x) = y;
+        F_ram_0084_X(x) = (unsigned char)(ly + 6u);
+        F_ram_0602_N3 = 0x04u;          /* PlaySecretFoundTune */
+        F_ram_00AC_N = 0x40u;              /* halt Link */
+        F_ram_0098_N5 = k_raft_dirs[y - 1u];
         roomrom_main_link_sync_from_nes();
         return;
     }
 
     if (st != 1u) {
         /* State 2: up. */
-        nes_ram[OBJ_Y + x] = (unsigned char)(nes_ram[OBJ_Y + x] - 1u);
-        nes_ram[OBJ_Y] = (unsigned char)(nes_ram[OBJ_Y] - 1u);
-        if (nes_ram[OBJ_Y] != 0x3Du) goto draw;
+        F_ram_0084_X(x) = (unsigned char)(F_ram_0084_X(x) - 1u);
+        F_ram_0084_N = (unsigned char)(F_ram_0084_N - 1u);
+        if (F_ram_0084_N != 0x3Du) goto draw;
         room_go_to_next_mode_from_play();
         leave = 1u;
     } else {
         /* State 1: down. */
-        nes_ram[OBJ_Y + x] = (unsigned char)(nes_ram[OBJ_Y + x] + 1u);
-        nes_ram[OBJ_Y] = (unsigned char)(nes_ram[OBJ_Y] + 1u);
-        if (nes_ram[OBJ_Y] != 0x7Fu) goto draw;
-        nes_ram[OBJ_GRID_OFFSET] = 0x02u;        /* $7F - $7D */
+        F_ram_0084_X(x) = (unsigned char)(F_ram_0084_X(x) + 1u);
+        F_ram_0084_N = (unsigned char)(F_ram_0084_N + 1u);
+        if (F_ram_0084_N != 0x7Fu) goto draw;
+        F_ram_0394_N = 0x02u;        /* $7F - $7D */
     }
     /* @ResetLinkAndRaftStateAndDraw */
-    nes_ram[OBJ_STATE] = 0u;
-    nes_ram[OBJ_STATE + x] = 0u;
+    F_ram_00AC_N = 0u;
+    F_ram_00AC_X(x) = 0u;
 
 draw:
     roomrom_main_link_end_move_from_object();   /* Link_EndMoveAndAnimate_Bank4 */

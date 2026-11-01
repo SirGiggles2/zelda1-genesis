@@ -3,6 +3,7 @@
 #include "render_abi.h"                   /* render_cram_subrange_upload */
 #include "../world/bg_palette.h"          /* roomrom_bg_palette_nes_to_cram */
 #include "../world/world_dispatch.h"      /* world_animate_world_fading */
+#include "../items/item_upgrades.h"
 
 /* T-111: UW dark rooms, NES palette model.
  *
@@ -25,8 +26,8 @@
 
 unsigned char uw_dark_is_dark_room(unsigned char room_id)
 {
-    if (nes_ram[NES_CUR_LEVEL] == 0u) return 0u;
-    return (nes_ram[NES_LBA_E + room_id] & 0x80u) ? 1u : 0u;
+    if (F_ram_0010_N2 == 0u) return 0u;
+    return (F_ram_6A7E_X(room_id) & 0x80u) ? 1u : 0u;
 }
 
 void uw_dark_apply_cycle_row(unsigned char cycle)
@@ -37,23 +38,23 @@ void uw_dark_apply_cycle_row(unsigned char cycle)
     idx = (unsigned char)(((unsigned char)(val << 3) + val) & 0xFCu);
     for (i = 0u; i < 8u; ++i)
         cram[i] = roomrom_bg_palette_nes_to_cram(
-            nes_ram[NES_PALETTE_CYCLES + (unsigned char)(idx + i)]);
+            F_ram_6BFA_X2((unsigned char)(idx + i)));
     render_cram_subrange_upload(8u, cram, 8u);
 }
 
 void uw_dark_update_candle(void)
 {
-    switch (nes_ram[NES_CANDLE_STATE]) {
+    switch (F_ram_051F_N2) {
     case 0u:                                  /* UpdateCandle_Begin */
-        if (!uw_dark_is_dark_room(nes_ram[0x00EBu])) return;
-        nes_ram[NES_FADE_CYCLE] = 0xC0u;      /* fade to light */
-        nes_ram[NES_BRIGHTENING] = (unsigned char)(nes_ram[NES_BRIGHTENING] + 1u);
-        nes_ram[NES_CANDLE_STATE] = 1u;
+        if (!uw_dark_is_dark_room(F_ram_00EB)) return;
+        F_ram_051C_N2 = 0xC0u;      /* fade to light */
+        F_ram_051E_N = (unsigned char)(F_ram_051E_N + 1u);
+        F_ram_051F_N2 = 1u;
         return;
     case 1u:                                  /* UpdateCandle_Brightening */
         if (world_animate_world_fading() == 0u) {
-            nes_ram[NES_BRIGHTENING] = 0u;
-            nes_ram[NES_CANDLE_STATE] = 2u;
+            F_ram_051E_N = 0u;
+            F_ram_051F_N2 = 2u;
         }
         return;
     default:                                  /* UpdateCandle_Done */
@@ -63,5 +64,9 @@ void uw_dark_update_candle(void)
 
 unsigned char uw_dark_brightening(void)
 {
-    return nes_ram[NES_BRIGHTENING] != 0u ? 1u : 0u;
+    /* T-418: ownership starts the ordinary one-shot room-entry fade.
+     * The play dispatcher already advances it and freezes world updates. */
+    if (item_upgrade_candle() && F_ram_051F_N2 == 0u)
+        uw_dark_update_candle();
+    return F_ram_051E_N != 0u ? 1u : 0u;
 }

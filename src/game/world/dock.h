@@ -25,5 +25,7 @@
  * him one pixel a frame to Y $7F (grid offset 2) or to $3D, where
  * GoToNextModeFromPlay scrolls north. */
 void world_update_dock(unsigned int slot);
+/* Original body; called only with its actual carried player's context loaded. */
+void world_update_dock_for_loaded_player(unsigned int slot);
 
 #endif

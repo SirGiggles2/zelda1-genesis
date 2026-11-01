@@ -84,7 +84,7 @@ unsigned char c_find_empty_monster_slot(void)
 {
     signed char i;
     for (i = 11; i >= 1; i--) {
-        if (OBJ(NES_OBJ_TYPE, (unsigned char)i) == 0u) {
+        if (F_ram_034F_O2((unsigned char)i) == 0u) {
             ENEMY_NEXT_SHOT_SLOT = (unsigned char)i;
             return (unsigned char)i;
         }
@@ -150,7 +150,7 @@ static const unsigned char k_aquamentus_sprite_offsets_x[6] = {
 
 /* NES ObjGridOffset = $0394 (per-slot distance-remaining counter).
  * Aquamentus reuses it as its move-distance-remaining counter. */
-#define BOSS_OBJ_GRID_OFFSET(slot) OBJ(0x0394u, (slot))
+#define BOSS_OBJ_GRID_OFFSET(slot) F_ram_0394_O4((slot))
 
 void c_aquamentus_move(unsigned int slot)
 {
@@ -256,9 +256,9 @@ void c_aquamentus_draw(unsigned int slot)
         const unsigned char sy = (unsigned char)(
             (unsigned char)ENEMY_Y(slot)
             + k_aquamentus_sprite_offsets_y[(unsigned char)sprite_idx]);
-        RAM(0x0000u) = sx;
-        RAM(0x0001u) = sy;
-        RAM(0x0003u) = attr;
+        F_ram_0000_R = sx;
+        F_ram_0001_R = sy;
+        F_ram_0003_R = attr;
 
         unsigned char tile = k_aquamentus_tiles[tile_idx];
         if (tile == k_aquamentus_tiles[0]) {
@@ -269,8 +269,8 @@ void c_aquamentus_draw(unsigned int slot)
         }
         draw_write_boss_sprite(tile, sx, sy, attr);
         tile_idx = (unsigned char)(tile_idx - 1u);
-        RAM(0x000Au) = tile_idx;
-        RAM(0x000Bu) = (unsigned char)(sprite_idx - 1);
+        F_ZP_TMPA_R = tile_idx;
+        F_ZP_TMPB_R = (unsigned char)(sprite_idx - 1);
     }
 }
 

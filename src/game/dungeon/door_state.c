@@ -83,8 +83,8 @@ static unsigned char dir_of_bit(unsigned char bit)
  * ($6FF / $77F blocks). 0 when LevelInfo holds no UW world-flags pointer. */
 static unsigned short room_flags_addr(unsigned char room_id)
 {
-    unsigned short ptr = (unsigned short)(nes_ram[NES_WORLD_FLAGS_PTR] |
-                          ((unsigned short)nes_ram[NES_WORLD_FLAGS_PTR + 1u] << 8));
+    unsigned short ptr = (unsigned short)(F_ram_6BAF_N2 |
+                          ((unsigned short)F_ram_6BB0_N2 << 8));
     if (ptr < 0x06FFu || ptr > 0x077Fu) return 0u;
     return (unsigned short)(ptr + (room_id & 0x7Fu));
 }
@@ -93,13 +93,13 @@ static unsigned short room_flags_addr(unsigned char room_id)
 static void set_door_flag(unsigned char room_id, unsigned char dir)
 {
     unsigned short a = room_flags_addr(room_id);
-    if (a) nes_ram[a] = (unsigned char)(nes_ram[a] | DOOR_DIR_BIT(dir));
+    if (a) nes_ram[a] = (unsigned char)(nes_ram[a] | DOOR_DIR_BIT(dir)); /* native_ram bulk:dyn_addr */
 }
 
 static void reset_door_flag(unsigned char room_id, unsigned char dir)
 {
     unsigned short a = room_flags_addr(room_id);
-    if (a) nes_ram[a] = (unsigned char)(nes_ram[a] & (unsigned char)~DOOR_DIR_BIT(dir));
+    if (a) nes_ram[a] = (unsigned char)(nes_ram[a] & (unsigned char)~DOOR_DIR_BIT(dir)); /* native_ram bulk:dyn_addr */
 }
 
 /* Shared FindDoorAttrByDoorBit extraction: rooms_dungeons[] LevelBlock
@@ -145,8 +145,8 @@ static void lay_out_doors(unsigned char plane)
 /* TriggerOpenDoor. */
 static void trigger_open_door(unsigned char bit)
 {
-    nes_ram[NES_TRIG_DOOR_DIR] = bit;
-    nes_ram[NES_TRIG_DOOR_CMD] = 0x06u;
+    F_ram_0055_N2 = bit;
+    F_ram_0054_N2 = 0x06u;
 }
 
 /* =========================================================================
@@ -185,18 +185,18 @@ void uw_door_state_room_init(unsigned char level,
      * entering doorway (scroll entries only; other entries start at 0);
      * LayOutRoom then ORs in the room's door flags
      * (AddDoorFlagsToCurOpenedDoors) and runs LayOutDoors. */
-    if (entering) nes_ram[NES_PREV_OPENED_DOORS] = s_cur_opened;
+    if (entering) F_ram_0521_N2 = s_cur_opened;
     s_cur_opened = entering;
     flags_at = room_flags_addr(room_id);
-    if (flags_at) s_cur_opened |= (unsigned char)(nes_ram[flags_at] & 0x0Fu);
+    if (flags_at) s_cur_opened |= (unsigned char)(nes_ram[flags_at] & 0x0Fu); /* native_ram bulk:dyn_addr */
     lay_out_doors(1u);
 
     /* InitMode4 @Method2 (room to room): if Link came through an opened
      * door, command it to close (only shutters change; UpdateDoors). */
     if (entering) {
         unsigned char d = (unsigned char)(entering & s_cur_opened);
-        nes_ram[NES_TRIG_DOOR_DIR] = d;
-        if (d) nes_ram[NES_TRIG_DOOR_CMD] = 0x02u;
+        F_ram_0055_N2 = d;
+        if (d) F_ram_0054_N2 = 0x02u;
     }
 }
 
@@ -225,7 +225,7 @@ void uw_door_state_prelayout_room(unsigned char room_id, unsigned char level,
     read_door_types(level, quest, room_id, s_door_types);
     s_cur_opened = entering;
     flags_at = room_flags_addr(room_id);
-    if (flags_at) s_cur_opened |= (unsigned char)(nes_ram[flags_at] & 0x0Fu);
+    if (flags_at) s_cur_opened |= (unsigned char)(nes_ram[flags_at] & 0x0Fu); /* native_ram bulk:dyn_addr */
     for (dir = 0u; dir < DOOR_DIR_COUNT; dir++) layout_door(dir, 1u);
 
     for (dir = 0u; dir < DOOR_DIR_COUNT; dir++)
@@ -306,16 +306,16 @@ unsigned char uw_door_state_touch(unsigned char dir, unsigned char *keys)
     case DOOR_TYPE_KEY2:
         /* TouchDoorKey. */
         if (s_cur_opened & bit) return 1u;
-        if (nes_ram[NES_TRIG_DOOR_CMD] != 0u) {
+        if (F_ram_0054_N2 != 0u) {
             /* BlockUntilTime: blocked while Link's timer runs. */
-            return (nes_ram[NES_LINK_OBJ_TIMER] != 0u) ? 0u : 1u;
+            return (F_ram_0028_N != 0u) ? 0u : 1u;
         }
-        if (nes_ram[NES_INV_MAGIC_KEY] == 0u) {
+        if (F_ram_0664_N == 0u) {
             if (keys == (unsigned char *)0 || *keys == 0u) return 0u;
             (*keys)--;
         }
         trigger_open_door(bit);
-        nes_ram[NES_LINK_OBJ_TIMER] = 0x20u;
+        F_ram_0028_N = 0x20u;
         return 0u;
 
     case DOOR_TYPE_BOMBABLE:
@@ -324,11 +324,11 @@ unsigned char uw_door_state_touch(unsigned char dir, unsigned char *keys)
 
     case DOOR_TYPE_SHUTTER:
         /* TouchDoorShutter. */
-        if (nes_ram[NES_TRIG_DOOR_CMD] != 0u) return 0u;
+        if (F_ram_0054_N2 != 0u) return 0u;
         if (!(s_cur_opened & bit)) return 0u;
-        if (nes_ram[NES_SHUTTER_PASSED] & bit)
-            return (nes_ram[NES_LINK_OBJ_TIMER] != 0u) ? 0u : 1u;
-        nes_ram[NES_SHUTTER_PASSED] = (unsigned char)(nes_ram[NES_SHUTTER_PASSED] | bit);
+        if (F_ram_0519_N & bit)
+            return (F_ram_0028_N != 0u) ? 0u : 1u;
+        F_ram_0519_N = (unsigned char)(F_ram_0519_N | bit);
         return 1u;
 
     default:
@@ -361,15 +361,15 @@ void uw_door_state_tick(void)
 static void check_shutters(void)
 {
     unsigned char bit;
-    if (nes_ram[NES_SHUTTER_TRIGGER] == 0u) return;
+    if (F_ram_04CE_N == 0u) return;
     for (bit = DOOR_BIT_N; bit != 0u; bit = (unsigned char)(bit >> 1)) {
         if (s_cur_opened & bit) continue;
         if (s_door_types[dir_of_bit(bit)] != DOOR_TYPE_SHUTTER) continue;
-        if (nes_ram[NES_TRIG_DOOR_CMD] != 0u) return;
+        if (F_ram_0054_N2 != 0u) return;
         trigger_open_door(bit);
         return;
     }
-    nes_ram[NES_SHUTTER_TRIGGER] = 0u;
+    F_ram_04CE_N = 0u;
 }
 
 /* One UpdateDoors step's nametable write: the door face's middle 2x2
@@ -406,7 +406,7 @@ static void door_anim_step(unsigned char dir, unsigned char open)
     transfer_buf_note_native_record();
     /* PrepareWriteHorizontalDoorTransferRecords: keys and shutter play
      * the door sound. */
-    if (t >= DOOR_TYPE_KEY) nes_ram[0x0601u] |= 0x04u;   /* PlaySample $04: door */
+    if (t >= DOOR_TYPE_KEY) F_ram_0601 |= 0x04u;   /* PlaySample $04: door */
     prov = (t == DOOR_TYPE_BOMBABLE) ? 8u : (t == DOOR_TYPE_WALL) ? 4u : t;
     face = (unsigned char)(prov - 3u);
     if (open) {
@@ -443,28 +443,28 @@ static void door_anim_step(unsigned char dir, unsigned char open)
 static void update_doors(void)
 {
     unsigned char cmd, a, open, bit, dir, t;
-    if (nes_ram[NES_GAME_MODE] == 0x12u) return;
-    if (nes_ram[NES_DOOR_TIMER] != 0u) return;
-    cmd = nes_ram[NES_TRIG_DOOR_CMD];
+    if (F_ram_0012_N2 == 0x12u) return;
+    if (F_NES_DOOR_TIMER_N != 0u) return;
+    cmd = F_ram_0054_N2;
     if (cmd == 0u) return;
     a = (unsigned char)(cmd & 0x07u);
     if (a & 0x01u) a = (unsigned char)(a >> 1);
-    if (a == 0x02u) nes_ram[NES_LINK_OBJ_TIMER] = 0x30u;
+    if (a == 0x02u) F_ram_0028_N = 0x30u;
     open = (unsigned char)(((unsigned char)((a & 0x03u) - 1u)) & 0x02u);
-    bit = nes_ram[NES_TRIG_DOOR_DIR];
+    bit = F_ram_0055_N2;
     dir = dir_of_bit(bit);
     t = s_door_types[dir];
     if (cmd < 0x05u && t != DOOR_TYPE_SHUTTER) {
         /* Closing a key door or bombable wall does nothing. */
-        nes_ram[NES_TRIG_DOOR_CMD] = 0u;
+        F_ram_0054_N2 = 0u;
         lay_out_doors(0u);
         return;
     }
     door_anim_step(dir, open);
     cmd = (unsigned char)(cmd + 1u);
-    nes_ram[NES_TRIG_DOOR_CMD] = cmd;
+    F_ram_0054_N2 = cmd;
     if (cmd & 0x03u) {
-        nes_ram[NES_DOOR_TIMER] = 0x08u;
+        F_NES_DOOR_TIMER_N = 0x08u;
         return;
     }
     if (cmd == 0x04u) {
@@ -479,7 +479,7 @@ static void update_doors(void)
         }
         s_cur_opened |= bit;
     }
-    nes_ram[NES_TRIG_DOOR_CMD] = 0u;
+    F_ram_0054_N2 = 0u;
     /* NES LayOutDoors writes PlayAreaTiles only; the nametable already
      * shows the final face (door_anim_step wrote its middle 2x2, the only
      * cells any door state change alters). */
@@ -515,7 +515,7 @@ void uw_door_state_open_by_mask(unsigned char dir_mask)
     }
     if (any_new) {
         lay_out_doors(1u);
-        nes_ram[0x0601u] |= 0x04u;   /* PlaySample $04: door */
+        F_ram_0601 |= 0x04u;   /* PlaySample $04: door */
     }
 }
 
@@ -666,7 +666,7 @@ static void layout_door(unsigned char dir, unsigned char plane)
  * key, key 2, shutter) keep their bit (LayOutDoors clears the rest). */
 static void publish_cur_opened_doors(void)
 {
-    nes_ram[NES_CUR_OPENED_DOORS] = s_cur_opened;
+    F_ram_00EE_N2 = s_cur_opened;
 }
 
 void uw_door_state_patch_open_tiles(unsigned char dir)
@@ -688,7 +688,7 @@ unsigned char uw_door_state_has_shutters(void)
  * shutters one command at a time. */
 void uw_door_state_trigger_shutters(void)
 {
-    nes_ram[NES_SHUTTER_TRIGGER] = 1u;
+    F_ram_04CE_N = 1u;
 }
 
 unsigned char uw_door_state_false_timer(void)
@@ -709,6 +709,6 @@ void uw_door_state_copy_persist_for_active_level(unsigned char *dst,
     if (dst == 0 || dst_size == 0u) return;
     for (i = 0u; i < dst_size; i++) {
         unsigned short a = (i < 128u) ? room_flags_addr((unsigned char)i) : 0u;
-        dst[i] = a ? (unsigned char)(nes_ram[a] & 0x0Fu) : 0u;
+        dst[i] = a ? (unsigned char)(nes_ram[a] & 0x0Fu) : 0u; /* native_ram bulk:dyn_addr */
     }
 }

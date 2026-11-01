@@ -386,7 +386,7 @@
       "draw_rule": "narrow_8x16",
       "frame_index": 0,
       "frame_subpal": 0,
-      "nes_dispatch_note": "Phase K cont. #3 (2026-05-18): ring pickup. NES item slot 0x0C / UW_ITEM_ID_RING. Tile $76/$77 from DemoSpritePatterns.dat (only available source; gameplay PPU bank not directly extractable).",
+      "nes_dispatch_note": "Phase K cont. #3 (2026-05-18): ring pickup. NES item slot 0x0C / UW_ITEM_ID_RING. Tile $76/$77 from DemoSpritePatterns.dat tiles 6/7 (the block loads at PPU tile $70; T-056 byte-verified vs live NES CHR in OW and UW: it is the ladder, Anim_ItemFrameTiles slot $0C). Was DemoSpritePatterns tile 118/119 (raw $76 index).",
       "sprite_size_override_reason": "NES 8x16 mode. Tile $76 top + $77 bottom."
     },
     {
@@ -1246,14 +1246,14 @@
           "source": "reference_aldonunez_DemoSpritePatterns_dat",
           "sha256": "phase_k_2026_05_18",
           "flat_pattern": false,
-          "bytes_sha256": "171fb1aa584fd1a0d22978d81647da181fffb9dfd16dece1a087a8d83f59d889"
+          "bytes_sha256": "6af075ef297ec662fa216f6d6e07ba5e65323e890f99f0e4ae051e2d95c0537a"
         },
         "0x77": {
           "ppu_addr": "0x0770",
           "source": "reference_aldonunez_DemoSpritePatterns_dat",
           "sha256": "phase_k_2026_05_18",
           "flat_pattern": false,
-          "bytes_sha256": "204a076204a1be0e58b0aff9cde1771a4fd51868ca0784cd1337871686e2e57d"
+          "bytes_sha256": "78368d2023d86e87b0312d28bcc7b800f8f8439c9da1050e5100287ec8f76302"
         },
         "0xF0": {
           "ppu_addr": "0x0500",
@@ -1931,14 +1931,14 @@
           "source": "reference_aldonunez_DemoSpritePatterns_dat",
           "sha256": "phase_k_2026_05_18",
           "flat_pattern": false,
-          "bytes_sha256": "171fb1aa584fd1a0d22978d81647da181fffb9dfd16dece1a087a8d83f59d889"
+          "bytes_sha256": "6af075ef297ec662fa216f6d6e07ba5e65323e890f99f0e4ae051e2d95c0537a"
         },
         "0x77": {
           "ppu_addr": "0x0770",
           "source": "reference_aldonunez_DemoSpritePatterns_dat",
           "sha256": "phase_k_2026_05_18",
           "flat_pattern": false,
-          "bytes_sha256": "204a076204a1be0e58b0aff9cde1771a4fd51868ca0784cd1337871686e2e57d"
+          "bytes_sha256": "78368d2023d86e87b0312d28bcc7b800f8f8439c9da1050e5100287ec8f76302"
         },
         "0xF0": {
           "ppu_addr": "0x0500",

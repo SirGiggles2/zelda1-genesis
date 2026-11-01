@@ -30,21 +30,21 @@
 #include "../dungeon/uw_render.h"      /* UW collision tables */
 
 #define PB_SLOT 11u                                    /* where the game creates it */
-#define PB_OBJ_X(s)           RAM(0x0070u + (s))
-#define PB_OBJ_Y(s)           RAM(0x0084u + (s))
-#define PB_OBJ_DIR(s)         RAM(0x0098u + (s))
-#define PB_OBJ_STATE(s)       RAM(0x00ACu + (s))
-#define PB_OBJ_TYPE(s)        RAM(0x034Fu + (s))
-#define PB_OBJ_GRID(s)        RAM(0x0394u + (s))
-#define PB_PUSH_TIMER(s)      RAM(0x0412u + (s))     /* ObjPushTimer */
-#define LINK_X                RAM(0x0070u)
-#define LINK_Y                RAM(0x0084u)
-#define LINK_INPUT_DIR        RAM(0x03F8u)             /* ObjInputDir */
-#define ROOM_ALL_DEAD         RAM(0x034Du)
-#define RETURN_TO_BANK4       RAM(0x00F7u)
-#define TUNE1_REQUEST         RAM(0x0602u)
-#define BLOCK_PUSH_COMPLETE   RAM(0x04CFu)
-#define PB_SCRATCH_DIR        RAM(0x000Fu)             /* [0F] MoveObject dir */
+#define PB_OBJ_X(s)           F_ram_0070_R4((s))
+#define PB_OBJ_Y(s)           F_ram_0084_R4((s))
+#define PB_OBJ_DIR(s)         F_ram_0098_R3((s))
+#define PB_OBJ_STATE(s)       F_ram_00AC_R5((s))
+#define PB_OBJ_TYPE(s)        F_ram_034F_R4((s))
+#define PB_OBJ_GRID(s)        F_ram_0394_R3((s))
+#define PB_PUSH_TIMER(s)      F_ram_0412_R3((s))     /* ObjPushTimer */
+#define LINK_X                F_ram_0070_R
+#define LINK_Y                F_ram_0084_R
+#define LINK_INPUT_DIR        F_ram_03F8_R             /* ObjInputDir */
+#define ROOM_ALL_DEAD         F_ram_034D_R
+#define RETURN_TO_BANK4       F_ram_00F7_R
+#define TUNE1_REQUEST         F_ram_0602_R
+#define BLOCK_PUSH_COMPLETE   F_ram_04CF_R
+#define PB_SCRATCH_DIR        F_ram_000F_R             /* [0F] MoveObject dir */
 
 #define PB_TILE_FLOOR  0x74u   /* UpdateBlock0Idle: floor at the source */
 #define PB_TILE_BLOCK  0xB0u   /* UpdateBlock1Moving: block at the target */
@@ -70,9 +70,9 @@ static void pb_refresh_uw_collision(unsigned int slot)
 /* DrawBlock: sprite one pixel above the object's Y, frame 0. */
 static void pb_draw_block(unsigned int slot)
 {
-    RAM(0x0000u) = (unsigned char)PB_OBJ_X(slot);                  /* Anim_FetchObjPos... */
-    RAM(0x0001u) = (unsigned char)((unsigned char)PB_OBJ_Y(slot) - 1u);   /* DEC $01 */
-    RAM(0x000Fu) = 0u;
+    F_ram_0000_R = (unsigned char)PB_OBJ_X(slot);                  /* Anim_FetchObjPos... */
+    F_ram_0001_R = (unsigned char)((unsigned char)PB_OBJ_Y(slot) - 1u);   /* DEC $01 */
+    F_ram_000F_R = 0u;
     draw_object_not_mirrored(0u, slot);
 }
 

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zelda Genesis Builder</title>
+<style>
+  :root { --bg: #f6f4ee; --fg: #1d1d1b; --muted: #5d5a52; --line: #c9c4b6; --accent: #2f6b3a; --error: #a3261b; --panel: #ffffff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171815; --fg: #ecebe6; --muted: #a8a59b; --line: #3a3b35; --accent: #7cc48a; --error: #ff8a7a; --panel: #20211d; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  #zone { display: block; border: 2px dashed var(--line); border-radius: 12px; padding: 32px 16px; text-align: center;
+          background: var(--panel); cursor: pointer; }
+  #zone.over { border-color: var(--accent); }
+  #zone strong { display: block; font-size: 18px; margin-bottom: 4px; }
+  #zone span { color: var(--muted); font-size: 14px; }
+  #pick { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  #files { min-height: 24px; margin: 12px 0; color: var(--muted); word-break: break-word; }
+  #build { width: 100%; padding: 14px; font-size: 18px; font-weight: 600; border: 0; border-radius: 10px;
+           background: var(--accent); color: var(--bg); cursor: pointer; }
+  #build:disabled { opacity: .45; cursor: default; }
+  #status { margin-top: 20px; font-weight: 600; }
+  #status[data-state="error"] { color: var(--error); }
+  #status[data-state="done"] { color: var(--accent); }
+  #details { white-space: pre-wrap; color: var(--muted); font-size: 13px; }
+  #save { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 600; }
+  details { margin-top: 28px; color: var(--muted); font-size: 13px; }
+  #log { white-space: pre-wrap; max-height: 240px; overflow: auto; }
+  footer { margin-top: 32px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Zelda Genesis Builder</h1>
+  <p class="sub">Makes the Sega Genesis version from your own NES Zelda ROM. Everything stays on this computer.</p>
+  <label id="zone" for="pick">
+    <strong>Drop your Zelda NES ROM and the Redux patch here</strong>
+    <span>or click to choose them (USA PRG0 .nes, plus Zelda1_Redux.ips or the Redux .zip)</span>
+    <input id="pick" type="file" multiple>
+  </label>
+  <div id="files"></div>
+  <button id="build" type="button" disabled>Build</button>
+  <div id="status" data-state="idle"></div>
+  <div id="details"></div>
+  <a id="save" hidden>Save ROM</a>
+  <details><summary>Build details</summary><div id="log"></div></details>
+  <footer>The first build downloads its Python runtime once (about 20 MB). <span id="version"></span></footer>
+</main>
+<script type="application/json" id="recipe">__RECIPE__</script>
+<script type="text/plain" id="base">__BASE__</script>
+<script type="text/plain" id="xgmtool">__XGMTOOL__</script>
+<script type="application/json" id="bundle">__BUNDLE__</script>
+<script type="text/plain" id="worker-src">__WORKER__</script>
+<script>__APP__</script>
+</body>
+</html>
